@@ -12,7 +12,7 @@ const config: Configuration = {
   extraResources: [],
   mac: {
     target: [
-      { target: 'dmg', arch: ['arm64', 'x64'] }
+      { target: 'dmg' }
     ],
     icon: 'resources/icon.icns',
     category: 'public.app-category.business',
