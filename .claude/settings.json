@@ -1,0 +1,9 @@
+{
+  "projectName": "SkillCraft IMS",
+  "description": "進銷存管理系統 — Electron + React + Google Sheets + AI Skills",
+  "context": {
+    "dbPathMacOS": "~/Library/Application Support/skillcraft-ims/ims.db",
+    "dbPathWindows": "%APPDATA%\\skillcraft-ims\\ims.db",
+    "techStack": ["Electron 34", "React 19", "TypeScript", "SQLite (better-sqlite3)", "Google Sheets API v4", "Tailwind CSS v3"]
+  }
+}

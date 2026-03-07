@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies (skip native modules)
+        run: npm ci --ignore-scripts
+
+      - name: Type Check (main process)
+        run: npx tsc --noEmit -p tsconfig.node.json
+
+      - name: Type Check (renderer)
+        run: npx tsc --noEmit -p tsconfig.web.json
+
+      - name: Build (without native modules)
+        run: npx electron-vite build
+        env:
+          # Skip postinstall rebuild in CI
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'

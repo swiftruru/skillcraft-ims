@@ -1,0 +1,116 @@
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Plus, Search, Edit2, Trash2 } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { DataTable, type Column } from '@/components/common/DataTable'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import type { Customer, CustomerCreate } from '@/types/schema'
+
+const schema = z.object({
+  name: z.string().min(1, '客戶名稱必填'),
+  contact: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  address: z.string().optional(),
+  notes: z.string().optional()
+})
+type FormValues = z.infer<typeof schema>
+
+export default function Customers() {
+  const queryClient = useQueryClient()
+  const [search, setSearch] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
+  const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
+
+  const { data: customers, isLoading } = useQuery<Customer[]>({
+    queryKey: ['customers', 'all', search],
+    queryFn: () => window.electronAPI.customers.getAll(search || undefined)
+  })
+
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({ resolver: zodResolver(schema) })
+
+  const createMutation = useMutation({
+    mutationFn: (data: CustomerCreate) => window.electronAPI.customers.create(data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['customers'] }); setFormOpen(false); reset() }
+  })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<CustomerCreate> }) => window.electronAPI.customers.update(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['customers'] }); setFormOpen(false); setEditCustomer(null); reset() }
+  })
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => window.electronAPI.customers.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] })
+  })
+
+  const onSubmit = (data: FormValues) => {
+    const payload = { name: data.name, contact: data.contact ?? null, phone: data.phone ?? null, email: data.email ?? null, address: data.address ?? null, notes: data.notes ?? null }
+    if (editCustomer) updateMutation.mutate({ id: editCustomer.id, data: payload })
+    else createMutation.mutate(payload)
+  }
+
+  const openEdit = (c: Customer) => {
+    setEditCustomer(c)
+    reset({ name: c.name, contact: c.contact ?? '', phone: c.phone ?? '', email: c.email ?? '', address: c.address ?? '', notes: c.notes ?? '' })
+    setFormOpen(true)
+  }
+
+  const columns: Column<Customer>[] = [
+    { key: 'name', label: '客戶名稱', sortable: true },
+    { key: 'contact', label: '聯絡人' },
+    { key: 'phone', label: '電話' },
+    { key: 'email', label: 'Email' },
+    { key: 'address', label: '地址' },
+    { key: 'id', label: '', className: 'w-20 text-right', render: (_v, row) => (
+      <div className="flex justify-end gap-1">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(row as unknown as Customer)}><Edit2 className="w-3.5 h-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(row.id as number)}><Trash2 className="w-3.5 h-3.5" /></Button>
+      </div>
+    )}
+  ]
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input className="pl-9" placeholder="搜尋客戶..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Button onClick={() => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '' }); setFormOpen(true) }} className="gap-2">
+          <Plus className="w-4 h-4" />新增客戶
+        </Button>
+      </div>
+      <div className="rounded-lg border border-border bg-card">
+        {isLoading ? <LoadingSpinner /> : (
+          <DataTable data={(customers ?? []) as unknown as Record<string, unknown>[]} columns={columns as unknown as Column<Record<string, unknown>>[]} keyField="id" emptyMessage="沒有客戶" />
+        )}
+      </div>
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editCustomer ? '編輯客戶' : '新增客戶'}</DialogTitle></DialogHeader>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-1.5"><Label>客戶名稱 *</Label><Input {...register('name')} />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5"><Label>聯絡人</Label><Input {...register('contact')} /></div>
+              <div className="space-y-1.5"><Label>電話</Label><Input {...register('phone')} /></div>
+              <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...register('email')} /></div>
+              <div className="space-y-1.5"><Label>地址</Label><Input {...register('address')} /></div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => { setFormOpen(false); setEditCustomer(null) }}>取消</Button>
+              <Button type="submit" disabled={isSubmitting}>{editCustomer ? '更新' : '新增'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)} title="刪除客戶" description="刪除後無法復原。" onConfirm={() => deleteId && deleteMutation.mutate(deleteId)} />
+    </div>
+  )
+}

@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+release/
+*.db
+*.db-shm
+*.db-wal
+.env
+*.json.key
+service-account*.json
+*-service-account.json
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
