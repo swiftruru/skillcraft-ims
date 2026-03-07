@@ -6,8 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  build-macos:
-    name: Build macOS
+  build-macos-arm64:
+    name: Build macOS (Apple Silicon)
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -22,22 +22,48 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Rebuild native modules for Electron
-        run: npx @electron/rebuild -f -w better-sqlite3
+      - name: Rebuild native modules for Electron (arm64)
+        run: npx @electron/rebuild -f -w better-sqlite3 --arch arm64
 
-      - name: Build & Package
-        run: npm run package
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & Package (arm64)
+        run: npm run build && npx electron-builder --mac --arm64 --config electron-builder.config.ts
 
-      - name: Upload macOS artifacts
+      - name: Upload arm64 DMG
         uses: actions/upload-artifact@v4
         with:
-          name: macos-dmg
+          name: macos-arm64-dmg
+          path: release/*.dmg
+
+  build-macos-x64:
+    name: Build macOS (Intel)
+    runs-on: macos-13
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Rebuild native modules for Electron (x64)
+        run: npx @electron/rebuild -f -w better-sqlite3 --arch x64
+
+      - name: Build & Package (x64)
+        run: npm run build && npx electron-builder --mac --x64 --config electron-builder.config.ts
+
+      - name: Upload x64 DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-x64-dmg
           path: release/*.dmg
 
   build-windows:
-    name: Build Windows
+    name: Build Windows (x64)
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -56,11 +82,9 @@ jobs:
         run: npx @electron/rebuild -f -w better-sqlite3
 
       - name: Build & Package
-        run: npm run package
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build && npx electron-builder --win --x64 --config electron-builder.config.ts
 
-      - name: Upload Windows artifacts
+      - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
@@ -68,22 +92,16 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    needs: [build-macos, build-windows]
+    needs: [build-macos-arm64, build-macos-x64, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download macOS artifact
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: macos-dmg
           path: artifacts/
-
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-exe
-          path: artifacts/
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
