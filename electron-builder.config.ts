@@ -19,7 +19,10 @@ const config: Configuration = {
     darkModeSupport: true
   },
   win: {
-    target: [{ target: 'nsis', arch: ['x64'] }],
+    target: [
+      { target: 'nsis', arch: ['x64'] },
+      { target: 'portable', arch: ['x64'] }
+    ],
     icon: 'resources/icon.ico'
   },
   linux: {
