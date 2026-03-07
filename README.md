@@ -30,6 +30,7 @@
 | `/sales-analysis` | 銷售趨勢、產品績效矩陣、客戶洞察 |
 | `/import-data` | 引導 CSV 欄位映射 + 事務性批次匯入 |
 | `/sync-sheets` | Google Sheets 同步操作、日誌查看、錯誤診斷 |
+| `/generate-mock-data` | 自動生成測試資料（支援 S/M/L 規模、3 種情境） |
 
 ### Google Sheets 整合
 - **雙向同步**（商品）：以 `updated_at` 時間戳決定版本，offline-first 設計
@@ -84,7 +85,10 @@ npm install --ignore-scripts
 # 2. 編譯 SQLite native module
 npx @electron/rebuild -f -w better-sqlite3
 
-# 3. 啟動開發模式
+# 3. 下載 Electron 執行檔（首次需要）
+node node_modules/electron/install.js
+
+# 4. 啟動開發模式
 npm run dev
 ```
 
@@ -106,7 +110,7 @@ npm run package
 1. 建立 Google Cloud 專案並啟用 Sheets API
 2. 建立 Service Account 並下載 JSON 金鑰
 3. 建立 Google Sheet 並分享給 Service Account
-4. 在 app 設定頁面填入 Sheet ID 和金鑰路徑
+4. 在 app 設定頁面填入 Sheet ID 和金鑰路徑（支援 `~` 展開，如 `~/.config/skillcraft-ims/service-account.json`）
 
 ---
 
@@ -153,7 +157,7 @@ skillcraft-ims/
 此專案為「**高等程式語言與軟體設計**」課程期末作業，
 整合了課程提供的三個方向：
 
-1. **LLM SKILL 機制** — 5 個 Claude Code skills，真實查詢 SQLite 資料庫
+1. **LLM SKILL 機制** — 6 個 Claude Code skills，真實查詢 SQLite 資料庫
 2. **GitHub + Google Sheet** — 完整 CI 流程 + Google Sheets API 雙向同步
 3. **桌面進銷存系統** — Electron 跨平台應用，完整的採購銷售庫存管理
 

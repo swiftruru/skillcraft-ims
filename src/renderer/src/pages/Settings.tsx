@@ -90,7 +90,11 @@ export default function Settings() {
           <CardTitle className="text-base">Google Sheets 同步設定</CardTitle>
           <CardDescription>
             設定 Service Account 憑證以啟用雙向同步。{' '}
-            <a href="#" className="text-primary underline inline-flex items-center gap-1" onClick={() => {}}>
+            <a
+              href="#"
+              className="text-primary underline inline-flex items-center gap-1"
+              onClick={(e) => { e.preventDefault(); window.electronAPI.shell.openExternal('https://github.com/swiftruru/skillcraft-ims/blob/main/docs/google-cloud-setup.md') }}
+            >
               查看設定說明 <ExternalLink className="w-3 h-3" />
             </a>
           </CardDescription>

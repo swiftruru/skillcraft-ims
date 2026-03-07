@@ -88,6 +88,11 @@ const electronAPI = {
     get: () => ipcRenderer.invoke('settings:get'),
     set: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
     setAll: (data: Record<string, string>) => ipcRenderer.invoke('settings:setAll', data)
+  },
+
+  // Shell
+  shell: {
+    openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url)
   }
 }
 

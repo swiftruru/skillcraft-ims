@@ -1,8 +1,9 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
-import { readFileSync } from 'fs'
 import { mkdirSync } from 'fs'
+import initSchemaSql from './migrations/001_init_schema.sql?raw'
+import seedDataSql from './migrations/002_seed_data.sql?raw'
 
 let db: Database.Database | null = null
 
@@ -40,8 +41,8 @@ async function runMigrations(database: Database.Database): Promise<void> {
   `)
 
   const migrations = [
-    { name: '001_init_schema', file: join(__dirname, 'migrations/001_init_schema.sql') },
-    { name: '002_seed_data', file: join(__dirname, 'migrations/002_seed_data.sql') }
+    { name: '001_init_schema', sql: initSchemaSql },
+    { name: '002_seed_data', sql: seedDataSql }
   ]
 
   for (const migration of migrations) {
@@ -51,8 +52,7 @@ async function runMigrations(database: Database.Database): Promise<void> {
 
     if (!already) {
       try {
-        const sql = readFileSync(migration.file, 'utf-8')
-        database.exec(sql)
+        database.exec(migration.sql)
         database.prepare('INSERT INTO _migrations (name) VALUES (?)').run(migration.name)
         console.log(`[DB] Migration applied: ${migration.name}`)
       } catch (err) {

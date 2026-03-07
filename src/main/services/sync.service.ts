@@ -4,6 +4,11 @@ import { ProductModel } from '../db/models/product.model'
 import { PurchaseModel } from '../db/models/purchase.model'
 import { SaleModel } from '../db/models/sale.model'
 import { getMainWindow } from '../index'
+import { homedir } from 'os'
+
+function expandHome(p: string): string {
+  return p.startsWith('~') ? homedir() + p.slice(1) : p
+}
 
 export class SyncService {
   private static instance: SyncService
@@ -30,7 +35,7 @@ export class SyncService {
     const keyPath = settings['serviceAccountKeyPath']
 
     if (sheetId && keyPath) {
-      await this.sheetsService.initialize(keyPath, sheetId)
+      await this.sheetsService.initialize(expandHome(keyPath), sheetId)
       this.initialized = true
     }
   }

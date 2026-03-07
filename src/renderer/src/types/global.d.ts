@@ -65,6 +65,9 @@ declare global {
         set(key: string, value: string): Promise<boolean>
         setAll(data: Record<string, string>): Promise<boolean>
       }
+      shell: {
+        openExternal(url: string): Promise<void>
+      }
     }
   }
 }

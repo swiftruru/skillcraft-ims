@@ -1,4 +1,4 @@
-import { ipcMain, app } from 'electron'
+import { ipcMain, app, shell } from 'electron'
 import { getDb } from '../db'
 import { join } from 'path'
 
@@ -37,5 +37,9 @@ export function registerSettingsIpc(): void {
       }
     })()
     return true
+  })
+
+  ipcMain.handle('shell:openExternal', (_e, url: string) => {
+    shell.openExternal(url)
   })
 }
