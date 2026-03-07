@@ -14,13 +14,13 @@ const config: Configuration = {
     target: [
       { target: 'dmg', arch: ['arm64', 'x64'] }
     ],
-    icon: 'resources/icons/icon.icns',
+    icon: 'resources/icon.icns',
     category: 'public.app-category.business',
     darkModeSupport: true
   },
   win: {
     target: [{ target: 'nsis', arch: ['x64'] }],
-    icon: 'resources/icons/icon.ico'
+    icon: 'resources/icon.ico'
   },
   linux: {
     target: ['AppImage'],
@@ -29,8 +29,8 @@ const config: Configuration = {
   nsis: {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
-    installerIcon: 'resources/icons/icon.ico',
-    installerHeaderIcon: 'resources/icons/icon.ico'
+    installerIcon: 'resources/icon.ico',
+    installerHeaderIcon: 'resources/icon.ico'
   },
   dmg: {
     title: 'SkillCraft IMS',
