@@ -6,9 +6,19 @@
 [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite)](https://www.sqlite.org/)
 [![Google Sheets](https://img.shields.io/badge/Google%20Sheets-API-34A853?logo=google-sheets)](https://developers.google.com/sheets)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/swiftruru/skillcraft-ims?logo=github)](https://github.com/swiftruru/skillcraft-ims/releases/latest)
 
 > 跨平台桌面進銷存管理系統，整合 Claude Code AI Skill、Google Sheets 雲端同步，
 > 展示「高等程式語言與軟體設計」課程三個核心方向的完整整合。
+
+## 下載
+
+| 平台 | 下載連結 |
+| --- | --- |
+| macOS (Apple Silicon / Intel) | [下載 .dmg](https://github.com/swiftruru/skillcraft-ims/releases/latest) |
+| Windows (x64) | [下載 .exe](https://github.com/swiftruru/skillcraft-ims/releases/latest) |
+
+> 所有版本：[github.com/swiftruru/skillcraft-ims/releases](https://github.com/swiftruru/skillcraft-ims/releases)
 
 ---
 
@@ -26,12 +36,14 @@
 ## 功能特色
 
 ### 核心進銷存功能
+
 - **商品管理** — SKU、分類、進售價、庫存、補貨點警示
 - **採購管理** — 採購單建立、確認收貨（自動更新庫存）、供應商管理
 - **銷售管理** — 銷售單建立、完成銷售（事務性庫存扣除）、客戶管理
 - **報表分析** — 銷售趨勢、庫存分佈、產品銷售排行、低庫存警示
 
 ### Google Sheets 整合
+
 - **雙向同步**（商品）：以 `updated_at` 時間戳決定版本，offline-first 設計
 - **推送同步**（採購單、銷售單、每日報表快照）
 - **自動排程**：可設定每 N 分鐘自動同步
@@ -47,7 +59,7 @@ Skill 存放於 `.claude/commands/`，每個 Skill 檔案包含 YAML frontmatter
 
 ### Skill 運作方式
 
-```
+```text
 開發者提出需求
       │
       ▼
@@ -112,7 +124,7 @@ claude
 
 ## 技術架構
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │             Renderer (React 19)              │
 │  Dashboard │ Products │ Purchases │ Sales    │
