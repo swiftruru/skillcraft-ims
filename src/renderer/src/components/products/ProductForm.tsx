@@ -21,8 +21,17 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { Wand2 } from 'lucide-react'
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@/lib/constants'
 import type { Product } from '@/types/schema'
+
+const MOCK_DATA = [
+  { sku: '', name: 'USB-C 充電器 65W', category: '電子產品', sell_price: 890, buy_price: 450, stock_qty: 50, reorder_pt: 10, unit: '個', description: '支援 PD 快充，適用於筆電及手機' },
+  { sku: '', name: '無線藍牙滑鼠', category: '電子產品', sell_price: 590, buy_price: 280, stock_qty: 30, reorder_pt: 5, unit: '個', description: '2.4G 無線連接，長效電池' },
+  { sku: '', name: 'A4 影印紙 500 張', category: '辦公用品', sell_price: 180, buy_price: 90, stock_qty: 200, reorder_pt: 30, unit: '包', description: '80g 高白紙，適合雷射/噴墨印表機' },
+  { sku: '', name: '有機燕麥片 500g', category: '食品', sell_price: 160, buy_price: 80, stock_qty: 150, reorder_pt: 20, unit: '包', description: '無農藥認證，早餐首選' },
+  { sku: '', name: '工業手套 L 號', category: '其他', sell_price: 120, buy_price: 55, stock_qty: 80, reorder_pt: 15, unit: '雙', description: '防靜電、耐磨設計' },
+]
 
 const schema = z.object({
   sku: z.string().min(1, 'SKU 必填'),
@@ -111,6 +120,12 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
   })
 
   const onSubmit = (data: FormValues) => mutation.mutate(data)
+
+  const fillMock = () => {
+    const m = MOCK_DATA[Math.floor(Math.random() * MOCK_DATA.length)]
+    const prefix = m.category === '電子產品' ? 'ELEC' : m.category === '辦公用品' ? 'OFF' : m.category === '食品' ? 'FOOD' : 'MISC'
+    reset({ ...m, sku: `${prefix}-${Math.floor(Math.random() * 900 + 100)}` })
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -225,6 +240,11 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
           </div>
 
           <DialogFooter className="gap-2">
+            {!isEdit && (
+              <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
+                <Wand2 className="w-3.5 h-3.5" />Mock 資料
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               取消
             </Button>

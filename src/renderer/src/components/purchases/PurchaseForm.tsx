@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Wand2 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '@/components/ui/dialog'
@@ -70,6 +70,18 @@ export function PurchaseForm({ open, onOpenChange }: { open: boolean; onOpenChan
 
   const items = watch('items')
   const total = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0), 0)
+
+  const fillMock = () => {
+    const firstProduct = products?.[0]
+    reset({
+      supplier_id: suppliers?.[0]?.id ?? null,
+      order_date: today,
+      notes: '測試採購單，請確認品項後送出',
+      items: firstProduct
+        ? [{ product_id: firstProduct.id, quantity: 10, unit_price: firstProduct.buy_price }]
+        : [{ product_id: 0, quantity: 10, unit_price: 100 }]
+    })
+  }
 
   const handleProductChange = (index: number, productId: string) => {
     const pid = parseInt(productId)
@@ -171,6 +183,9 @@ export function PurchaseForm({ open, onOpenChange }: { open: boolean; onOpenChan
           </div>
 
           <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
+              <Wand2 className="w-3.5 h-3.5" />Mock 資料
+            </Button>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
             <Button type="submit" disabled={isSubmitting || mutation.isPending}>建立採購單</Button>
           </DialogFooter>

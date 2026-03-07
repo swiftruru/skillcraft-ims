@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2 } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Wand2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -51,6 +51,17 @@ export default function Suppliers() {
     mutationFn: (id: number) => window.electronAPI.suppliers.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['suppliers'] })
   })
+
+  const MOCK_SUPPLIERS = [
+    { name: '台灣科技器材有限公司', contact: '陳經理', phone: '02-2345-6789', email: 'chen@techsupply.tw', address: '台北市中山區南京東路三段100號', notes: '' },
+    { name: '全球辦公用品股份有限公司', contact: '林副理', phone: '03-456-7890', email: 'lin@globalofficetw.com', address: '桃園市中壢區中央西路二段200號', notes: '' },
+    { name: '南方食品原料行', contact: '黃老闆', phone: '06-789-0123', email: 'huang@southfood.tw', address: '台南市東區東門路一段50號', notes: '' },
+  ]
+
+  const fillMock = () => {
+    const m = MOCK_SUPPLIERS[Math.floor(Math.random() * MOCK_SUPPLIERS.length)]
+    reset(m)
+  }
 
   const onSubmit = (data: FormValues) => {
     const payload = { name: data.name, contact: data.contact ?? null, phone: data.phone ?? null, email: data.email ?? null, address: data.address ?? null, notes: data.notes ?? null }
@@ -112,6 +123,11 @@ export default function Suppliers() {
               <div className="space-y-1.5"><Label>地址</Label><Input {...register('address')} /></div>
             </div>
             <DialogFooter className="gap-2">
+              {!editSupplier && (
+                <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
+                  <Wand2 className="w-3.5 h-3.5" />Mock 資料
+                </Button>
+              )}
               <Button type="button" variant="outline" onClick={() => { setFormOpen(false); setEditSupplier(null) }}>取消</Button>
               <Button type="submit" disabled={isSubmitting}>{editSupplier ? '更新' : '新增'}</Button>
             </DialogFooter>

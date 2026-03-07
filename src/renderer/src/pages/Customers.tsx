@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2 } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Wand2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -49,6 +49,17 @@ export default function Customers() {
     mutationFn: (id: number) => window.electronAPI.customers.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] })
   })
+
+  const MOCK_CUSTOMERS = [
+    { name: '中小型電商公司', contact: '王經理', phone: '02-8765-4321', email: 'wang@ecom.tw', address: '台北市信義區松仁路100號', notes: '' },
+    { name: '個人工作室設計師', contact: '李設計師', phone: '0912-345-678', email: 'li@studio.tw', address: '台北市大安區敦化南路二段88號', notes: '' },
+    { name: '大型連鎖零售商', contact: '張副總', phone: '03-234-5678', email: 'chang@retail.tw', address: '新竹市東區光復路二段101號', notes: '' },
+  ]
+
+  const fillMock = () => {
+    const m = MOCK_CUSTOMERS[Math.floor(Math.random() * MOCK_CUSTOMERS.length)]
+    reset(m)
+  }
 
   const onSubmit = (data: FormValues) => {
     const payload = { name: data.name, contact: data.contact ?? null, phone: data.phone ?? null, email: data.email ?? null, address: data.address ?? null, notes: data.notes ?? null }
@@ -104,6 +115,11 @@ export default function Customers() {
               <div className="space-y-1.5"><Label>地址</Label><Input {...register('address')} /></div>
             </div>
             <DialogFooter className="gap-2">
+              {!editCustomer && (
+                <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
+                  <Wand2 className="w-3.5 h-3.5" />Mock 資料
+                </Button>
+              )}
               <Button type="button" variant="outline" onClick={() => { setFormOpen(false); setEditCustomer(null) }}>取消</Button>
               <Button type="submit" disabled={isSubmitting}>{editCustomer ? '更新' : '新增'}</Button>
             </DialogFooter>
