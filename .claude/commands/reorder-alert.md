@@ -1,21 +1,13 @@
-# reorder-alert
-
-> 掃描低庫存商品，計算 EOQ 補貨建議，並可產生草稿採購單。
-
-## 說明
-
-此 Skill 會查詢所有低於補貨點的商品，根據歷史銷售量計算
-建議補貨數量（簡易 EOQ 模型），並提供優先序排列的補貨清單。
-
-## 使用方式
-
-在 Claude Code 中輸入：`/reorder-alert`
-
+---
+name: reorder-alert
+description: 當使用者要求查看低庫存警示、計算補貨量或產生採購建議時觸發。
 ---
 
-## 執行步驟
+## 補貨警示規範
 
-1. **查詢低庫存商品與銷售速率**
+1. **資料庫路徑**：永遠使用 `~/Library/Application Support/skillcraft-ims/ims.db`，以 `stock_qty <= reorder_pt` 篩選需補貨商品。
+
+2. **低庫存查詢**：從 SQLite 取得低庫存商品列表，並計算過去 90 天平均日銷量。
 
    ```bash
    DB=~/Library/Application\ Support/skillcraft-ims/ims.db
@@ -51,32 +43,19 @@
    " -column -header
    ```
 
-2. **計算建議補貨量**
-
-   對每個低庫存商品計算：
+3. **補貨量計算**：對每項低庫存商品計算以下數值，取最大值作為建議補貨量。
    - **剩餘天數** = `stock_qty / avg_daily_sales`（若 avg_daily_sales > 0）
    - **30 天需求量** = `avg_daily_sales * 30`
-   - **建議補貨量** = `MAX(reorder_pt * 2 - stock_qty, 30天需求量, 缺口)`
+   - **建議補貨量** = `MAX(reorder_pt * 2 - stock_qty, 30天需求量)`
 
-3. **呈現優先序補貨表**
-
-   以 Markdown 表格輸出，依優先序排列：
-
-   ```
-   🔴 CRITICAL（立即補貨）
-   ⚠️  WARNING（近期補貨）
-   ```
+4. **輸出格式**：以 Markdown 表格依優先序分組輸出，CRITICAL 為立即補貨，WARNING 為近期補貨。
 
    | 優先序 | SKU | 商品 | 現有庫存 | 補貨點 | 剩餘天數 | 建議補貨量 | 預估成本 |
    |--------|-----|------|----------|--------|----------|------------|----------|
 
-4. **詢問是否產生採購草稿**
+5. **採購草稿詢問**：表格輸出後詢問「是否要依供應商分組，產生草稿採購單摘要？」，若確認則查詢供應商資訊並輸出分組草稿，最後說明如何在 app 中建立正式採購單。
 
-   問：「是否要依供應商分組，產生草稿採購單摘要？」
-
-   若確認：
    ```bash
-   # 查詢供應商資訊（由使用者指定或從最近採購推斷）
    sqlite3 "$DB" "
    SELECT s.name as supplier, p.sku, p.name, p.buy_price
    FROM products p
@@ -91,5 +70,3 @@
    ORDER BY s.name, p.name
    " -column -header
    ```
-
-   輸出依供應商分組的草稿採購單，並說明如何在 app 中建立正式採購單。

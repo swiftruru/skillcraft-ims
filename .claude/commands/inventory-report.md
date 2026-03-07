@@ -1,33 +1,17 @@
-# inventory-report
-
-> 產生 AI 驅動的庫存分析報告，涵蓋類別分佈、利潤分析與補貨建議。
-
-## 說明
-
-此 Skill 會對 SkillCraft IMS 的 SQLite 資料庫執行真實查詢，
-自動分析目前庫存狀況，並以結構化的 Markdown 報告呈現。
-
-## 使用方式
-
-在 Claude Code 中輸入：`/inventory-report`
-
+---
+name: inventory-report
+description: 當使用者要求產生庫存分析報告、查看庫存狀況或分析庫存健康度時觸發。
 ---
 
-## 執行步驟
+## 庫存報告規範
 
-1. **找到資料庫路徑**
+1. **資料庫路徑**：永遠使用 `~/Library/Application Support/skillcraft-ims/ims.db`（macOS），執行前先確認檔案存在。
 
-   macOS：`~/Library/Application Support/skillcraft-ims/ims.db`
-   Windows：`%APPDATA%\skillcraft-ims\ims.db`
-
-   用 Bash 確認資料庫存在：
    ```bash
    ls ~/Library/Application\ Support/skillcraft-ims/ims.db
    ```
 
-2. **執行庫存查詢**
-
-   對資料庫執行以下 SQL 查詢（使用 sqlite3 CLI）：
+2. **必查四組數據**：依序對資料庫執行類別摘要、總覽統計、低庫存商品、前 5 大庫存值商品四組查詢。
 
    ```bash
    DB=~/Library/Application\ Support/skillcraft-ims/ims.db
@@ -76,20 +60,17 @@
    " -column -header
    ```
 
-3. **分析數據並產生報告**
-
-   根據查詢結果，撰寫以下格式的 Markdown 報告：
+3. **報告格式**：依查詢結果輸出 Markdown 報告，含今日日期，以繁體中文撰寫。
 
    ```markdown
    # 庫存分析報告
-   **日期**：[今天的日期]
+   **日期**：YYYY-MM-DD
    **系統**：SkillCraft IMS
 
    ## 執行摘要
    [2-3 句話總結庫存健康狀況]
 
    ## 類別分佈
-
    | 類別 | 商品數 | 庫存單位 | 庫存成本 | 零售值 | 平均毛利率 |
    |------|--------|----------|----------|--------|------------|
    [填入查詢結果]
@@ -102,12 +83,9 @@
    [分析哪些商品/類別有最佳/最差毛利]
 
    ## 建議行動
-   1. [具體建議 1]
-   2. [具體建議 2]
-   3. [具體建議 3]
+   1. [具體建議]
+   2. [具體建議]
+   3. [具體建議]
    ```
 
-4. **詢問是否儲存報告**
-
-   問：「是否要將此報告儲存到 `docs/reports/inventory-YYYY-MM-DD.md`？」
-   若確認，建立 `docs/reports/` 目錄並寫入報告。
+4. **儲存詢問**：報告產生後詢問是否儲存至 `docs/reports/inventory-YYYY-MM-DD.md`，若確認則建立目錄並寫入。
