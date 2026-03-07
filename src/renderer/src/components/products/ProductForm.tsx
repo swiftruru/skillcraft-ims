@@ -30,7 +30,7 @@ const MOCK_DATA = [
   { sku: '', name: '無線藍牙滑鼠', category: '電腦周邊', sell_price: 590, buy_price: 280, stock_qty: 30, reorder_pt: 5, unit: '個', description: '2.4G 無線連接，長效電池' },
   { sku: '', name: 'A4 影印紙 500 張', category: '文具', sell_price: 180, buy_price: 90, stock_qty: 200, reorder_pt: 30, unit: '包', description: '80g 高白紙，適合雷射/噴墨印表機' },
   { sku: '', name: '氣泡布捲 50m', category: '包裝材料', sell_price: 320, buy_price: 150, stock_qty: 80, reorder_pt: 10, unit: '捲', description: '防震氣泡布，適合易碎品包裝' },
-  { sku: '', name: '工業手套 L 號', category: '雜項', sell_price: 120, buy_price: 55, stock_qty: 80, reorder_pt: 15, unit: '雙', description: '防靜電、耐磨設計' },
+  { sku: '', name: '工業手套 L 號', category: '雜項', sell_price: 120, buy_price: 55, stock_qty: 80, reorder_pt: 15, unit: '件', description: '防靜電、耐磨設計' },
 ]
 
 const schema = z.object({
