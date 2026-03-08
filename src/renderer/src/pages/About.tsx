@@ -1,4 +1,4 @@
-import { ExternalLink, Mail, Globe, Github, GraduationCap, BookOpen, Cpu } from 'lucide-react'
+import { ExternalLink, Mail, Globe, Github, GraduationCap, BookOpen, Cpu, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const techStack = [
@@ -23,10 +23,34 @@ export default function About() {
           <Cpu className="w-8 h-8" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight">SkillCraft IMS</h1>
-        <p className="text-sm text-muted-foreground">進銷存管理系統 · v0.1.0</p>
+        <p className="text-sm text-muted-foreground">Inventory Management System · v0.1.0</p>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           整合 Electron 桌面應用、SQLite 本地資料庫、Google Sheets 雲端同步與 Claude Code AI Skills 的跨平台進銷存系統。
         </p>
+      </div>
+
+      {/* Name Concept */}
+      <div className="rounded-lg border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5" />
+          命名概念
+        </h2>
+        <div className="space-y-3 text-sm">
+          <div className="flex items-start gap-4">
+            <span className="font-mono font-bold text-primary w-24 shrink-0">SkillCraft</span>
+            <div>
+              <span className="text-foreground">SKILL + Craft（手藝）</span>
+              <span className="text-muted-foreground ml-2">— 強調「用 AI 技能打造系統」的匠人感</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <span className="font-mono font-bold text-primary w-24 shrink-0">IMS</span>
+            <div>
+              <span className="text-foreground">Inventory Management System</span>
+              <span className="text-muted-foreground ml-2">— 業界標準縮寫，專業但不失創意</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Author */}
@@ -37,7 +61,7 @@ export default function About() {
             <GraduationCap className="w-4 h-4 text-primary mt-0.5 shrink-0" />
             <div>
               <div className="text-sm font-medium">潘昱如</div>
-              <div className="text-xs text-muted-foreground">國立台北護理健康大學 · 資訊管理學系</div>
+              <div className="text-xs text-muted-foreground">國立台北護理健康大學 · 資訊管理系</div>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -56,6 +80,15 @@ export default function About() {
               onClick={() => openUrl('https://swift.moe')}
             >
               https://swift.moe
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <Github className="w-4 h-4 text-primary shrink-0" />
+            <button
+              className="text-sm text-primary hover:underline"
+              onClick={() => openUrl('https://github.com/swiftruru/')}
+            >
+              github.com/swiftruru
             </button>
           </div>
         </div>
@@ -78,7 +111,7 @@ export default function About() {
             <span className="text-muted-foreground">學校</span>
             <span>國立台北護理健康大學</span>
             <span className="text-muted-foreground">系所</span>
-            <span>資訊管理學系</span>
+            <span>資訊管理系</span>
           </div>
         </div>
       </div>
@@ -102,7 +135,7 @@ export default function About() {
           variant="outline"
           size="sm"
           className="gap-2"
-          onClick={() => openUrl('https://github.com')}
+          onClick={() => openUrl('https://github.com/swiftruru/')}
         >
           <Github className="w-4 h-4" />
           GitHub
