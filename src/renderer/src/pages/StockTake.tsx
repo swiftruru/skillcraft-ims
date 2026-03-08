@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ArrowLeft, CheckCircle2, Trash2, ClipboardCheck } from 'lucide-react'
+import { Plus, ArrowLeft, CheckCircle2, Trash2, ClipboardCheck, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -161,6 +161,14 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
     onError: (e) => toast({ title: (e as Error).message, variant: 'destructive' })
   })
 
+  const handleMockFill = async () => {
+    const uncounted = take?.items.filter((i) => i.counted_qty === null) ?? []
+    if (!uncounted.length) return
+    await Promise.all(uncounted.map((i) => window.electronAPI.stocktake.updateItem(i.id, i.system_qty)))
+    queryClient.invalidateQueries({ queryKey: ['stocktakes', id] })
+    toast({ title: `已填入 ${uncounted.length} 項（與系統庫存相符）`, variant: 'success' })
+  }
+
   const handleInput = useCallback((item: StockTakeItem, raw: string) => {
     const val = raw === '' ? null : parseInt(raw)
     if (val !== null && (isNaN(val) || val < 0)) return
@@ -191,14 +199,25 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
           <p className="text-xs text-muted-foreground mt-0.5">{formatDate(take.created_at)}</p>
         </div>
         {isDraft && (
-          <Button
-            onClick={() => setConfirmComplete(true)}
-            disabled={completeMutation.isPending}
-            className="gap-2"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            完成盤點
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleMockFill}
+              className="gap-2 text-muted-foreground"
+              title="快速填入：將所有未盤項目設為與系統庫存相符"
+            >
+              <Wand2 className="w-4 h-4" />
+              Mock填入
+            </Button>
+            <Button
+              onClick={() => setConfirmComplete(true)}
+              disabled={completeMutation.isPending}
+              className="gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              完成盤點
+            </Button>
+          </div>
         )}
       </div>
 
@@ -231,6 +250,7 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
                 <td className="px-4 py-2 text-right">
                   {isDraft ? (
                     <input
+                      key={item.counted_qty ?? 'null'}
                       type="number"
                       min={0}
                       defaultValue={item.counted_qty ?? ''}
