@@ -12,6 +12,8 @@ declare global {
         delete(id: number): Promise<boolean>
         getCategories(): Promise<string[]>
         getLowStock(): Promise<import('./schema').LowStockItem[]>
+        adjust(productId: number, delta: number, reason: string, note?: string): Promise<import('./schema').Product>
+        getAdjustmentHistory(productId: number): Promise<import('./schema').InventoryAdjustment[]>
       }
       suppliers: {
         getAll(search?: string): Promise<import('./schema').Supplier[]>
@@ -64,6 +66,9 @@ declare global {
         get(): Promise<import('./schema').AppSettings>
         set(key: string, value: string): Promise<boolean>
         setAll(data: Record<string, string>): Promise<boolean>
+      }
+      search: {
+        global(query: string): Promise<import('./schema').SearchResult[]>
       }
       shell: {
         openExternal(url: string): Promise<void>

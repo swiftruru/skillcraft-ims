@@ -11,7 +11,11 @@ const electronAPI = {
     update: (id: number, data: unknown) => ipcRenderer.invoke('products:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('products:delete', id),
     getCategories: () => ipcRenderer.invoke('products:getCategories'),
-    getLowStock: () => ipcRenderer.invoke('products:getLowStock')
+    getLowStock: () => ipcRenderer.invoke('products:getLowStock'),
+    adjust: (productId: number, delta: number, reason: string, note?: string) =>
+      ipcRenderer.invoke('products:adjust', productId, delta, reason, note),
+    getAdjustmentHistory: (productId: number) =>
+      ipcRenderer.invoke('products:getAdjustmentHistory', productId)
   },
 
   // Suppliers
@@ -88,6 +92,11 @@ const electronAPI = {
     get: () => ipcRenderer.invoke('settings:get'),
     set: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
     setAll: (data: Record<string, string>) => ipcRenderer.invoke('settings:setAll', data)
+  },
+
+  // Global search
+  search: {
+    global: (query: string) => ipcRenderer.invoke('search:global', query)
   },
 
   // Shell

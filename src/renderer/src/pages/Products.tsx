@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, AlertTriangle } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -8,6 +8,7 @@ import { DataTable, type Column } from '@/components/common/DataTable'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ProductForm } from '@/components/products/ProductForm'
+import { AdjustInventoryDialog } from '@/components/products/AdjustInventoryDialog'
 import { formatCurrency, formatNumber } from '@/lib/utils'
 import type { Product } from '@/types/schema'
 
@@ -17,6 +18,7 @@ export default function Products() {
   const [formOpen, setFormOpen] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [adjustProduct, setAdjustProduct] = useState<Product | null>(null)
 
   const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ['products', 'all', search],
@@ -66,14 +68,23 @@ export default function Products() {
     {
       key: 'id',
       label: '',
-      className: 'w-20 text-right',
+      className: 'w-28 text-right',
       render: (_v, row) => (
         <div className="flex justify-end gap-1">
           <Button
             variant="ghost"
             size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            title="庫存調整"
+            onClick={() => setAdjustProduct(row as unknown as Product)}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-7 w-7"
-            onClick={() => { setEditProduct(row); setFormOpen(true) }}
+            onClick={() => { setEditProduct(row as unknown as Product); setFormOpen(true) }}
           >
             <Edit2 className="w-3.5 h-3.5" />
           </Button>
@@ -81,7 +92,7 @@ export default function Products() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={() => setDeleteId(row.id)}
+            onClick={() => setDeleteId(row.id as number)}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
@@ -139,6 +150,13 @@ export default function Products() {
           if (!open) setEditProduct(null)
         }}
         product={editProduct}
+      />
+
+      {/* Adjust Inventory Dialog */}
+      <AdjustInventoryDialog
+        open={adjustProduct !== null}
+        onOpenChange={(open) => !open && setAdjustProduct(null)}
+        product={adjustProduct}
       />
 
       {/* Delete Confirm */}

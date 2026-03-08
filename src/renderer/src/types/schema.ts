@@ -169,3 +169,23 @@ export interface AppSettings {
   autoSyncEnabled: boolean
   dbPath: string
 }
+
+export interface InventoryAdjustment {
+  id: number
+  product_id: number
+  delta: number
+  reason: string
+  note: string | null
+  adjusted_by: string
+  adjusted_at: string
+  product_name?: string
+  sku?: string
+}
+
+export interface SearchResult {
+  type: 'product' | 'supplier' | 'customer' | 'purchase' | 'sale'
+  id: number
+  title: string
+  subtitle: string
+  meta?: string
+}

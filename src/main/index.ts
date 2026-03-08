@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, nativeTheme } from 'electron'
+import { app, shell, BrowserWindow, nativeTheme, Notification } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase } from './db'
@@ -6,6 +6,24 @@ import { registerAllIpcHandlers } from './ipc'
 import { SchedulerService } from './services/scheduler.service'
 
 let mainWindow: BrowserWindow | null = null
+
+function checkLowStockNotification(): void {
+  if (!Notification.isSupported()) return
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { ProductModel } = require('./db/models/product.model') as typeof import('./db/models/product.model')
+    const items = ProductModel.getLowStockItems() as { name: string; stock_qty: number }[]
+    if (items.length === 0) return
+    const outOfStock = items.filter((i) => i.stock_qty === 0).length
+    const body =
+      outOfStock > 0
+        ? `${items.length} 項低庫存，其中 ${outOfStock} 項已售完`
+        : `${items.length} 項商品庫存低於補貨點，請盡快補貨`
+    new Notification({ title: 'SkillCraft IMS — 庫存警示', body, silent: false }).show()
+  } catch {
+    // Ignore notification errors silently
+  }
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -27,6 +45,7 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow!.show()
+    checkLowStockNotification()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -57,6 +76,14 @@ app.whenReady().then(async () => {
 
   // Force dark mode
   nativeTheme.themeSource = 'dark'
+
+  // Set dock icon (dev mode uses default Electron icon)
+  if (process.platform === 'darwin' && app.dock) {
+    const { nativeImage } = await import('electron')
+    const iconPath = join(__dirname, '../../resources/icon.png')
+    const icon = nativeImage.createFromPath(iconPath)
+    if (!icon.isEmpty()) app.dock.setIcon(icon)
+  }
 
   // Initialize SQLite database
   await initDatabase()

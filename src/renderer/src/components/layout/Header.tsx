@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDate } from '@/lib/utils'
 
 type SyncState = 'idle' | 'running' | 'success' | 'error'
 
-export function Header({ title }: { title: string }) {
+export function Header({ title, onSearchClick }: { title: string; onSearchClick?: () => void }) {
   const queryClient = useQueryClient()
   const [syncState, setSyncState] = useState<SyncState>('idle')
   const [syncMessage, setSyncMessage] = useState('')
@@ -59,6 +59,16 @@ export function Header({ title }: { title: string }) {
       <h1 className="text-base font-semibold text-foreground titlebar-no-drag">{title}</h1>
 
       <div className="flex items-center gap-3 titlebar-no-drag">
+        {/* Global search button */}
+        <button
+          onClick={onSearchClick}
+          className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-3 py-1.5 hover:bg-muted transition-colors w-48"
+        >
+          <Search className="w-3 h-3" />
+          <span>搜尋...</span>
+          <kbd className="ml-auto text-[10px] bg-background border border-border rounded px-1 py-0.5">⌘K</kbd>
+        </button>
+
         {/* Low stock alert */}
         {lowStockCount > 0 && (
           <div className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 px-2.5 py-1 rounded-full">

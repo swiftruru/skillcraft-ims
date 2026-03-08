@@ -6,6 +6,7 @@ import { registerSalesIpc } from './sales.ipc'
 import { registerReportsIpc } from './reports.ipc'
 import { registerSyncIpc } from './sync.ipc'
 import { registerSettingsIpc } from './settings.ipc'
+import { registerSearchIpc } from './search.ipc'
 
 export function registerAllIpcHandlers(): void {
   registerProductsIpc()
@@ -16,4 +17,5 @@ export function registerAllIpcHandlers(): void {
   registerReportsIpc()
   registerSyncIpc()
   registerSettingsIpc()
+  registerSearchIpc()
 }

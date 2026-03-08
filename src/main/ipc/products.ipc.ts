@@ -29,4 +29,12 @@ export function registerProductsIpc(): void {
   ipcMain.handle('products:getLowStock', () => {
     return ProductModel.getLowStockItems()
   })
+
+  ipcMain.handle('products:adjust', (_e, productId: number, delta: number, reason: string, note?: string) => {
+    return ProductModel.adjust(productId, delta, reason, note)
+  })
+
+  ipcMain.handle('products:getAdjustmentHistory', (_e, productId: number) => {
+    return ProductModel.getAdjustmentHistory(productId)
+  })
 }

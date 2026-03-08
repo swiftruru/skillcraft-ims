@@ -83,5 +83,39 @@ export const ProductModel = {
          FROM products WHERE stock_qty <= reorder_pt ORDER BY (stock_qty * 1.0 / MAX(reorder_pt, 1)) ASC`
       )
       .all()
+  },
+
+  adjust(productId: number, delta: number, reason: string, note?: string): Product {
+    const db = getDb()
+    const product = this.findById(productId)
+    if (!product) throw new Error(`Product ${productId} not found`)
+
+    const newQty = product.stock_qty + delta
+    if (newQty < 0) throw new Error(`庫存不足，無法調整：目前庫存 ${product.stock_qty}，調整量 ${delta}`)
+
+    const doAdjust = db.transaction(() => {
+      db.prepare('UPDATE products SET stock_qty = ?, updated_at = ? WHERE id = ?').run(
+        newQty,
+        new Date().toISOString(),
+        productId
+      )
+      db.prepare(
+        'INSERT INTO inventory_adjustments (product_id, delta, reason, note) VALUES (?, ?, ?, ?)'
+      ).run(productId, delta, reason, note ?? null)
+    })
+
+    doAdjust()
+    return this.findById(productId)!
+  },
+
+  getAdjustmentHistory(productId: number) {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT a.*, p.name as product_name, p.sku
+         FROM inventory_adjustments a JOIN products p ON a.product_id = p.id
+         WHERE a.product_id = ? ORDER BY a.adjusted_at DESC LIMIT 50`
+      )
+      .all(productId)
   }
 }
