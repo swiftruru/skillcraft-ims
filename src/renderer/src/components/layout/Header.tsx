@@ -1,14 +1,16 @@
 import { useState } from 'react'
-import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2, Search } from 'lucide-react'
+import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2, Search, Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDate } from '@/lib/utils'
+import { useThemeStore } from '@/stores/theme.store'
 
 type SyncState = 'idle' | 'running' | 'success' | 'error'
 
 export function Header({ title, onSearchClick }: { title: string; onSearchClick?: () => void }) {
   const queryClient = useQueryClient()
   const [syncState, setSyncState] = useState<SyncState>('idle')
+  const { theme, toggleTheme } = useThemeStore()
   const [syncMessage, setSyncMessage] = useState('')
 
   const { data: kpis } = useQuery({
@@ -101,6 +103,17 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
             上次同步：{formatDate(lastSync.synced_at ?? '')}
           </span>
         )}
+
+        {/* Theme toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleTheme}
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          title={theme === 'dark' ? '切換亮色模式' : '切換深色模式'}
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </Button>
 
         {/* Sync button */}
         <Button

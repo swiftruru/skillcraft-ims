@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { HashRouter, Routes, Route } from 'react-router-dom'
 import { Layout } from './components/layout/Layout'
 import Dashboard from './pages/Dashboard'
@@ -9,8 +10,15 @@ import Customers from './pages/Customers'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import About from './pages/About'
+import { useThemeStore } from './stores/theme.store'
 
 export default function App() {
+  const applyTheme = useThemeStore((s) => s.applyTheme)
+
+  useEffect(() => {
+    applyTheme()
+  }, [applyTheme])
+
   return (
     <HashRouter>
       <Routes>
