@@ -40,14 +40,14 @@ export default function About() {
             <span className="font-mono font-bold text-primary w-24 shrink-0">SkillCraft</span>
             <div>
               <span className="text-foreground">SKILL + Craft（手藝）</span>
-              <span className="text-muted-foreground ml-2">— 強調「用 AI 技能打造系統」的匠人感</span>
+              <span className="text-muted-foreground ml-2">— 以課程核心「AI Skill」為靈感的命名</span>
             </div>
           </div>
           <div className="flex items-start gap-4">
             <span className="font-mono font-bold text-primary w-24 shrink-0">IMS</span>
             <div>
               <span className="text-foreground">Inventory Management System</span>
-              <span className="text-muted-foreground ml-2">— 業界標準縮寫，專業但不失創意</span>
+              <span className="text-muted-foreground ml-2">— 進銷存管理系統的通用縮寫</span>
             </div>
           </div>
         </div>
