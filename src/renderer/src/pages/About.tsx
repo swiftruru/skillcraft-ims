@@ -107,7 +107,7 @@ export default function About() {
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm pl-7">
             <span className="text-muted-foreground">指導老師</span>
-            <span>陳彥宏博士　Dr. YEN-HUNG CHEN</span>
+            <span>陳彥宏博士　Dr. CHEN, YEN-HUNG</span>
             <span className="text-muted-foreground">學校</span>
             <span>國立台北護理健康大學</span>
             <span className="text-muted-foreground">系所</span>
