@@ -180,6 +180,7 @@ export interface InventoryAdjustment {
   adjusted_at: string
   product_name?: string
   sku?: string
+  category?: string
 }
 
 export interface SearchResult {

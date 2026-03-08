@@ -15,7 +15,9 @@ const electronAPI = {
     adjust: (productId: number, delta: number, reason: string, note?: string) =>
       ipcRenderer.invoke('products:adjust', productId, delta, reason, note),
     getAdjustmentHistory: (productId: number) =>
-      ipcRenderer.invoke('products:getAdjustmentHistory', productId)
+      ipcRenderer.invoke('products:getAdjustmentHistory', productId),
+    getAllAdjustments: (filters?: { search?: string; reason?: string; limit?: number }) =>
+      ipcRenderer.invoke('products:getAllAdjustments', filters)
   },
 
   // Suppliers

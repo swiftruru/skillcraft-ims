@@ -117,5 +117,32 @@ export const ProductModel = {
          WHERE a.product_id = ? ORDER BY a.adjusted_at DESC LIMIT 50`
       )
       .all(productId)
+  },
+
+  getAllAdjustments(filters?: { search?: string; reason?: string; limit?: number }) {
+    const db = getDb()
+    const conditions: string[] = []
+    const params: unknown[] = []
+
+    if (filters?.reason) {
+      conditions.push('a.reason = ?')
+      params.push(filters.reason)
+    }
+    if (filters?.search) {
+      conditions.push('(p.name LIKE ? OR p.sku LIKE ?)')
+      params.push(`%${filters.search}%`, `%${filters.search}%`)
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+    const limit = filters?.limit ?? 200
+
+    return db
+      .prepare(
+        `SELECT a.id, a.product_id, a.delta, a.reason, a.note, a.adjusted_by, a.adjusted_at,
+                p.name as product_name, p.sku, p.category
+         FROM inventory_adjustments a JOIN products p ON a.product_id = p.id
+         ${where} ORDER BY a.adjusted_at DESC LIMIT ${limit}`
+      )
+      .all(...params)
   }
 }

@@ -11,6 +11,7 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import About from './pages/About'
 import StockTake from './pages/StockTake'
+import InventoryHistory from './pages/InventoryHistory'
 import { useThemeStore } from './stores/theme.store'
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/about" element={<About />} />
           <Route path="/stock-take" element={<StockTake />} />
+          <Route path="/inventory-history" element={<InventoryHistory />} />
         </Route>
       </Routes>
     </HashRouter>

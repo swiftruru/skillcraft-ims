@@ -55,3 +55,10 @@ description: 當使用者要求新增或修改進貨、銷售、庫存異動、�
    - `stocktake:create` 建立草稿時快照所有商品的 `stock_qty`；`stocktake:updateItem` 更新 counted_qty；`stocktake:complete` 在 transaction 內對每個 diff != 0 的品項產生 `inventory_adjustments`（reason = '盤點修正'），並將 status 改為 completed。
    - 只有 draft 狀態的盤點單可編輯和刪除；completed 為唯讀。
    - UI：list/detail 兩種 view state 在同一頁；detail 顯示商品名稱、SKU、系統庫存、實際數量（input）、差異（diff > 0 綠色、< 0 紅色、= 0 灰色、未填 `-`）；底部顯示「已盤 X / 共 Y 項」和「完成盤點」按鈕。
+
+10. **庫存異動歷史頁面規範**：獨立頁面 `/inventory-history`，顯示所有 `inventory_adjustments` 記錄：
+    - IPC：`products:getAllAdjustments({ search?, reason?, limit? })` → JOIN products，回傳含 `product_name`, `sku`
+    - 欄位：日期時間、商品名稱、SKU、類別、delta（`+N` 綠色 / `-N` 紅色）、原因、備註
+    - 篩選：reason 下拉（全部 / 盤點修正 / 損耗報廢 / 手動調整 …）+ 商品名稱/SKU 搜尋
+    - 匯出：右上角「匯出 CSV」按鈕呼叫既有 `export:adjustments` IPC
+    - 預設顯示最新 200 筆，`adjusted_at DESC`

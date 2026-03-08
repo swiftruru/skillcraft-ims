@@ -8,6 +8,7 @@ import {
   Users,
   BarChart3,
   ClipboardList,
+  History,
   Settings,
   Warehouse,
   Info
@@ -22,7 +23,8 @@ const navItems = [
   { to: '/suppliers', icon: Truck, label: '供應商' },
   { to: '/customers', icon: Users, label: '客戶管理' },
   { to: '/reports', icon: BarChart3, label: '報表分析' },
-  { to: '/stock-take', icon: ClipboardList, label: '庫存盤點' }
+  { to: '/stock-take', icon: ClipboardList, label: '庫存盤點' },
+  { to: '/inventory-history', icon: History, label: '異動歷史' }
 ]
 
 export function Sidebar() {

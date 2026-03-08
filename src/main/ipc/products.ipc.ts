@@ -37,4 +37,8 @@ export function registerProductsIpc(): void {
   ipcMain.handle('products:getAdjustmentHistory', (_e, productId: number) => {
     return ProductModel.getAdjustmentHistory(productId)
   })
+
+  ipcMain.handle('products:getAllAdjustments', (_e, filters) => {
+    return ProductModel.getAllAdjustments(filters)
+  })
 }
