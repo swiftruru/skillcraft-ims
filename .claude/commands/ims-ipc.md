@@ -19,3 +19,5 @@ description: 當使用者要求新增 Electron IPC 功能、修改 preload bridg
 5. **型別共享**：IPC 傳遞的資料型別（如 `Product`、`SalesOrder`）定義在 `src/renderer/src/types/schema.ts`，main 與 renderer 兩側都使用此型別，不重複定義。
 
 6. **資料庫備份/還原**：`db:backup` 用 `dialog.showSaveDialog` 取得路徑後 `fs.copyFileSync`；`db:restore` 用 `dialog.showOpenDialog` 選檔後 `fs.copyFileSync` 覆蓋現有 DB，再 `app.relaunch(); app.exit(0)` 重啟；兩者都回傳 `{ success, filePath?, error? }`；dbPath 由 main process 計算，不由 renderer 傳入。
+
+7. **CSV 匯入**：channel 為 `import:csv`，用 `dialog.showOpenDialog({ filters: [{ name: 'CSV', extensions: ['csv'] }] })` 讓使用者選檔；主程序讀取並解析 CSV（不依賴第三方 CSV 套件，手動 split），欄位映射在主程序完成；以 `db.transaction()` 批次 upsert（`ON CONFLICT(sku) DO UPDATE SET ...`）；回傳 `{ success, imported, skipped, errors: string[] }`；超過 50 筆時先自動備份 DB；renderer 不傳入路徑，路徑由 dialog 取得。

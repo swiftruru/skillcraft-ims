@@ -87,6 +87,9 @@ declare global {
         backup(): Promise<{ success: boolean; filePath?: string; error?: string }>
         restore(): Promise<{ success: boolean; error?: string }>
       }
+      import: {
+        csv(): Promise<{ success: boolean; imported: number; skipped: number; errors: string[]; error?: string }>
+      }
       shell: {
         openExternal(url: string): Promise<void>
       }

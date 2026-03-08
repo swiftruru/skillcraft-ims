@@ -10,6 +10,7 @@ import { registerSearchIpc } from './search.ipc'
 import { registerExportIpc } from './export.ipc'
 import { registerInventoryIpc } from './inventory.ipc'
 import { registerDbIpc } from './db.ipc'
+import { registerImportIpc } from './import.ipc'
 
 export function registerAllIpcHandlers(): void {
   registerProductsIpc()
@@ -24,4 +25,5 @@ export function registerAllIpcHandlers(): void {
   registerExportIpc()
   registerInventoryIpc()
   registerDbIpc()
+  registerImportIpc()
 }

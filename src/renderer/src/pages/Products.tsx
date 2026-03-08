@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, ShoppingCart } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import { ProductForm } from '@/components/products/ProductForm'
 import { AdjustInventoryDialog } from '@/components/products/AdjustInventoryDialog'
 import { AdjustmentHistoryDialog } from '@/components/products/AdjustmentHistoryDialog'
 import { PurchaseSuggestionDialog } from '@/components/inventory/PurchaseSuggestionDialog'
+import { ImportCsvDialog } from '@/components/products/ImportCsvDialog'
 import { formatCurrency, formatNumber } from '@/lib/utils'
 import type { Product } from '@/types/schema'
 
@@ -24,6 +25,7 @@ export default function Products() {
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
   const [exporting, setExporting] = useState(false)
   const [suggestionOpen, setSuggestionOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ['products', 'all', search],
@@ -139,6 +141,14 @@ export default function Products() {
         <Button
           variant="outline"
           className="gap-2"
+          onClick={() => setImportOpen(true)}
+        >
+          <Upload className="w-4 h-4" />
+          匯入 CSV
+        </Button>
+        <Button
+          variant="outline"
+          className="gap-2"
           disabled={exporting}
           onClick={async () => {
             setExporting(true)
@@ -176,6 +186,12 @@ export default function Products() {
           {products.filter((p) => p.stock_qty <= p.reorder_pt).length} 項低庫存
         </p>
       )}
+
+      {/* Import CSV Dialog */}
+      <ImportCsvDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+      />
 
       {/* Purchase Suggestion Dialog */}
       <PurchaseSuggestionDialog

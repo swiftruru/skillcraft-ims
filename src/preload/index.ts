@@ -123,6 +123,11 @@ const electronAPI = {
     restore: () => ipcRenderer.invoke('db:restore')
   },
 
+  // CSV import
+  import: {
+    csv: () => ipcRenderer.invoke('import:csv')
+  },
+
   // Shell
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url)
