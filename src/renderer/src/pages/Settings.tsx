@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { CheckCircle2, XCircle, Loader2, ExternalLink } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import type { AppSettings } from '@/types/schema'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
+type DbOpStatus = { type: 'idle' | 'loading' | 'success' | 'error'; msg?: string }
 
 export default function Settings() {
   const [testStatus, setTestStatus] = useState<Status>('idle')
@@ -16,6 +17,8 @@ export default function Settings() {
   const [initStatus, setInitStatus] = useState<Status>('idle')
   const [initMsg, setInitMsg] = useState('')
   const [saveStatus, setSaveStatus] = useState<Status>('idle')
+  const [backupStatus, setBackupStatus] = useState<DbOpStatus>({ type: 'idle' })
+  const [restoreStatus, setRestoreStatus] = useState<DbOpStatus>({ type: 'idle' })
 
   const { data: settings } = useQuery<AppSettings>({
     queryKey: ['settings'],
@@ -67,6 +70,27 @@ export default function Settings() {
       setTestStatus('error')
       setTestMsg(result.error ?? '連線失敗')
     }
+  }
+
+  const handleBackup = async () => {
+    setBackupStatus({ type: 'loading' })
+    const result = await window.electronAPI.db.backup()
+    if (result.success) {
+      setBackupStatus({ type: 'success', msg: `備份已儲存至 ${result.filePath}` })
+    } else {
+      setBackupStatus({ type: 'error', msg: result.error ?? '備份失敗' })
+    }
+    setTimeout(() => setBackupStatus({ type: 'idle' }), 4000)
+  }
+
+  const handleRestore = async () => {
+    setRestoreStatus({ type: 'loading' })
+    const result = await window.electronAPI.db.restore()
+    if (!result.success) {
+      setRestoreStatus({ type: 'error', msg: result.error ?? '還原失敗' })
+      setTimeout(() => setRestoreStatus({ type: 'idle' }), 4000)
+    }
+    // On success the app relaunches automatically
   }
 
   const handleInitStructure = async () => {
@@ -181,6 +205,60 @@ export default function Settings() {
             <span className="text-muted-foreground shrink-0">資料庫路徑：</span>
             <span className="font-mono text-xs break-all">{settings?.dbPath ?? '載入中...'}</span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">資料管理</CardTitle>
+          <CardDescription>備份或還原 SQLite 資料庫檔案。還原後應用程式將自動重啟。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBackup}
+              disabled={backupStatus.type === 'loading'}
+              className="flex items-center gap-2"
+            >
+              {backupStatus.type === 'loading'
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <HardDrive className="w-4 h-4" />}
+              備份資料庫
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRestore}
+              disabled={restoreStatus.type === 'loading'}
+              className="flex items-center gap-2 border-yellow-600 text-yellow-500 hover:bg-yellow-600/10"
+            >
+              {restoreStatus.type === 'loading'
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <UploadCloud className="w-4 h-4" />}
+              還原資料庫
+            </Button>
+          </div>
+          {backupStatus.type === 'success' && (
+            <div className="flex items-center gap-2 text-sm text-green-400">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span className="break-all">{backupStatus.msg}</span>
+            </div>
+          )}
+          {backupStatus.type === 'error' && (
+            <div className="flex items-center gap-2 text-sm text-red-400">
+              <XCircle className="w-4 h-4 shrink-0" />
+              {backupStatus.msg}
+            </div>
+          )}
+          {restoreStatus.type === 'error' && (
+            <div className="flex items-center gap-2 text-sm text-red-400">
+              <XCircle className="w-4 h-4 shrink-0" />
+              {restoreStatus.msg}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

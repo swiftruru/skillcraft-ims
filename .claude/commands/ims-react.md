@@ -26,3 +26,7 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
    - 初始化：App 啟動時讀取 store 並同步 `document.documentElement.classList`（`'dark'` 或移除）。
    - 切換觸發：`toggleTheme()` 同時更新 store 和 DOM class，不得僅更新其中一個。
    - 切換按鈕：放在 `Header` 右側，使用 `Sun` / `Moon` icon，`variant="ghost" size="icon"`。
+
+8. **Toast 通知**：操作成功/失敗使用 toast 通知。import `useToast` from `@/components/ui/use-toast`；success 用 `toast({ title: '...', variant: 'success' })`；error 用 `toast({ title: '...', variant: 'destructive' })`。Toaster 元件已在 Layout 中掛載，不要重複掛載。
+
+9. **鍵盤快捷鍵面板**：`?` 鍵開啟 ShortcutOverlay（target 為 input/textarea/select 時忽略）；`Esc` 關閉；面板列出所有快捷鍵的 label + key badge；不使用 Dialog，改用 fixed overlay + backdrop。

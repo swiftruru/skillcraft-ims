@@ -8,7 +8,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts'
-import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem } from '@/types/schema'
+import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat } from '@/types/schema'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
 
@@ -33,6 +33,24 @@ export default function Reports() {
   const { data: lowStock } = useQuery<LowStockItem[]>({
     queryKey: ['reports', 'lowStock'],
     queryFn: () => window.electronAPI.reports.lowStock()
+  })
+
+  const { data: marginItems } = useQuery<MarginItem[]>({
+    queryKey: ['reports', 'marginAnalysis'],
+    queryFn: () => window.electronAPI.reports.marginAnalysis(),
+    staleTime: 1000 * 60 * 5
+  })
+
+  const { data: supplierStats } = useQuery<SupplierStat[]>({
+    queryKey: ['reports', 'supplierStats'],
+    queryFn: () => window.electronAPI.reports.supplierStats(),
+    staleTime: 1000 * 60 * 5
+  })
+
+  const { data: customerStats } = useQuery<CustomerStat[]>({
+    queryKey: ['reports', 'customerStats'],
+    queryFn: () => window.electronAPI.reports.customerStats(),
+    staleTime: 1000 * 60 * 5
   })
 
   return (
@@ -173,6 +191,122 @@ export default function Reports() {
           )}
         </CardContent>
       </Card>
+
+      {/* Margin Analysis */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium">商品毛利分析</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {marginItems && marginItems.length > 0 ? (
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    {['SKU', '商品名稱', '類別', '售價', '進價', '毛利', '毛利率 %'].map((h) => (
+                      <th key={h} className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {marginItems.map((item) => {
+                    const pct = item.margin_pct
+                    const pctClass =
+                      pct === null ? 'text-muted-foreground' :
+                      pct >= 30 ? 'text-green-400 font-semibold' :
+                      pct >= 10 ? 'text-yellow-400 font-semibold' :
+                      'text-destructive font-semibold'
+                    return (
+                      <tr key={item.id} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="px-4 py-2 font-mono text-xs">{item.sku}</td>
+                        <td className="px-4 py-2">{item.name}</td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground">{item.category}</td>
+                        <td className="px-4 py-2">{formatCurrency(item.sell_price)}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{formatCurrency(item.buy_price)}</td>
+                        <td className="px-4 py-2">{formatCurrency(item.margin)}</td>
+                        <td className={`px-4 py-2 ${pctClass}`}>
+                          {pct !== null ? `${pct.toFixed(1)}%` : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">無商品資料</div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Supplier & Customer Stats */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">供應商採購統計</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {supplierStats && supplierStats.length > 0 ? (
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      {['供應商', '採購次數', '收貨總金額', '訂單總金額'].map((h) => (
+                        <th key={h} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {supplierStats.map((s) => (
+                      <tr key={s.id} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium">{s.name}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{s.order_count}</td>
+                        <td className="px-3 py-2 text-blue-400 font-semibold">{formatCurrency(s.total_received)}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{formatCurrency(s.total_ordered)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">無供應商資料</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">客戶消費統計</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {customerStats && customerStats.length > 0 ? (
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      {['客戶', '訂單次數', '完成總金額', '訂單總金額'].map((h) => (
+                        <th key={h} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customerStats.map((c) => (
+                      <tr key={c.id} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium">{c.name}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{c.order_count}</td>
+                        <td className="px-3 py-2 text-green-400 font-semibold">{formatCurrency(c.total_spent)}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{formatCurrency(c.total_ordered)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">無客戶資料</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

@@ -33,3 +33,7 @@ description: 當使用者要求新增或修改 Electron 主程序功能，如視
 5. **Model 只在 main process 使用**：`ProductModel`、`SupplierModel` 等 DB model 只能在 `src/main/` 中呼叫，renderer 必須透過 `window.electronAPI` 取得資料，不直接存取 DB。
 
 6. **視窗狀態**：`mainWindow` 以模組層級變數管理，透過 `getMainWindow()` 導出供其他 main process 模組（如 IPC handler 需要推送事件至 renderer）使用，避免循環 import。
+
+7. **視窗狀態持久化**：視窗尺寸與位置以 JSON 存在 `app.getPath('userData')/window-state.json`；`createWindow` 時讀取套用，`mainWindow.on('close')` 時寫入；若存檔不存在使用預設值（1280×800）；maximized 狀態另外處理（先 setBounds 再 maximize()）。
+
+8. **排程每日通知**：SchedulerService 除了同步排程外，另起一個 `'0 9 * * *'` cron job（每天早上 9 點）發送庫存摘要通知；此排程不依賴 autoSyncEnabled 設定，無條件啟動；通知內容包含低庫存數量與待處理訂單數量。

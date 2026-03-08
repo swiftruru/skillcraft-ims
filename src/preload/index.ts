@@ -64,7 +64,10 @@ const electronAPI = {
     salesTrend: (days?: number) => ipcRenderer.invoke('reports:salesTrend', days),
     inventoryByCategory: () => ipcRenderer.invoke('reports:inventoryByCategory'),
     topProducts: (days?: number) => ipcRenderer.invoke('reports:topProducts', days),
-    lowStock: () => ipcRenderer.invoke('reports:lowStock')
+    lowStock: () => ipcRenderer.invoke('reports:lowStock'),
+    marginAnalysis: () => ipcRenderer.invoke('reports:marginAnalysis'),
+    supplierStats: () => ipcRenderer.invoke('reports:supplierStats'),
+    customerStats: () => ipcRenderer.invoke('reports:customerStats')
   },
 
   // Sync
@@ -112,6 +115,12 @@ const electronAPI = {
     getPurchaseSuggestions: () => ipcRenderer.invoke('inventory:getPurchaseSuggestions'),
     createPurchaseFromSuggestions: (items: { product_id: number; quantity: number; unit_price: number }[]) =>
       ipcRenderer.invoke('inventory:createPurchaseFromSuggestions', items)
+  },
+
+  // Database backup/restore
+  db: {
+    backup: () => ipcRenderer.invoke('db:backup'),
+    restore: () => ipcRenderer.invoke('db:restore')
   },
 
   // Shell

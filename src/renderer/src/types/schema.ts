@@ -201,3 +201,31 @@ export interface PurchaseSuggestion {
   buy_price: number
   estimated_cost: number
 }
+
+export interface MarginItem {
+  id: number
+  sku: string
+  name: string
+  category: string
+  sell_price: number
+  buy_price: number
+  stock_qty: number
+  margin: number
+  margin_pct: number | null
+}
+
+export interface SupplierStat {
+  id: number
+  name: string
+  order_count: number
+  total_received: number
+  total_ordered: number
+}
+
+export interface CustomerStat {
+  id: number
+  name: string
+  order_count: number
+  total_spent: number
+  total_ordered: number
+}

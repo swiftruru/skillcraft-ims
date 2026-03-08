@@ -137,4 +137,47 @@ export function registerReportsIpc(): void {
       )
       .all()
   })
+
+  ipcMain.handle('reports:marginAnalysis', () => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT id, sku, name, category, sell_price, buy_price, stock_qty,
+                ROUND(sell_price - buy_price, 2) as margin,
+                ROUND((sell_price - buy_price) * 100.0 / NULLIF(sell_price, 0), 1) as margin_pct
+         FROM products
+         ORDER BY margin_pct DESC`
+      )
+      .all()
+  })
+
+  ipcMain.handle('reports:supplierStats', () => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT s.id, s.name,
+                COUNT(po.id) as order_count,
+                COALESCE(SUM(CASE WHEN po.status='received' THEN po.total_amount ELSE 0 END), 0) as total_received,
+                COALESCE(SUM(po.total_amount), 0) as total_ordered
+         FROM suppliers s
+         LEFT JOIN purchase_orders po ON po.supplier_id = s.id
+         GROUP BY s.id ORDER BY total_received DESC`
+      )
+      .all()
+  })
+
+  ipcMain.handle('reports:customerStats', () => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT c.id, c.name,
+                COUNT(so.id) as order_count,
+                COALESCE(SUM(CASE WHEN so.status='completed' THEN so.total_amount ELSE 0 END), 0) as total_spent,
+                COALESCE(SUM(so.total_amount), 0) as total_ordered
+         FROM customers c
+         LEFT JOIN sales_orders so ON so.customer_id = c.id
+         GROUP BY c.id ORDER BY total_spent DESC`
+      )
+      .all()
+  })
 }

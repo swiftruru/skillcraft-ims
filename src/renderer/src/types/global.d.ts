@@ -51,6 +51,9 @@ declare global {
         inventoryByCategory(): Promise<import('./schema').InventoryByCategory[]>
         topProducts(days?: number): Promise<import('./schema').TopProduct[]>
         lowStock(): Promise<import('./schema').LowStockItem[]>
+        marginAnalysis(): Promise<import('./schema').MarginItem[]>
+        supplierStats(): Promise<import('./schema').SupplierStat[]>
+        customerStats(): Promise<import('./schema').CustomerStat[]>
       }
       sync: {
         trigger(direction: 'push' | 'pull' | 'bidirectional'): Promise<{ success: boolean; recordsSynced?: number; error?: string }>
@@ -79,6 +82,10 @@ declare global {
       inventory: {
         getPurchaseSuggestions(): Promise<import('./schema').PurchaseSuggestion[]>
         createPurchaseFromSuggestions(items: { product_id: number; quantity: number; unit_price: number }[]): Promise<import('./schema').PurchaseOrder>
+      }
+      db: {
+        backup(): Promise<{ success: boolean; filePath?: string; error?: string }>
+        restore(): Promise<{ success: boolean; error?: string }>
       }
       shell: {
         openExternal(url: string): Promise<void>

@@ -17,3 +17,5 @@ description: 當使用者要求新增 Electron IPC 功能、修改 preload bridg
 4. **錯誤傳遞**：`ipcMain.handle` 內的 `try/catch` 必須 `throw error`（不可 `return null`），讓 renderer 的 `await window.electronAPI.xxx()` 能正確捕捉到錯誤訊息。
 
 5. **型別共享**：IPC 傳遞的資料型別（如 `Product`、`SalesOrder`）定義在 `src/renderer/src/types/schema.ts`，main 與 renderer 兩側都使用此型別，不重複定義。
+
+6. **資料庫備份/還原**：`db:backup` 用 `dialog.showSaveDialog` 取得路徑後 `fs.copyFileSync`；`db:restore` 用 `dialog.showOpenDialog` 選檔後 `fs.copyFileSync` 覆蓋現有 DB，再 `app.relaunch(); app.exit(0)` 重啟；兩者都回傳 `{ success, filePath?, error? }`；dbPath 由 main process 計算，不由 renderer 傳入。

@@ -1,11 +1,48 @@
 import { app, shell, BrowserWindow, nativeTheme, Notification } from 'electron'
 import { join } from 'path'
+import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase } from './db'
 import { registerAllIpcHandlers } from './ipc'
 import { SchedulerService } from './services/scheduler.service'
 
 let mainWindow: BrowserWindow | null = null
+
+interface WindowState {
+  width: number
+  height: number
+  x?: number
+  y?: number
+  maximized: boolean
+}
+
+const DEFAULT_WINDOW_STATE: WindowState = { width: 1280, height: 800, maximized: false }
+
+function getWindowStatePath(): string {
+  return join(app.getPath('userData'), 'window-state.json')
+}
+
+function loadWindowState(): WindowState {
+  try {
+    const raw = readFileSync(getWindowStatePath(), 'utf-8')
+    return { ...DEFAULT_WINDOW_STATE, ...JSON.parse(raw) }
+  } catch {
+    return { ...DEFAULT_WINDOW_STATE }
+  }
+}
+
+function saveWindowState(win: BrowserWindow): void {
+  try {
+    const maximized = win.isMaximized()
+    const bounds = win.getBounds()
+    const state: WindowState = maximized
+      ? { width: bounds.width, height: bounds.height, x: bounds.x, y: bounds.y, maximized: true }
+      : { ...bounds, maximized: false }
+    writeFileSync(getWindowStatePath(), JSON.stringify(state), 'utf-8')
+  } catch {
+    // Ignore save errors silently
+  }
+}
 
 function checkLowStockNotification(): void {
   if (!Notification.isSupported()) return
@@ -26,9 +63,13 @@ function checkLowStockNotification(): void {
 }
 
 function createWindow(): void {
+  const winState = loadWindowState()
+
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: winState.width,
+    height: winState.height,
+    x: winState.x,
+    y: winState.y,
     minWidth: 900,
     minHeight: 600,
     show: false,
@@ -41,6 +82,14 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false
     }
+  })
+
+  if (winState.maximized) {
+    mainWindow.maximize()
+  }
+
+  mainWindow.on('close', () => {
+    saveWindowState(mainWindow!)
   })
 
   mainWindow.on('ready-to-show', () => {

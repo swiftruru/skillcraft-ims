@@ -16,3 +16,7 @@ description: 當使用者要求新增或修改 Dashboard、KPI 卡片、圖表�
 5. **查詢快取設定**：報表資料的 React Query 快取時間設為 `staleTime: 1000 * 60 * 5`（5 分鐘），避免每次切換頁面重複查詢，使用者可手動點擊重新整理。
 
 6. **報表 queryKey 命名**：統一使用 `['reports', 'summary']`、`['reports', 'inventory']`、`['reports', 'sales', { days }]` 格式，便於精確 invalidate 特定報表而不影響其他查詢。
+
+7. **毛利分析**：`reports:marginAnalysis` IPC 回傳 `MarginItem[]`；毛利率 ≥30% 顯示 `text-green-400`，10–30% 顯示 `text-yellow-400`，<10% 顯示 `text-destructive`；queryKey 為 `['reports', 'marginAnalysis']`。
+
+8. **供應商/客戶統計**：`reports:supplierStats` 和 `reports:customerStats` 回傳各自的統計陣列；供應商顯示採購次數與收貨總金額；客戶顯示訂單次數與完成總金額；queryKey 分別為 `['reports', 'supplierStats']` 和 `['reports', 'customerStats']`。

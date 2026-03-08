@@ -4,6 +4,8 @@ import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { StatusBar } from './StatusBar'
 import { CommandPalette } from '../common/CommandPalette'
+import { Toaster } from '../ui/toaster'
+import { ShortcutOverlay } from '../common/ShortcutOverlay'
 
 const pageTitles: Record<string, string> = {
   '/': '總覽 Dashboard',
@@ -21,12 +23,27 @@ export function Layout() {
   const location = useLocation()
   const title = pageTitles[location.pathname] ?? 'SkillCraft IMS'
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [shortcutOpen, setShortcutOpen] = useState(false)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT'
+
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         setPaletteOpen((prev) => !prev)
+        return
+      }
+
+      if (e.key === '?' && !isInput) {
+        e.preventDefault()
+        setShortcutOpen((prev) => !prev)
+        return
+      }
+
+      if (e.key === 'Escape') {
+        setShortcutOpen(false)
       }
     }
     window.addEventListener('keydown', handler)
@@ -44,6 +61,8 @@ export function Layout() {
         <StatusBar />
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <ShortcutOverlay open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
+      <Toaster />
     </div>
   )
 }
