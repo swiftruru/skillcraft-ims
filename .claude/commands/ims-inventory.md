@@ -50,3 +50,8 @@ description: 當使用者要求新增或修改進貨、銷售、庫存異動、�
    - 必須同時回傳 `product_id, sku, name, stock_qty, reorder_pt, suggested_qty, buy_price, estimated_cost`
    - UI 以表格呈現，每列可勾選，底部「建立採購單」按鈕觸發 `purchases:create`
    - 建立採購單後 invalidate `['purchases']` 和 `['reports']` query cache
+
+9. **庫存盤點規範**：`stock_takes` 為盤點單（status: draft/completed），`stock_take_items` 為每商品的盤點項目（`system_qty` 為建立時的庫存快照，`counted_qty` 為實際盤點數量）。
+   - `stocktake:create` 建立草稿時快照所有商品的 `stock_qty`；`stocktake:updateItem` 更新 counted_qty；`stocktake:complete` 在 transaction 內對每個 diff != 0 的品項產生 `inventory_adjustments`（reason = '盤點修正'），並將 status 改為 completed。
+   - 只有 draft 狀態的盤點單可編輯和刪除；completed 為唯讀。
+   - UI：list/detail 兩種 view state 在同一頁；detail 顯示商品名稱、SKU、系統庫存、實際數量（input）、差異（diff > 0 綠色、< 0 紅色、= 0 灰色、未填 `-`）；底部顯示「已盤 X / 共 Y 項」和「完成盤點」按鈕。

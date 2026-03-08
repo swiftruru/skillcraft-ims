@@ -7,6 +7,7 @@ import seedDataSql from './migrations/002_seed_data.sql?raw'
 import inventoryAdjustmentsSql from './migrations/003_inventory_adjustments.sql?raw'
 import demoSalesWaveSql from './migrations/004_demo_sales_wave.sql?raw'
 import moreCustomersSql from './migrations/005_more_customers.sql?raw'
+import stockTakesSql from './migrations/006_stock_takes.sql?raw'
 
 let db: Database.Database | null = null
 
@@ -48,7 +49,8 @@ async function runMigrations(database: Database.Database): Promise<void> {
     { name: '002_seed_data', sql: seedDataSql },
     { name: '003_inventory_adjustments', sql: inventoryAdjustmentsSql },
     { name: '004_demo_sales_wave', sql: demoSalesWaveSql },
-    { name: '005_more_customers', sql: moreCustomersSql }
+    { name: '005_more_customers', sql: moreCustomersSql },
+    { name: '006_stock_takes', sql: stockTakesSql }
   ]
 
   for (const migration of migrations) {

@@ -128,6 +128,21 @@ const electronAPI = {
     csv: () => ipcRenderer.invoke('import:csv')
   },
 
+  // Stock takes
+  stocktake: {
+    getAll: () => ipcRenderer.invoke('stocktake:getAll'),
+    getById: (id: number) => ipcRenderer.invoke('stocktake:getById', id),
+    create: (notes?: string) => ipcRenderer.invoke('stocktake:create', notes),
+    updateItem: (itemId: number, countedQty: number | null) => ipcRenderer.invoke('stocktake:updateItem', itemId, countedQty),
+    complete: (id: number) => ipcRenderer.invoke('stocktake:complete', id),
+    delete: (id: number) => ipcRenderer.invoke('stocktake:delete', id)
+  },
+
+  // PDF print
+  print: {
+    pdf: (opts: { type: 'sales' | 'purchase'; id: number }) => ipcRenderer.invoke('print:pdf', opts)
+  },
+
   // Shell
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url)

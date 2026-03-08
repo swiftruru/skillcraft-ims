@@ -16,7 +16,8 @@ const pageTitles: Record<string, string> = {
   '/customers': '客戶管理',
   '/reports': '報表分析',
   '/settings': '系統設定',
-  '/about': '關於 SkillCraft IMS'
+  '/about': '關於 SkillCraft IMS',
+  '/stock-take': '庫存盤點'
 }
 
 export function Layout() {

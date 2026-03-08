@@ -21,3 +21,5 @@ description: 當使用者要求新增 Electron IPC 功能、修改 preload bridg
 6. **資料庫備份/還原**：`db:backup` 用 `dialog.showSaveDialog` 取得路徑後 `fs.copyFileSync`；`db:restore` 用 `dialog.showOpenDialog` 選檔後 `fs.copyFileSync` 覆蓋現有 DB，再 `app.relaunch(); app.exit(0)` 重啟；兩者都回傳 `{ success, filePath?, error? }`；dbPath 由 main process 計算，不由 renderer 傳入。
 
 7. **CSV 匯入**：channel 為 `import:csv`，用 `dialog.showOpenDialog({ filters: [{ name: 'CSV', extensions: ['csv'] }] })` 讓使用者選檔；主程序讀取並解析 CSV（不依賴第三方 CSV 套件，手動 split），欄位映射在主程序完成；以 `db.transaction()` 批次 upsert（`ON CONFLICT(sku) DO UPDATE SET ...`）；回傳 `{ success, imported, skipped, errors: string[] }`；超過 50 筆時先自動備份 DB；renderer 不傳入路徑，路徑由 dialog 取得。
+
+8. **PDF 列印**：channel 為 `print:pdf`，接受 `{ type: 'sales' | 'purchase', id: number }`；主程序查詢 DB 取得訂單與明細，產生 HTML 字串，建立隱藏 BrowserWindow（`show: false`）載入 HTML data URL，呼叫 `webContents.printToPDF({ marginsType: 1, pageSize: 'A4' })`，再用 `dialog.showSaveDialog` 讓使用者選儲存路徑（預設檔名 `{order_no}.pdf`），寫入 PDF；BrowserWindow 用完立即關閉；回傳 `{ success: boolean; filePath?: string; error?: string }`。

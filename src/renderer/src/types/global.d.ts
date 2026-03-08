@@ -90,6 +90,17 @@ declare global {
       import: {
         csv(): Promise<{ success: boolean; imported: number; skipped: number; errors: string[]; error?: string }>
       }
+      stocktake: {
+        getAll(): Promise<import('./schema').StockTake[]>
+        getById(id: number): Promise<import('./schema').StockTakeDetail | null>
+        create(notes?: string): Promise<import('./schema').StockTake>
+        updateItem(itemId: number, countedQty: number | null): Promise<boolean>
+        complete(id: number): Promise<{ success: boolean; adjustments: number }>
+        delete(id: number): Promise<boolean>
+      }
+      print: {
+        pdf(opts: { type: 'sales' | 'purchase'; id: number }): Promise<{ success: boolean; filePath?: string; error?: string }>
+      }
       shell: {
         openExternal(url: string): Promise<void>
       }

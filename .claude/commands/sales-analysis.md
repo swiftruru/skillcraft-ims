@@ -88,7 +88,37 @@ description: 當使用者要求分析銷售趨勢、查看產品表現、比較�
    " -column -header
    ```
 
-4. **報告格式**：輸出含產品績效矩陣的 Markdown 報告，以繁體中文撰寫。
+4. **類別績效分析**：額外執行類別層級的彙總查詢。
+
+   ```bash
+   echo "" && echo "=== 類別銷售占比 ===" && \
+   sqlite3 "$DB" "
+   SELECT
+     p.category,
+     COUNT(DISTINCT so.id) as orders,
+     SUM(si.quantity) as qty_sold,
+     printf('NT$ %,.0f', SUM(si.quantity * si.unit_price)) as revenue,
+     printf('%.1f%%', SUM(si.quantity * si.unit_price) * 100.0 /
+       (SELECT SUM(si2.quantity * si2.unit_price) FROM sale_items si2
+        JOIN sales_orders so2 ON si2.sales_order_id = so2.id
+        WHERE so2.status = 'completed'
+          AND so2.order_date >= date('now', '-' || $DAYS || ' days'))) as pct_revenue
+   FROM sale_items si
+   JOIN products p ON si.product_id = p.id
+   JOIN sales_orders so ON si.sales_order_id = so.id
+   WHERE so.status = 'completed'
+     AND so.order_date >= date('now', '-' || $DAYS || ' days')
+   GROUP BY p.category
+   ORDER BY SUM(si.quantity * si.unit_price) DESC
+   " -column -header
+   ```
+
+5. **跨平台 DB 路徑**：
+   - macOS：`~/Library/Application Support/skillcraft-ims/ims.db`
+   - Windows：`%APPDATA%\skillcraft-ims\ims.db`
+   - Linux：`~/.config/skillcraft-ims/ims.db`
+
+6. **報告格式**：輸出含產品績效矩陣的 Markdown 報告，以繁體中文撰寫。
 
    ```markdown
    # 銷售分析報告

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2 } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable, type Column } from '@/components/common/DataTable'
@@ -73,6 +73,13 @@ export default function Purchases() {
         <div className="flex justify-end gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailId(row.id)}>
             <Eye className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"
+            title="匯出 PDF"
+            onClick={() => window.electronAPI.print.pdf({ type: 'purchase', id: row.id as number })}
+          >
+            <Printer className="w-3.5 h-3.5" />
           </Button>
           {row.status === 'pending' && (
             <>

@@ -229,3 +229,31 @@ export interface CustomerStat {
   total_spent: number
   total_ordered: number
 }
+
+export interface StockTake {
+  id: number
+  take_no: string
+  status: 'draft' | 'completed'
+  notes: string | null
+  created_at: string
+  completed_at: string | null
+  item_count?: number
+  diff_count?: number
+  uncounted?: number
+}
+
+export interface StockTakeItem {
+  id: number
+  stock_take_id: number
+  product_id: number
+  product_name: string
+  sku: string
+  unit: string
+  category: string
+  system_qty: number
+  counted_qty: number | null
+}
+
+export interface StockTakeDetail extends StockTake {
+  items: StockTakeItem[]
+}
