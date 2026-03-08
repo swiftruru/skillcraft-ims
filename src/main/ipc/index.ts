@@ -7,6 +7,8 @@ import { registerReportsIpc } from './reports.ipc'
 import { registerSyncIpc } from './sync.ipc'
 import { registerSettingsIpc } from './settings.ipc'
 import { registerSearchIpc } from './search.ipc'
+import { registerExportIpc } from './export.ipc'
+import { registerInventoryIpc } from './inventory.ipc'
 
 export function registerAllIpcHandlers(): void {
   registerProductsIpc()
@@ -18,4 +20,6 @@ export function registerAllIpcHandlers(): void {
   registerSyncIpc()
   registerSettingsIpc()
   registerSearchIpc()
+  registerExportIpc()
+  registerInventoryIpc()
 }

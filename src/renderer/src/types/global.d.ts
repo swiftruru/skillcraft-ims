@@ -70,6 +70,16 @@ declare global {
       search: {
         global(query: string): Promise<import('./schema').SearchResult[]>
       }
+      export: {
+        products(): Promise<{ success: boolean; filePath?: string; error?: string }>
+        purchases(): Promise<{ success: boolean; filePath?: string; error?: string }>
+        sales(): Promise<{ success: boolean; filePath?: string; error?: string }>
+        adjustments(): Promise<{ success: boolean; filePath?: string; error?: string }>
+      }
+      inventory: {
+        getPurchaseSuggestions(): Promise<import('./schema').PurchaseSuggestion[]>
+        createPurchaseFromSuggestions(items: { product_id: number; quantity: number; unit_price: number }[]): Promise<import('./schema').PurchaseOrder>
+      }
       shell: {
         openExternal(url: string): Promise<void>
       }

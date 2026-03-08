@@ -189,3 +189,15 @@ export interface SearchResult {
   subtitle: string
   meta?: string
 }
+
+export interface PurchaseSuggestion {
+  product_id: number
+  sku: string
+  name: string
+  category: string
+  stock_qty: number
+  reorder_pt: number
+  suggested_qty: number
+  buy_price: number
+  estimated_cost: number
+}

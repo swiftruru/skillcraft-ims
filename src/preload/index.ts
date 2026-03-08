@@ -99,6 +99,21 @@ const electronAPI = {
     global: (query: string) => ipcRenderer.invoke('search:global', query)
   },
 
+  // CSV export
+  export: {
+    products: () => ipcRenderer.invoke('export:products'),
+    purchases: () => ipcRenderer.invoke('export:purchases'),
+    sales: () => ipcRenderer.invoke('export:sales'),
+    adjustments: () => ipcRenderer.invoke('export:adjustments')
+  },
+
+  // Inventory utilities
+  inventory: {
+    getPurchaseSuggestions: () => ipcRenderer.invoke('inventory:getPurchaseSuggestions'),
+    createPurchaseFromSuggestions: (items: { product_id: number; quantity: number; unit_price: number }[]) =>
+      ipcRenderer.invoke('inventory:createPurchaseFromSuggestions', items)
+  },
+
   // Shell
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url)

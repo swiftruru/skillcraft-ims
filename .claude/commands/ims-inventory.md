@@ -38,3 +38,15 @@ description: 當使用者要求新增或修改進貨、銷售、庫存異動、�
    - 出庫後庫存若 < 0，調整前必須 throw Error，不執行 transaction
    - `reason` 必填，從固定選單選取（盤點修正、損耗報廢、樣品出貨、退貨入庫、系統校正、其他）
    - UI 元件（`AdjustInventoryDialog`）使用 react-hook-form + zod 驗證，以紅色（出庫）/ 綠色（入庫）視覺區分方向
+
+7. **庫存調整歷史查詢規範**：調整歷史透過 `products:getAdjustmentHistory` IPC 查詢，以 Dialog 形式呈現在商品頁：
+   - 每筆記錄顯示：日期時間、delta（正數加庫存 / 負數減庫存）、reason、note
+   - delta > 0 顯示綠色 `+N`，delta < 0 顯示紅色 `N`
+   - 依 `adjusted_at DESC` 排序，最多顯示 50 筆
+   - 使用 `useQuery(['products', 'adjustments', productId])` 快取，productId 為 key 的一部分
+
+8. **採購建議規範**：`inventory:getPurchaseSuggestions` IPC 回傳低於補貨點商品的建議採購量：
+   - 建議採購量 = `MAX(reorder_pt * 2 - stock_qty, reorder_pt)` — 補到補貨點的兩倍，至少補一個補貨點
+   - 必須同時回傳 `product_id, sku, name, stock_qty, reorder_pt, suggested_qty, buy_price, estimated_cost`
+   - UI 以表格呈現，每列可勾選，底部「建立採購單」按鈕觸發 `purchases:create`
+   - 建立採購單後 invalidate `['purchases']` 和 `['reports']` query cache

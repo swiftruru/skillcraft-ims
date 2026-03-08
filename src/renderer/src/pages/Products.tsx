@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -9,6 +9,8 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ProductForm } from '@/components/products/ProductForm'
 import { AdjustInventoryDialog } from '@/components/products/AdjustInventoryDialog'
+import { AdjustmentHistoryDialog } from '@/components/products/AdjustmentHistoryDialog'
+import { PurchaseSuggestionDialog } from '@/components/inventory/PurchaseSuggestionDialog'
 import { formatCurrency, formatNumber } from '@/lib/utils'
 import type { Product } from '@/types/schema'
 
@@ -19,6 +21,9 @@ export default function Products() {
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [adjustProduct, setAdjustProduct] = useState<Product | null>(null)
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [suggestionOpen, setSuggestionOpen] = useState(false)
 
   const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ['products', 'all', search],
@@ -68,9 +73,18 @@ export default function Products() {
     {
       key: 'id',
       label: '',
-      className: 'w-28 text-right',
+      className: 'w-36 text-right',
       render: (_v, row) => (
         <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            title="調整記錄"
+            onClick={() => setHistoryProduct(row as unknown as Product)}
+          >
+            <History className="w-3.5 h-3.5" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -114,6 +128,27 @@ export default function Products() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => setSuggestionOpen(true)}
+        >
+          <ShoppingCart className="w-4 h-4" />
+          採購建議
+        </Button>
+        <Button
+          variant="outline"
+          className="gap-2"
+          disabled={exporting}
+          onClick={async () => {
+            setExporting(true)
+            await window.electronAPI.export.products()
+            setExporting(false)
+          }}
+        >
+          <Download className="w-4 h-4" />
+          {exporting ? '匯出中...' : '匯出 CSV'}
+        </Button>
         <Button onClick={() => { setEditProduct(null); setFormOpen(true) }} className="gap-2">
           <Plus className="w-4 h-4" />
           新增商品
@@ -142,6 +177,12 @@ export default function Products() {
         </p>
       )}
 
+      {/* Purchase Suggestion Dialog */}
+      <PurchaseSuggestionDialog
+        open={suggestionOpen}
+        onOpenChange={setSuggestionOpen}
+      />
+
       {/* Product Form Dialog */}
       <ProductForm
         open={formOpen}
@@ -150,6 +191,13 @@ export default function Products() {
           if (!open) setEditProduct(null)
         }}
         product={editProduct}
+      />
+
+      {/* Adjustment History Dialog */}
+      <AdjustmentHistoryDialog
+        open={historyProduct !== null}
+        onOpenChange={(open) => !open && setHistoryProduct(null)}
+        product={historyProduct}
       />
 
       {/* Adjust Inventory Dialog */}
