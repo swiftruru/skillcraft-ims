@@ -30,3 +30,5 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 8. **Toast 通知**：操作成功/失敗使用 toast 通知。import `useToast` from `@/components/ui/use-toast`；success 用 `toast({ title: '...', variant: 'success' })`；error 用 `toast({ title: '...', variant: 'destructive' })`。Toaster 元件已在 Layout 中掛載，不要重複掛載。
 
 9. **鍵盤快捷鍵面板**：`?` 鍵開啟 ShortcutOverlay（target 為 input/textarea/select 時忽略）；`Esc` 關閉；面板列出所有快捷鍵的 label + key badge；不使用 Dialog，改用 fixed overlay + backdrop。
+
+10. **DataTable 分頁**：DataTable 支援 `pageSize` prop（預設 15）；分頁狀態為元件內部 `useState(1)`；排序欄位變更時重置到第 1 頁；分頁列顯示「第 X / Y 頁」與上一頁／下一頁按鈕（`variant="outline" size="sm"`）；資料總筆數 ≤ pageSize 時不顯示分頁列。
