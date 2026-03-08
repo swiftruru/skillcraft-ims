@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useToast } from '@/components/ui/use-toast'
 import type { InventoryAdjustment } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 const REASONS = ['盤點修正', '損耗報廢', '樣品出貨', '退貨入庫', '系統校正', '其他']
 
@@ -16,6 +17,8 @@ function DeltaCell({ delta }: { delta: number }) {
 
 export default function InventoryHistory() {
   const { toast } = useToast()
+  const t = useLang()
+  const h = t.inventoryHistory
   const [search, setSearch] = useState('')
   const [reason, setReason] = useState('')
 
@@ -45,7 +48,7 @@ export default function InventoryHistory() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder="搜尋商品名稱或 SKU..."
+            placeholder={h.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -55,14 +58,14 @@ export default function InventoryHistory() {
           onChange={(e) => setReason(e.target.value)}
           className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
         >
-          <option value="">全部原因</option>
+          <option value="">{h.allReasons}</option>
           {REASONS.map((r) => (
-            <option key={r} value={r}>{r}</option>
+            <option key={r} value={r}>{h.reasons[r as keyof typeof h.reasons] ?? r}</option>
           ))}
         </select>
         <Button variant="outline" onClick={handleExport} className="gap-2 ml-auto">
           <Download className="w-4 h-4" />
-          匯出 CSV
+          {t.common.exportCsv}
         </Button>
       </div>
 
@@ -73,19 +76,19 @@ export default function InventoryHistory() {
         ) : !records?.length ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
             <History className="w-10 h-10 opacity-30" />
-            <p className="text-sm">尚無庫存異動記錄</p>
+            <p className="text-sm">{h.emptyMessage}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">時間</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">商品名稱</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{h.time}</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.products.title}</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground font-mono text-xs">SKU</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">類別</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground w-20">異動量</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">原因</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">備註</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.products.category}</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground w-20">{h.delta}</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{h.reason}</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{h.note}</th>
               </tr>
             </thead>
             <tbody>
@@ -102,7 +105,7 @@ export default function InventoryHistory() {
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      {rec.reason}
+                      {h.reasons[rec.reason as keyof typeof h.reasons] ?? rec.reason}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground">{rec.note ?? '-'}</td>
@@ -114,7 +117,9 @@ export default function InventoryHistory() {
       </div>
 
       {records && records.length > 0 && (
-        <p className="text-xs text-muted-foreground text-right">共 {records.length} 筆記錄</p>
+        <p className="text-xs text-muted-foreground text-right">
+          {records.length} {t.common.noData === 'No data' ? 'records' : '筆記錄'}
+        </p>
       )}
     </div>
   )

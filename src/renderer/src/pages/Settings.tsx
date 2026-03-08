@@ -7,11 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { AppSettings } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 type DbOpStatus = { type: 'idle' | 'loading' | 'success' | 'error'; msg?: string }
 
 export default function Settings() {
+  const t = useLang()
+  const s = t.settings
   const [testStatus, setTestStatus] = useState<Status>('idle')
   const [testMsg, setTestMsg] = useState('')
   const [initStatus, setInitStatus] = useState<Status>('idle')
@@ -61,14 +64,14 @@ export default function Settings() {
 
   const handleTest = async () => {
     setTestStatus('loading')
-    setTestMsg('測試連線中...')
+    setTestMsg(s.testing)
     const result = await window.electronAPI.sync.testConnection()
     if (result.success) {
       setTestStatus('success')
-      setTestMsg('連線成功！')
+      setTestMsg(s.testSuccess)
     } else {
       setTestStatus('error')
-      setTestMsg(result.error ?? '連線失敗')
+      setTestMsg(result.error ?? s.testFailed)
     }
   }
 
@@ -76,9 +79,9 @@ export default function Settings() {
     setBackupStatus({ type: 'loading' })
     const result = await window.electronAPI.db.backup()
     if (result.success) {
-      setBackupStatus({ type: 'success', msg: `備份已儲存至 ${result.filePath}` })
+      setBackupStatus({ type: 'success', msg: s.backupSuccess(result.filePath!) })
     } else {
-      setBackupStatus({ type: 'error', msg: result.error ?? '備份失敗' })
+      setBackupStatus({ type: 'error', msg: result.error ?? s.backupFailed })
     }
     setTimeout(() => setBackupStatus({ type: 'idle' }), 4000)
   }
@@ -87,7 +90,7 @@ export default function Settings() {
     setRestoreStatus({ type: 'loading' })
     const result = await window.electronAPI.db.restore()
     if (!result.success) {
-      setRestoreStatus({ type: 'error', msg: result.error ?? '還原失敗' })
+      setRestoreStatus({ type: 'error', msg: result.error ?? s.restoreFailed })
       setTimeout(() => setRestoreStatus({ type: 'idle' }), 4000)
     }
     // On success the app relaunches automatically
@@ -95,14 +98,14 @@ export default function Settings() {
 
   const handleInitStructure = async () => {
     setInitStatus('loading')
-    setInitMsg('初始化中...')
+    setInitMsg(s.initializing)
     const result = await window.electronAPI.sync.initSheetStructure()
     if (result.success) {
       setInitStatus('success')
-      setInitMsg('Sheet 結構初始化完成！')
+      setInitMsg(s.initDone)
     } else {
       setInitStatus('error')
-      setInitMsg(result.error ?? '初始化失敗')
+      setInitMsg(result.error ?? s.initFailed)
     }
   }
 
@@ -111,70 +114,68 @@ export default function Settings() {
       {/* Google Sheets */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Google Sheets 同步設定</CardTitle>
+          <CardTitle className="text-base">{s.sheetsSync}</CardTitle>
           <CardDescription>
-            設定 Service Account 憑證以啟用雙向同步。{' '}
+            {s.sheetsDesc}{' '}
             <a
               href="#"
               className="text-primary underline inline-flex items-center gap-1"
               onClick={(e) => { e.preventDefault(); window.electronAPI.shell.openExternal('https://github.com/swiftruru/skillcraft-ims/blob/main/docs/google-cloud-setup.md') }}
             >
-              查看設定說明 <ExternalLink className="w-3 h-3" />
+              {s.openGuide} <ExternalLink className="w-3 h-3" />
             </a>
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSave)} className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Google Sheet ID</Label>
+              <Label>{s.sheetId}</Label>
               <Input
                 {...register('googleSheetId')}
-                placeholder="從試算表 URL 複製 ID（docs.google.com/spreadsheets/d/{ID}/edit）"
+                placeholder={s.sheetIdPlaceholder}
                 className="font-mono text-sm"
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Service Account Key 路徑</Label>
+              <Label>{s.keyPath}</Label>
               <Input
                 {...register('serviceAccountKeyPath')}
-                placeholder="/Users/yourname/.config/skillcraft-ims/service-account.json"
+                placeholder={s.keyPathPlaceholder}
                 className="font-mono text-sm"
               />
-              <p className="text-xs text-muted-foreground">
-                從 Google Cloud Console 下載的 JSON 金鑰檔案完整路徑
-              </p>
+              <p className="text-xs text-muted-foreground">{s.keyPathDesc}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>自動同步間隔（分鐘）</Label>
+                <Label>{s.syncInterval}</Label>
                 <Input type="number" min={5} max={1440} {...register('syncIntervalMinutes')} />
               </div>
               <div className="flex items-end pb-0.5">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" {...register('autoSyncEnabled')} className="w-4 h-4 rounded" />
-                  <span className="text-sm">啟用自動同步</span>
+                  <span className="text-sm">{s.autoSync}</span>
                 </label>
               </div>
             </div>
 
             <div className="flex items-center gap-3 pt-2">
               <Button type="submit" disabled={saveMutation.isPending} size="sm">
-                {saveStatus === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : '儲存設定'}
+                {saveStatus === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : s.saveSettings}
               </Button>
               {saveStatus === 'success' && (
                 <span className="text-xs text-green-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> 已儲存
+                  <CheckCircle2 className="w-3 h-3" /> {s.saved}
                 </span>
               )}
 
               <div className="ml-auto flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={handleTest} disabled={testStatus === 'loading'}>
                   {testStatus === 'loading' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
-                  測試連線
+                  {s.testConnection}
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={handleInitStructure} disabled={initStatus === 'loading'}>
                   {initStatus === 'loading' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
-                  初始化 Sheet
+                  {s.initSheet}
                 </Button>
               </div>
             </div>
@@ -198,12 +199,12 @@ export default function Settings() {
       {/* DB Info */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">資料庫資訊</CardTitle>
+          <CardTitle className="text-base">{s.dbInfo}</CardTitle>
         </CardHeader>
         <CardContent className="text-sm space-y-2">
           <div className="flex items-start gap-2">
-            <span className="text-muted-foreground shrink-0">資料庫路徑：</span>
-            <span className="font-mono text-xs break-all">{settings?.dbPath ?? '載入中...'}</span>
+            <span className="text-muted-foreground shrink-0">{s.dbPath}</span>
+            <span className="font-mono text-xs break-all">{settings?.dbPath ?? t.common.loading}</span>
           </div>
         </CardContent>
       </Card>
@@ -211,8 +212,8 @@ export default function Settings() {
       {/* Data Management */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">資料管理</CardTitle>
-          <CardDescription>備份或還原 SQLite 資料庫檔案。還原後應用程式將自動重啟。</CardDescription>
+          <CardTitle className="text-base">{s.dbSection}</CardTitle>
+          <CardDescription>{s.dbSectionDesc}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-3">
@@ -226,7 +227,7 @@ export default function Settings() {
               {backupStatus.type === 'loading'
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <HardDrive className="w-4 h-4" />}
-              備份資料庫
+              {s.backup}
             </Button>
             <Button
               variant="outline"
@@ -238,7 +239,7 @@ export default function Settings() {
               {restoreStatus.type === 'loading'
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <UploadCloud className="w-4 h-4" />}
-              還原資料庫
+              {s.restore}
             </Button>
           </div>
           {backupStatus.type === 'success' && (

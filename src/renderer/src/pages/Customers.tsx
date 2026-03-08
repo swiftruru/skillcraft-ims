@@ -12,6 +12,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import type { Customer, CustomerCreate } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 const schema = z.object({
   name: z.string().min(1, '客戶名稱必填'),
@@ -25,6 +26,8 @@ type FormValues = z.infer<typeof schema>
 
 export default function Customers() {
   const queryClient = useQueryClient()
+  const t = useLang()
+  const c = t.customers
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
@@ -67,18 +70,18 @@ export default function Customers() {
     else createMutation.mutate(payload)
   }
 
-  const openEdit = (c: Customer) => {
-    setEditCustomer(c)
-    reset({ name: c.name, contact: c.contact ?? '', phone: c.phone ?? '', email: c.email ?? '', address: c.address ?? '', notes: c.notes ?? '' })
+  const openEdit = (cust: Customer) => {
+    setEditCustomer(cust)
+    reset({ name: cust.name, contact: cust.contact ?? '', phone: cust.phone ?? '', email: cust.email ?? '', address: cust.address ?? '', notes: cust.notes ?? '' })
     setFormOpen(true)
   }
 
   const columns: Column<Customer>[] = [
-    { key: 'name', label: '客戶名稱', sortable: true },
-    { key: 'contact', label: '聯絡人' },
-    { key: 'phone', label: '電話' },
-    { key: 'email', label: 'Email' },
-    { key: 'address', label: '地址' },
+    { key: 'name', label: c.name, sortable: true },
+    { key: 'contact', label: c.contact },
+    { key: 'phone', label: c.phone },
+    { key: 'email', label: c.email },
+    { key: 'address', label: c.address },
     { key: 'id', label: '', className: 'w-20 text-right', render: (_v, row) => (
       <div className="flex justify-end gap-1">
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(row as unknown as Customer)}><Edit2 className="w-3.5 h-3.5" /></Button>
@@ -92,27 +95,27 @@ export default function Customers() {
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="搜尋客戶..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder={c.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Button onClick={() => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '' }); setFormOpen(true) }} className="gap-2">
-          <Plus className="w-4 h-4" />新增客戶
+          <Plus className="w-4 h-4" />{c.addCustomer}
         </Button>
       </div>
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? <LoadingSpinner /> : (
-          <DataTable data={(customers ?? []) as unknown as Record<string, unknown>[]} columns={columns as unknown as Column<Record<string, unknown>>[]} keyField="id" emptyMessage="沒有客戶" />
+          <DataTable data={(customers ?? []) as unknown as Record<string, unknown>[]} columns={columns as unknown as Column<Record<string, unknown>>[]} keyField="id" emptyMessage={c.emptyMessage} />
         )}
       </div>
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{editCustomer ? '編輯客戶' : '新增客戶'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editCustomer ? `${t.common.edit} ${c.name}` : c.addCustomer}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-1.5"><Label>客戶名稱 *</Label><Input {...register('name')} />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
+            <div className="space-y-1.5"><Label>{c.name} *</Label><Input {...register('name')} />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5"><Label>聯絡人</Label><Input {...register('contact')} /></div>
-              <div className="space-y-1.5"><Label>電話</Label><Input {...register('phone')} /></div>
-              <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...register('email')} /></div>
-              <div className="space-y-1.5"><Label>地址</Label><Input {...register('address')} /></div>
+              <div className="space-y-1.5"><Label>{c.contact}</Label><Input {...register('contact')} /></div>
+              <div className="space-y-1.5"><Label>{c.phone}</Label><Input {...register('phone')} /></div>
+              <div className="space-y-1.5"><Label>{c.email}</Label><Input type="email" {...register('email')} /></div>
+              <div className="space-y-1.5"><Label>{c.address}</Label><Input {...register('address')} /></div>
             </div>
             <DialogFooter className="gap-2">
               {!editCustomer && (
@@ -120,13 +123,13 @@ export default function Customers() {
                   <Wand2 className="w-3.5 h-3.5" />Mock 資料
                 </Button>
               )}
-              <Button type="button" variant="outline" onClick={() => { setFormOpen(false); setEditCustomer(null) }}>取消</Button>
-              <Button type="submit" disabled={isSubmitting}>{editCustomer ? '更新' : '新增'}</Button>
+              <Button type="button" variant="outline" onClick={() => { setFormOpen(false); setEditCustomer(null) }}>{t.common.cancel}</Button>
+              <Button type="submit" disabled={isSubmitting}>{editCustomer ? t.common.save : t.common.add}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-      <ConfirmDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)} title="刪除客戶" description="刪除後無法復原。" onConfirm={() => deleteId && deleteMutation.mutate(deleteId)} />
+      <ConfirmDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)} title={c.deleteTitle} description={c.deleteDesc} onConfirm={() => deleteId && deleteMutation.mutate(deleteId)} />
     </div>
   )
 }

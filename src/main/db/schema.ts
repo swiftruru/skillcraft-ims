@@ -120,6 +120,43 @@ export type SalesOrderCreate = {
   items: SaleItemInput[]
 }
 
+export interface InventoryAdjustment {
+  id: number
+  product_id: number
+  product_name?: string
+  sku?: string
+  category?: string
+  delta: number
+  reason: string
+  note: string | null
+  adjusted_by: string
+  adjusted_at: string
+}
+
+export interface StockTake {
+  id: number
+  take_no: string
+  status: 'draft' | 'completed'
+  notes: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+export interface StockTakeItem {
+  id: number
+  stock_take_id: number
+  take_no?: string
+  status?: string
+  notes?: string | null
+  created_at?: string
+  completed_at?: string | null
+  product_id: number
+  sku?: string
+  product_name?: string
+  system_qty: number
+  counted_qty: number | null
+}
+
 export interface SyncLog {
   id: number
   direction: 'push' | 'pull' | 'bidirectional'

@@ -26,10 +26,14 @@ import {
   Cell
 } from 'recharts'
 import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 const CATEGORY_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
 
 export default function Dashboard() {
+  const t = useLang()
+  const d = t.dashboard
+
   const { data: kpis, isLoading: kpisLoading } = useQuery<DashboardKPIs>({
     queryKey: ['reports', 'kpis'],
     queryFn: () => window.electronAPI.reports.kpis()
@@ -75,34 +79,30 @@ export default function Dashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard
-          title="庫存總值"
+          title={d.inventoryValue}
           value={formatCurrency(kpis?.totalInventoryValue ?? 0)}
-          subtitle={`${kpis?.totalProducts ?? 0} 種商品`}
+          subtitle={d.totalProducts(kpis?.totalProducts ?? 0)}
           icon={<Package className="w-4 h-4" />}
           color="text-blue-400"
         />
         <KpiCard
-          title="本月營收"
+          title={d.monthlyRevenue}
           value={formatCurrency(kpis?.monthlyRevenue ?? 0)}
-          subtitle={
-            <ChangeIndicator value={revenueChange} suffix="% vs 上月" />
-          }
+          subtitle={<ChangeIndicator value={revenueChange} suffix={d.vsLastMonth} />}
           icon={<DollarSign className="w-4 h-4" />}
           color="text-green-400"
         />
         <KpiCard
-          title="本月毛利率"
+          title={d.grossMargin}
           value={`${profitMargin}%`}
-          subtitle={
-            <ChangeIndicator value={profitChange} suffix="% vs 上月" />
-          }
+          subtitle={<ChangeIndicator value={profitChange} suffix={d.vsLastMonth} />}
           icon={<BarChart2 className="w-4 h-4" />}
           color="text-purple-400"
         />
         <KpiCard
-          title="低庫存警示"
+          title={d.lowStockAlert}
           value={String(kpis?.lowStockCount ?? 0)}
-          subtitle="項商品需補貨"
+          subtitle={d.itemsNeedRestock}
           icon={<AlertTriangle className="w-4 h-4" />}
           color={kpis?.lowStockCount ? 'text-yellow-400' : 'text-muted-foreground'}
           alert={!!kpis?.lowStockCount}
@@ -111,10 +111,9 @@ export default function Dashboard() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Sales Trend */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">近 30 天銷售趨勢</CardTitle>
+            <CardTitle className="text-sm font-medium">{d.salesTrend}</CardTitle>
           </CardHeader>
           <CardContent>
             {trend && trend.length > 0 ? (
@@ -137,7 +136,7 @@ export default function Dashboard() {
                       borderRadius: '8px',
                       fontSize: '12px'
                     }}
-                    formatter={(v: number) => [formatCurrency(v), '營收']}
+                    formatter={(v: number) => [formatCurrency(v), d.revenue]}
                   />
                   <Line
                     type="monotone"
@@ -151,16 +150,15 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
-                本月尚無銷售資料
+                {d.noSalesData}
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Inventory by Category */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">各類別庫存值</CardTitle>
+            <CardTitle className="text-sm font-medium">{d.inventoryByCategory}</CardTitle>
           </CardHeader>
           <CardContent>
             {categoryData && categoryData.length > 0 ? (
@@ -182,7 +180,7 @@ export default function Dashboard() {
                       borderRadius: '8px',
                       fontSize: '12px'
                     }}
-                    formatter={(v: number) => [formatCurrency(v), '庫存值']}
+                    formatter={(v: number) => [formatCurrency(v), d.inventoryValueTooltip]}
                   />
                   <Bar dataKey="inventory_value" radius={[4, 4, 0, 0]}>
                     {categoryData.map((_, i) => (
@@ -193,21 +191,20 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
-                無庫存資料
+                {d.noInventoryData}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Bottom Row: Low Stock + Pending Sales */}
+      {/* Bottom Row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Low Stock Items */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-yellow-400" />
-              低庫存商品
+              {d.lowStockItems}
               {lowStock && lowStock.length > 0 && (
                 <Badge variant="warning">{lowStock.length}</Badge>
               )}
@@ -227,27 +224,26 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-semibold text-yellow-400">
-                        庫存 {item.stock_qty}
+                        {d.stockLabel(item.stock_qty)}
                       </div>
-                      <div className="text-xs text-muted-foreground">補貨點 {item.reorder_pt}</div>
+                      <div className="text-xs text-muted-foreground">{d.reorderLabel(item.reorder_pt)}</div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="flex items-center justify-center h-20 text-sm text-muted-foreground">
-                所有商品庫存充足
+                {d.allStockSufficient}
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Pending Sales Orders */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-blue-400" />
-              待處理銷售單
+              {d.pendingSalesOrders}
               {kpis?.pendingSalesOrders ? (
                 <Badge variant="secondary">{kpis.pendingSalesOrders}</Badge>
               ) : null}
@@ -266,7 +262,7 @@ export default function Dashboard() {
                       <div className="text-xs text-muted-foreground flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {formatDate(order.order_date)} ·{' '}
-                        {(order as { customer_name?: string }).customer_name ?? '一般客戶'}
+                        {(order as { customer_name?: string }).customer_name ?? d.generalCustomer}
                       </div>
                     </div>
                     <div className="text-sm font-semibold text-green-400">
@@ -277,7 +273,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="flex items-center justify-center h-20 text-sm text-muted-foreground">
-                沒有待處理的銷售單
+                {d.noPendingSales}
               </div>
             )}
           </CardContent>

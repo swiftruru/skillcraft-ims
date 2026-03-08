@@ -8,12 +8,15 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useToast } from '@/components/ui/use-toast'
 import { formatDate } from '@/lib/utils'
 import type { StockTake, StockTakeDetail, StockTakeItem } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 // ── List view ────────────────────────────────────────────────────────────────
 
 function ListView({ onSelect }: { onSelect: (id: number) => void }) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const t = useLang()
+  const s = t.stockTake
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const { data: takes, isLoading } = useQuery<StockTake[]>({
@@ -25,7 +28,7 @@ function ListView({ onSelect }: { onSelect: (id: number) => void }) {
     mutationFn: () => window.electronAPI.stocktake.create(),
     onSuccess: (take) => {
       queryClient.invalidateQueries({ queryKey: ['stocktakes'] })
-      toast({ title: `盤點單 ${take.take_no} 已建立`, variant: 'success' })
+      toast({ title: s.created(take.take_no), variant: 'success' })
       onSelect(take.id)
     },
     onError: (e) => toast({ title: (e as Error).message, variant: 'destructive' })
@@ -35,7 +38,7 @@ function ListView({ onSelect }: { onSelect: (id: number) => void }) {
     mutationFn: (id: number) => window.electronAPI.stocktake.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stocktakes'] })
-      toast({ title: '盤點單已刪除', variant: 'success' })
+      toast({ title: s.deleted, variant: 'success' })
     }
   })
 
@@ -43,11 +46,11 @@ function ListView({ onSelect }: { onSelect: (id: number) => void }) {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-medium text-muted-foreground">盤點紀錄</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">{s.records}</h2>
         </div>
         <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending} className="gap-2">
           <Plus className="w-4 h-4" />
-          新建盤點
+          {s.newTake}
         </Button>
       </div>
 
@@ -56,19 +59,19 @@ function ListView({ onSelect }: { onSelect: (id: number) => void }) {
       ) : !takes?.length ? (
         <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
           <ClipboardCheck className="w-10 h-10 opacity-30" />
-          <p className="text-sm">尚無盤點記錄，點擊「新建盤點」開始</p>
+          <p className="text-sm">{s.emptyMessage}</p>
         </div>
       ) : (
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">盤點單號</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">狀態</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">建立日期</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">項目</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">差異</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">未盤</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">No.</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.common.status}</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.common.date}</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Items</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">{s.difference}</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Uncounted</th>
                 <th className="px-4 py-3 w-24"></th>
               </tr>
             </thead>
@@ -82,9 +85,9 @@ function ListView({ onSelect }: { onSelect: (id: number) => void }) {
                   <td className="px-4 py-3 font-mono text-xs">{take.take_no}</td>
                   <td className="px-4 py-3">
                     {take.status === 'draft' ? (
-                      <Badge variant="secondary" className="text-xs bg-blue-500/15 text-blue-400">草稿</Badge>
+                      <Badge variant="secondary" className="text-xs bg-blue-500/15 text-blue-400">{s.statusDraft}</Badge>
                     ) : (
-                      <Badge variant="secondary" className="text-xs bg-green-500/15 text-green-400">已完成</Badge>
+                      <Badge variant="secondary" className="text-xs bg-green-500/15 text-green-400">{s.statusCompleted}</Badge>
                     )}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{formatDate(take.created_at)}</td>
@@ -116,8 +119,8 @@ function ListView({ onSelect }: { onSelect: (id: number) => void }) {
       <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="刪除盤點單"
-        description="刪除後無法復原。"
+        title={s.deleteTitle}
+        description={s.deleteDesc}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
       />
     </div>
@@ -137,6 +140,8 @@ function DiffCell({ item }: { item: StockTakeItem }) {
 function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const t = useLang()
+  const s = t.stockTake
   const [confirmComplete, setConfirmComplete] = useState(false)
 
   const { data: take, isLoading } = useQuery<StockTakeDetail>({
@@ -155,7 +160,7 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['stocktakes'] })
       queryClient.invalidateQueries({ queryKey: ['products'] })
-      toast({ title: `盤點完成，產生 ${result.adjustments} 筆庫存調整`, variant: 'success' })
+      toast({ title: `${s.completedMsg}，${result.adjustments} adjustments`, variant: 'success' })
       onBack()
     },
     onError: (e) => toast({ title: (e as Error).message, variant: 'destructive' })
@@ -183,7 +188,6 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
 
   return (
     <div className="p-6 space-y-4">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onBack}>
           <ArrowLeft className="w-4 h-4" />
@@ -192,52 +196,41 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm font-semibold">{take.take_no}</span>
             {isDraft
-              ? <Badge variant="secondary" className="text-xs bg-blue-500/15 text-blue-400">草稿</Badge>
-              : <Badge variant="secondary" className="text-xs bg-green-500/15 text-green-400">已完成</Badge>
+              ? <Badge variant="secondary" className="text-xs bg-blue-500/15 text-blue-400">{s.statusDraft}</Badge>
+              : <Badge variant="secondary" className="text-xs bg-green-500/15 text-green-400">{s.statusCompleted}</Badge>
             }
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">{formatDate(take.created_at)}</p>
         </div>
         {isDraft && (
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleMockFill}
-              className="gap-2 text-muted-foreground"
-              title="快速填入：將所有未盤項目設為與系統庫存相符"
-            >
+            <Button variant="outline" onClick={handleMockFill} className="gap-2 text-muted-foreground">
               <Wand2 className="w-4 h-4" />
-              Mock填入
+              {s.mockFill}
             </Button>
-            <Button
-              onClick={() => setConfirmComplete(true)}
-              disabled={completeMutation.isPending}
-              className="gap-2"
-            >
+            <Button onClick={() => setConfirmComplete(true)} disabled={completeMutation.isPending} className="gap-2">
               <CheckCircle2 className="w-4 h-4" />
-              完成盤點
+              {s.complete}
             </Button>
           </div>
         )}
       </div>
 
-      {/* Stats bar */}
       <div className="flex gap-4 text-xs text-muted-foreground">
-        <span>已盤 <span className="font-semibold text-foreground">{counted}</span> / {take.items.length} 項</span>
-        <span>差異 <span className={`font-semibold ${diffs > 0 ? 'text-yellow-400' : 'text-foreground'}`}>{diffs}</span> 項</span>
+        <span>{counted} / {take.items.length} {s.countedQty}</span>
+        <span>{s.difference}: <span className={`font-semibold ${diffs > 0 ? 'text-yellow-400' : 'text-foreground'}`}>{diffs}</span></span>
       </div>
 
-      {/* Table */}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">商品名稱</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.products.title}</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground font-mono text-xs">SKU</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">類別</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-24">系統庫存</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-28">實際數量</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-20">差異</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.products.category}</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-24">{s.systemQty}</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-28">{s.countedQty}</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-20">{s.difference}</th>
             </tr>
           </thead>
           <tbody>
@@ -274,9 +267,9 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
       <ConfirmDialog
         open={confirmComplete}
         onOpenChange={setConfirmComplete}
-        title="完成盤點"
-        description={`系統將對 ${diffs} 項有差異的商品自動調整庫存（寫入盤點修正記錄），此操作無法復原。`}
-        confirmLabel="確認完成"
+        title={s.completeTitle}
+        description={s.completeDesc}
+        confirmLabel={s.complete}
         variant="default"
         onConfirm={() => completeMutation.mutate()}
       />

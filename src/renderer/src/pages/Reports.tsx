@@ -9,15 +9,14 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts'
 import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
 
 function getDaysForPeriod(period: string): number {
   const now = new Date()
   switch (period) {
-    case 'this-month': {
-      return now.getDate()
-    }
+    case 'this-month': return now.getDate()
     case 'last-month': {
       const d = new Date(now.getFullYear(), now.getMonth(), 0)
       return d.getDate() + now.getDate()
@@ -30,51 +29,47 @@ function getDaysForPeriod(period: string): number {
   }
 }
 
-const PERIODS = [
-  { label: '7 天', value: '7' },
-  { label: '30 天', value: '30' },
-  { label: '本月', value: 'this-month' },
-  { label: '上月', value: 'last-month' },
-  { label: '本季', value: 'this-quarter' },
-  { label: '90 天', value: '90' },
-]
-
 export default function Reports() {
+  const t = useLang()
+  const r = t.reports
   const [period, setPeriod] = useState('30')
   const trendDays = getDaysForPeriod(period)
+
+  const PERIODS = [
+    { label: r.period7, value: '7' },
+    { label: r.period30, value: '30' },
+    { label: r.thisMonth, value: 'this-month' },
+    { label: r.lastMonth, value: 'last-month' },
+    { label: r.thisQuarter, value: 'this-quarter' },
+    { label: r.period90, value: '90' },
+  ]
 
   const { data: trend, isLoading: trendLoading } = useQuery<SalesTrendPoint[]>({
     queryKey: ['reports', 'salesTrend', trendDays],
     queryFn: () => window.electronAPI.reports.salesTrend(trendDays)
   })
-
   const { data: categories } = useQuery<InventoryByCategory[]>({
     queryKey: ['reports', 'inventoryByCategory'],
     queryFn: () => window.electronAPI.reports.inventoryByCategory()
   })
-
   const { data: topProducts } = useQuery<TopProduct[]>({
     queryKey: ['reports', 'topProducts', trendDays],
     queryFn: () => window.electronAPI.reports.topProducts(trendDays)
   })
-
   const { data: lowStock } = useQuery<LowStockItem[]>({
     queryKey: ['reports', 'lowStock'],
     queryFn: () => window.electronAPI.reports.lowStock()
   })
-
   const { data: marginItems } = useQuery<MarginItem[]>({
     queryKey: ['reports', 'marginAnalysis'],
     queryFn: () => window.electronAPI.reports.marginAnalysis(),
     staleTime: 1000 * 60 * 5
   })
-
   const { data: supplierStats } = useQuery<SupplierStat[]>({
     queryKey: ['reports', 'supplierStats'],
     queryFn: () => window.electronAPI.reports.supplierStats(),
     staleTime: 1000 * 60 * 5
   })
-
   const { data: customerStats } = useQuery<CustomerStat[]>({
     queryKey: ['reports', 'customerStats'],
     queryFn: () => window.electronAPI.reports.customerStats(),
@@ -83,9 +78,9 @@ export default function Reports() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
+      {/* Period selector */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">分析期間</h2>
+        <h2 className="text-sm font-medium text-muted-foreground">{r.salesTrend}</h2>
         <div className="flex gap-2">
           {PERIODS.map((p) => (
             <Button
@@ -104,7 +99,7 @@ export default function Reports() {
       {/* Sales Trend */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">銷售趨勢（近 {trendDays} 天）</CardTitle>
+          <CardTitle className="text-sm font-medium">{r.salesTrend}（{trendDays}d）</CardTitle>
         </CardHeader>
         <CardContent>
           {trendLoading ? <LoadingSpinner /> : trend && trend.length > 0 ? (
@@ -115,14 +110,14 @@ export default function Reports() {
                 <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
                 <Tooltip
                   contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-                  formatter={(v: number) => [formatCurrency(v), '營收']}
+                  formatter={(v: number) => [formatCurrency(v), r.revenue]}
                 />
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
-                <Line type="monotone" dataKey="revenue" name="營收" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                <Line type="monotone" dataKey="revenue" name={r.revenue} stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">此期間無銷售資料</div>
+            <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">{r.noData}</div>
           )}
         </CardContent>
       </Card>
@@ -131,7 +126,7 @@ export default function Reports() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">各類別庫存值</CardTitle>
+            <CardTitle className="text-sm font-medium">{r.inventoryByCategory}</CardTitle>
           </CardHeader>
           <CardContent>
             {categories && categories.length > 0 ? (
@@ -140,21 +135,21 @@ export default function Reports() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
                   <YAxis type="category" dataKey="category" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={70} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v: number) => [formatCurrency(v), '庫存值']} />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v: number) => [formatCurrency(v), r.inventoryByCategory]} />
                   <Bar dataKey="inventory_value" radius={[0, 4, 4, 0]}>
                     {categories.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">無庫存資料</div>
+              <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">{r.noData}</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">銷售排行（近 {trendDays} 天）</CardTitle>
+            <CardTitle className="text-sm font-medium">{r.topProducts}（{trendDays}d）</CardTitle>
           </CardHeader>
           <CardContent>
             {topProducts && topProducts.length > 0 ? (
@@ -164,14 +159,14 @@ export default function Reports() {
                     <span className="text-xs text-muted-foreground w-5">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm truncate">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">{p.sku} · {formatNumber(p.total_quantity)} 件</div>
+                      <div className="text-xs text-muted-foreground">{p.sku} · {formatNumber(p.total_quantity)} {r.quantity}</div>
                     </div>
                     <span className="text-sm font-semibold text-green-400">{formatCurrency(p.total_revenue)}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">無銷售資料</div>
+              <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">{r.noData}</div>
             )}
           </CardContent>
         </Card>
@@ -181,7 +176,7 @@ export default function Reports() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-yellow-400">
-            低庫存警示 {lowStock && lowStock.length > 0 && `(${lowStock.length})`}
+            {r.lowStockItems} {lowStock && lowStock.length > 0 && `(${lowStock.length})`}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -190,7 +185,7 @@ export default function Reports() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    {['SKU', '商品名稱', '類別', '現有庫存', '補貨點', '缺口', '建議補貨'].map(h => (
+                    {['SKU', t.products.title, t.products.category, t.products.stock, '補貨點', '缺口', '建議補貨'].map(h => (
                       <th key={h} className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
                     ))}
                   </tr>
@@ -215,7 +210,7 @@ export default function Reports() {
               </table>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">所有商品庫存充足</div>
+            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">{t.dashboard.allStockSufficient}</div>
           )}
         </CardContent>
       </Card>
@@ -223,7 +218,7 @@ export default function Reports() {
       {/* Margin Analysis */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">商品毛利分析</CardTitle>
+          <CardTitle className="text-sm font-medium">{r.grossMargin}</CardTitle>
         </CardHeader>
         <CardContent>
           {marginItems && marginItems.length > 0 ? (
@@ -231,7 +226,7 @@ export default function Reports() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    {['SKU', '商品名稱', '類別', '售價', '進價', '毛利', '毛利率 %'].map((h) => (
+                    {['SKU', t.products.title, t.products.category, t.products.sellPrice, t.products.buyPrice, '毛利', '毛利率 %'].map((h) => (
                       <th key={h} className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
                     ))}
                   </tr>
@@ -239,11 +234,7 @@ export default function Reports() {
                 <tbody>
                   {marginItems.map((item) => {
                     const pct = item.margin_pct
-                    const pctClass =
-                      pct === null ? 'text-muted-foreground' :
-                      pct >= 30 ? 'text-green-400 font-semibold' :
-                      pct >= 10 ? 'text-yellow-400 font-semibold' :
-                      'text-destructive font-semibold'
+                    const pctClass = pct === null ? 'text-muted-foreground' : pct >= 30 ? 'text-green-400 font-semibold' : pct >= 10 ? 'text-yellow-400 font-semibold' : 'text-destructive font-semibold'
                     return (
                       <tr key={item.id} className="border-b border-border/50 hover:bg-muted/20">
                         <td className="px-4 py-2 font-mono text-xs">{item.sku}</td>
@@ -252,9 +243,7 @@ export default function Reports() {
                         <td className="px-4 py-2">{formatCurrency(item.sell_price)}</td>
                         <td className="px-4 py-2 text-muted-foreground">{formatCurrency(item.buy_price)}</td>
                         <td className="px-4 py-2">{formatCurrency(item.margin)}</td>
-                        <td className={`px-4 py-2 ${pctClass}`}>
-                          {pct !== null ? `${pct.toFixed(1)}%` : '—'}
-                        </td>
+                        <td className={`px-4 py-2 ${pctClass}`}>{pct !== null ? `${pct.toFixed(1)}%` : '—'}</td>
                       </tr>
                     )
                   })}
@@ -262,7 +251,7 @@ export default function Reports() {
               </table>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">無商品資料</div>
+            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">{r.noData}</div>
           )}
         </CardContent>
       </Card>
@@ -271,7 +260,7 @@ export default function Reports() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">供應商採購統計</CardTitle>
+            <CardTitle className="text-sm font-medium">{r.supplierStats}</CardTitle>
           </CardHeader>
           <CardContent>
             {supplierStats && supplierStats.length > 0 ? (
@@ -279,7 +268,7 @@ export default function Reports() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
-                      {['供應商', '採購次數', '收貨總金額', '訂單總金額'].map((h) => (
+                      {[t.suppliers.name, r.orders, r.revenue, t.common.amount].map((h) => (
                         <th key={h} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
                       ))}
                     </tr>
@@ -297,14 +286,14 @@ export default function Reports() {
                 </table>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">無供應商資料</div>
+              <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">{r.noData}</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">客戶消費統計</CardTitle>
+            <CardTitle className="text-sm font-medium">{r.customerStats}</CardTitle>
           </CardHeader>
           <CardContent>
             {customerStats && customerStats.length > 0 ? (
@@ -312,7 +301,7 @@ export default function Reports() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
-                      {['客戶', '訂單次數', '完成總金額', '訂單總金額'].map((h) => (
+                      {[t.customers.name, r.orders, r.revenue, t.common.amount].map((h) => (
                         <th key={h} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
                       ))}
                     </tr>
@@ -330,7 +319,7 @@ export default function Reports() {
                 </table>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">無客戶資料</div>
+              <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">{r.noData}</div>
             )}
           </CardContent>
         </Card>

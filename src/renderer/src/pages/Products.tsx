@@ -14,9 +14,12 @@ import { PurchaseSuggestionDialog } from '@/components/inventory/PurchaseSuggest
 import { ImportCsvDialog } from '@/components/products/ImportCsvDialog'
 import { formatCurrency, formatNumber } from '@/lib/utils'
 import type { Product } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 export default function Products() {
   const queryClient = useQueryClient()
+  const t = useLang()
+  const p = t.products
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
@@ -39,13 +42,13 @@ export default function Products() {
 
   const columns: Column<Product>[] = [
     { key: 'sku', label: 'SKU', sortable: true, className: 'font-mono text-xs w-32' },
-    { key: 'name', label: '商品名稱', sortable: true },
-    { key: 'category', label: '類別', sortable: true, render: (v) => (
+    { key: 'name', label: p.title, sortable: true },
+    { key: 'category', label: p.category, sortable: true, render: (v) => (
       <Badge variant="secondary" className="text-xs">{String(v)}</Badge>
     )},
     {
       key: 'stock_qty',
-      label: '庫存',
+      label: p.stock,
       sortable: true,
       className: 'text-right w-20',
       render: (v, row) => (
@@ -57,17 +60,17 @@ export default function Products() {
         </span>
       )
     },
-    { key: 'unit', label: '單位', className: 'w-16 text-center' },
+    { key: 'unit', label: p.unit, className: 'w-16 text-center' },
     {
       key: 'sell_price',
-      label: '售價',
+      label: p.sellPrice,
       sortable: true,
       className: 'text-right w-24',
       render: (v) => formatCurrency(Number(v))
     },
     {
       key: 'buy_price',
-      label: '進價',
+      label: p.buyPrice,
       sortable: true,
       className: 'text-right w-24',
       render: (v) => formatCurrency(Number(v))
@@ -82,7 +85,7 @@ export default function Products() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            title="調整記錄"
+            title={p.adjustHistory}
             onClick={() => setHistoryProduct(row as unknown as Product)}
           >
             <History className="w-3.5 h-3.5" />
@@ -91,7 +94,7 @@ export default function Products() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            title="庫存調整"
+            title={p.adjustInventory}
             onClick={() => setAdjustProduct(row as unknown as Product)}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -125,26 +128,18 @@ export default function Products() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder="搜尋商品名稱或 SKU..."
+            placeholder={p.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => setSuggestionOpen(true)}
-        >
+        <Button variant="outline" className="gap-2" onClick={() => setSuggestionOpen(true)}>
           <ShoppingCart className="w-4 h-4" />
-          採購建議
+          {p.purchaseSuggestion}
         </Button>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => setImportOpen(true)}
-        >
+        <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
           <Upload className="w-4 h-4" />
-          匯入 CSV
+          {t.common.importCsv}
         </Button>
         <Button
           variant="outline"
@@ -157,11 +152,11 @@ export default function Products() {
           }}
         >
           <Download className="w-4 h-4" />
-          {exporting ? '匯出中...' : '匯出 CSV'}
+          {exporting ? t.common.exporting : t.common.exportCsv}
         </Button>
         <Button onClick={() => { setEditProduct(null); setFormOpen(true) }} className="gap-2">
           <Plus className="w-4 h-4" />
-          新增商品
+          {p.addProduct}
         </Button>
       </div>
 
@@ -174,7 +169,7 @@ export default function Products() {
             data={(products ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
-            emptyMessage="沒有商品，請新增第一個商品"
+            emptyMessage={p.emptyMessage}
           />
         )}
       </div>
@@ -182,53 +177,32 @@ export default function Products() {
       {/* Stats */}
       {products && (
         <p className="text-xs text-muted-foreground">
-          共 {products.length} 項商品 ·{' '}
-          {products.filter((p) => p.stock_qty <= p.reorder_pt).length} 項低庫存
+          {p.statsText(products.length, products.filter((p) => p.stock_qty <= p.reorder_pt).length)}
         </p>
       )}
 
-      {/* Import CSV Dialog */}
-      <ImportCsvDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-      />
-
-      {/* Purchase Suggestion Dialog */}
-      <PurchaseSuggestionDialog
-        open={suggestionOpen}
-        onOpenChange={setSuggestionOpen}
-      />
-
-      {/* Product Form Dialog */}
+      <ImportCsvDialog open={importOpen} onOpenChange={setImportOpen} />
+      <PurchaseSuggestionDialog open={suggestionOpen} onOpenChange={setSuggestionOpen} />
       <ProductForm
         open={formOpen}
-        onOpenChange={(open) => {
-          setFormOpen(open)
-          if (!open) setEditProduct(null)
-        }}
+        onOpenChange={(open) => { setFormOpen(open); if (!open) setEditProduct(null) }}
         product={editProduct}
       />
-
-      {/* Adjustment History Dialog */}
       <AdjustmentHistoryDialog
         open={historyProduct !== null}
         onOpenChange={(open) => !open && setHistoryProduct(null)}
         product={historyProduct}
       />
-
-      {/* Adjust Inventory Dialog */}
       <AdjustInventoryDialog
         open={adjustProduct !== null}
         onOpenChange={(open) => !open && setAdjustProduct(null)}
         product={adjustProduct}
       />
-
-      {/* Delete Confirm */}
       <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="刪除商品"
-        description="刪除後無法復原，相關的採購/銷售明細中的商品將無法顯示名稱。"
+        title={p.deleteTitle}
+        description={p.deleteDesc}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
       />
     </div>

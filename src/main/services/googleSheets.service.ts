@@ -1,5 +1,5 @@
 import { google, sheets_v4 } from 'googleapis'
-import type { Product, PurchaseOrder, SalesOrder } from '../db/schema'
+import type { Product, PurchaseOrder, SalesOrder, InventoryAdjustment, StockTakeItem } from '../db/schema'
 
 export class GoogleSheetsService {
   private sheets: sheets_v4.Sheets | null = null
@@ -31,7 +31,7 @@ export class GoogleSheetsService {
     })
     const existingSheets = spreadsheet.data.sheets?.map((s) => s.properties?.title) ?? []
 
-    const requiredSheets = ['Products', 'Purchase Orders', 'Sales Orders', 'Reports']
+    const requiredSheets = ['Products', 'Purchase Orders', 'Sales Orders', 'Reports', '庫存異動', '盤點記錄']
     const toCreate = requiredSheets.filter((s) => !existingSheets.includes(s))
 
     if (toCreate.length > 0) {
@@ -50,7 +50,9 @@ export class GoogleSheetsService {
       Products: [['SKU', '商品名稱', '類別', '售價', '進價', '庫存', '補貨點', '單位', '說明', '更新時間']],
       'Purchase Orders': [['訂單號', '供應商', '狀態', '訂單日期', '收貨日期', '金額', '備註']],
       'Sales Orders': [['訂單號', '客戶', '狀態', '訂單日期', '金額', '備註']],
-      Reports: [['日期', '庫存總值', '低庫存商品數', '本月營收', '本月毛利']]
+      Reports: [['日期', '庫存總值', '低庫存商品數', '本月營收', '本月毛利']],
+      庫存異動: [['時間', 'SKU', '商品名稱', '類別', '異動量', '原因', '備註', '操作者']],
+      盤點記錄: [['盤點單號', '狀態', '建立時間', '完成時間', 'SKU', '商品名稱', '系統庫存', '盤點庫存', '差異', '備註']]
     }
 
     for (const [sheet, headerRow] of Object.entries(headers)) {
@@ -110,6 +112,26 @@ export class GoogleSheetsService {
       o.order_date, o.total_amount, o.notes ?? ''
     ])
     await this.clearAndWrite('Sales Orders!A2', values)
+  }
+
+  async pushInventoryAdjustments(adjustments: InventoryAdjustment[]): Promise<void> {
+    if (!this.sheets) throw new Error('未初始化')
+    const values = adjustments.map((a) => [
+      a.adjusted_at, a.sku ?? '', a.product_name ?? '', a.category ?? '',
+      a.delta, a.reason, a.note ?? '', a.adjusted_by
+    ])
+    await this.clearAndWrite('庫存異動!A2', values)
+  }
+
+  async pushStockTakes(items: StockTakeItem[]): Promise<void> {
+    if (!this.sheets) throw new Error('未初始化')
+    const values = items.map((i) => [
+      i.take_no ?? '', i.status ?? '', i.created_at ?? '',
+      i.completed_at ?? '', i.sku ?? '', i.product_name ?? '',
+      i.system_qty, i.counted_qty ?? '', (i.counted_qty ?? i.system_qty) - i.system_qty,
+      i.notes ?? ''
+    ])
+    await this.clearAndWrite('盤點記錄!A2', values)
   }
 
   async pushDailyReport(report: {

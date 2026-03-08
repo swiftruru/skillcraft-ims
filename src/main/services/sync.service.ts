@@ -89,6 +89,30 @@ export class SyncService {
         await this.sheetsService.pushSalesOrders(sales)
         recordsSynced += sales.length
 
+        emitProgress('推送庫存異動記錄...')
+        const adjustments = db.prepare(
+          `SELECT a.id, a.product_id, a.delta, a.reason, a.note, a.adjusted_by, a.adjusted_at,
+                  p.name as product_name, p.sku, p.category
+           FROM inventory_adjustments a
+           JOIN products p ON a.product_id = p.id
+           ORDER BY a.adjusted_at DESC`
+        ).all()
+        await this.sheetsService.pushInventoryAdjustments(adjustments as Parameters<typeof this.sheetsService.pushInventoryAdjustments>[0])
+        recordsSynced += adjustments.length
+
+        emitProgress('推送盤點記錄...')
+        const stockTakeItems = db.prepare(
+          `SELECT sti.id, sti.stock_take_id, sti.product_id, sti.system_qty, sti.counted_qty,
+                  st.take_no, st.status, st.notes, st.created_at, st.completed_at,
+                  p.sku, p.name as product_name
+           FROM stock_take_items sti
+           JOIN stock_takes st ON sti.stock_take_id = st.id
+           JOIN products p ON sti.product_id = p.id
+           ORDER BY st.created_at DESC, sti.id`
+        ).all()
+        await this.sheetsService.pushStockTakes(stockTakeItems as Parameters<typeof this.sheetsService.pushStockTakes>[0])
+        recordsSynced += stockTakeItems.length
+
         emitProgress('推送每日報表...')
         const kpiRow = db
           .prepare(

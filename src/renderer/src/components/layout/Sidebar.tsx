@@ -14,30 +14,36 @@ import {
   Info
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: '總覽', end: true },
-  { to: '/products', icon: Package, label: '商品管理' },
-  { to: '/purchases', icon: ShoppingCart, label: '採購管理' },
-  { to: '/sales', icon: TrendingUp, label: '銷售管理' },
-  { to: '/suppliers', icon: Truck, label: '供應商' },
-  { to: '/customers', icon: Users, label: '客戶管理' },
-  { to: '/reports', icon: BarChart3, label: '報表分析' },
-  { to: '/stock-take', icon: ClipboardList, label: '庫存盤點' },
-  { to: '/inventory-history', icon: History, label: '異動歷史' }
-]
+import { useLang } from '@/lib/useLang'
 
 export function Sidebar() {
+  const t = useLang()
+
+  const navItems = [
+    { to: '/', icon: LayoutDashboard, label: t.nav.dashboard, end: true },
+    { to: '/products', icon: Package, label: t.nav.products },
+    { to: '/purchases', icon: ShoppingCart, label: t.nav.purchases },
+    { to: '/sales', icon: TrendingUp, label: t.nav.sales },
+    { to: '/suppliers', icon: Truck, label: t.nav.suppliers },
+    { to: '/customers', icon: Users, label: t.nav.customers },
+    { to: '/reports', icon: BarChart3, label: t.nav.reports },
+    { to: '/stock-take', icon: ClipboardList, label: t.nav.stockTake },
+    { to: '/inventory-history', icon: History, label: t.nav.inventoryHistory }
+  ]
+
   return (
     <aside className="flex flex-col w-56 min-h-screen bg-sidebar border-r border-sidebar-border">
+      {/* macOS traffic-light drag zone */}
+      <div className="h-8 titlebar-drag shrink-0" />
+
       {/* Logo */}
-      <div className="flex items-center gap-2 pl-[76px] pr-4 py-5 border-b border-sidebar-border titlebar-drag">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/20 text-primary">
+      <div className="flex items-center gap-2.5 px-4 pb-4 border-b border-sidebar-border">
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/20 text-primary shrink-0">
           <Warehouse className="w-5 h-5" />
         </div>
-        <div className="titlebar-no-drag">
-          <div className="text-sm font-semibold text-sidebar-foreground">SkillCraft IMS</div>
-          <div className="text-[10px] text-muted-foreground">進銷存管理系統</div>
+        <div>
+          <div className="text-sm font-semibold text-sidebar-foreground leading-tight">SkillCraft IMS</div>
+          <div className="text-[10px] text-muted-foreground leading-tight">{t.sidebar.subtitle}</div>
         </div>
       </div>
 
@@ -77,7 +83,7 @@ export function Sidebar() {
           }
         >
           <Settings className="w-4 h-4 shrink-0" />
-          設定
+          {t.nav.settings}
         </NavLink>
         <NavLink
           to="/about"
@@ -91,7 +97,7 @@ export function Sidebar() {
           }
         >
           <Info className="w-4 h-4 shrink-0" />
-          關於
+          {t.nav.about}
         </NavLink>
       </div>
     </aside>

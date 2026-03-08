@@ -1,19 +1,25 @@
 import { ExternalLink, Mail, Globe, Github, GraduationCap, BookOpen, Cpu, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-const techStack = [
-  { name: 'Electron 34', desc: '跨平台桌面框架' },
-  { name: 'React 19 + TypeScript', desc: '前端 UI 框架' },
-  { name: 'SQLite (better-sqlite3)', desc: '本地關聯式資料庫' },
-  { name: 'Tailwind CSS + shadcn/ui', desc: 'UI 元件與樣式系統' },
-  { name: 'TanStack React Query', desc: '非同步資料狀態管理' },
-  { name: 'Google Sheets API v4', desc: '雲端資料雙向同步' },
-  { name: 'Claude Code Skills', desc: 'AI 驅動的庫存分析與操作指令' },
-  { name: 'Recharts', desc: '報表資料視覺化' }
-]
+import { useLang } from '@/lib/useLang'
+import { useLangStore } from '@/stores/lang.store'
 
 export default function About() {
+  const t = useLang()
+  const a = t.about
+  const { lang } = useLangStore()
+  const isEn = lang === 'en'
   const openUrl = (url: string) => window.electronAPI.shell.openExternal(url)
+
+  const techStack = [
+    { name: 'Electron 34', desc: isEn ? 'Cross-platform desktop framework' : '跨平台桌面框架' },
+    { name: 'React 19 + TypeScript', desc: isEn ? 'Frontend UI framework' : '前端 UI 框架' },
+    { name: 'SQLite (better-sqlite3)', desc: isEn ? 'Local relational database' : '本地關聯式資料庫' },
+    { name: 'Tailwind CSS + shadcn/ui', desc: isEn ? 'UI components & styling' : 'UI 元件與樣式系統' },
+    { name: 'TanStack React Query', desc: isEn ? 'Async data state management' : '非同步資料狀態管理' },
+    { name: 'Google Sheets API v4', desc: isEn ? 'Cloud two-way data sync' : '雲端資料雙向同步' },
+    { name: 'Claude Code Skills', desc: isEn ? 'AI-driven inventory analysis & commands' : 'AI 驅動的庫存分析與操作指令' },
+    { name: 'Recharts', desc: isEn ? 'Report data visualization' : '報表資料視覺化' }
+  ]
 
   return (
     <div className="p-8 max-w-2xl mx-auto space-y-8">
@@ -25,7 +31,9 @@ export default function About() {
         <h1 className="text-2xl font-bold tracking-tight">SkillCraft IMS</h1>
         <p className="text-sm text-muted-foreground">Inventory Management System · v0.1.0</p>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          整合 Electron 桌面應用、SQLite 本地資料庫、Google Sheets 雲端同步與 Claude Code AI Skills 的跨平台進銷存系統。
+          {isEn
+            ? 'A cross-platform inventory system integrating Electron desktop, SQLite local database, Google Sheets cloud sync, and Claude Code AI Skills.'
+            : '整合 Electron 桌面應用、SQLite 本地資料庫、Google Sheets 雲端同步與 Claude Code AI Skills 的跨平台進銷存系統。'}
         </p>
       </div>
 
@@ -33,21 +41,25 @@ export default function About() {
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
           <Sparkles className="w-3.5 h-3.5" />
-          命名概念
+          {a.nameConcept}
         </h2>
         <div className="space-y-3 text-sm">
           <div className="flex items-start gap-4">
             <span className="font-mono font-bold text-primary w-24 shrink-0">SkillCraft</span>
             <div>
-              <span className="text-foreground">SKILL + Craft（手藝）</span>
-              <span className="text-muted-foreground ml-2">— 以課程核心「AI Skill」為靈感的命名</span>
+              <span className="text-foreground">SKILL + Craft</span>
+              <span className="text-muted-foreground ml-2">
+                {isEn ? '— Named after the course\'s core concept "AI Skill"' : '— 以課程核心「AI Skill」為靈感的命名'}
+              </span>
             </div>
           </div>
           <div className="flex items-start gap-4">
             <span className="font-mono font-bold text-primary w-24 shrink-0">IMS</span>
             <div>
               <span className="text-foreground">Inventory Management System</span>
-              <span className="text-muted-foreground ml-2">— 進銷存管理系統的通用縮寫</span>
+              <span className="text-muted-foreground ml-2">
+                {isEn ? '— Standard abbreviation for inventory management' : '— 進銷存管理系統的通用縮寫'}
+              </span>
             </div>
           </div>
         </div>
@@ -55,7 +67,7 @@ export default function About() {
 
       {/* Author */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">作者資訊</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{a.authorInfo}</h2>
         <div className="space-y-3">
           <div className="flex items-start gap-3">
             <GraduationCap className="w-4 h-4 text-primary mt-0.5 shrink-0" />
@@ -96,7 +108,7 @@ export default function About() {
 
       {/* Course Info */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">課程資訊</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{a.courseInfo}</h2>
         <div className="space-y-3">
           <div className="flex items-start gap-3">
             <BookOpen className="w-4 h-4 text-primary mt-0.5 shrink-0" />
@@ -106,11 +118,11 @@ export default function About() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm pl-7">
-            <span className="text-muted-foreground">指導老師</span>
+            <span className="text-muted-foreground">{a.advisor}</span>
             <span>陳彥宏博士　Dr. CHEN, YEN-HUNG</span>
-            <span className="text-muted-foreground">學校</span>
+            <span className="text-muted-foreground">{a.school}</span>
             <span>國立台北護理健康大學</span>
-            <span className="text-muted-foreground">系所</span>
+            <span className="text-muted-foreground">{a.dept}</span>
             <span>資訊管理系</span>
           </div>
         </div>
@@ -118,12 +130,12 @@ export default function About() {
 
       {/* Tech Stack */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">技術堆疊</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{a.techStack}</h2>
         <div className="grid grid-cols-1 gap-2">
-          {techStack.map((t) => (
-            <div key={t.name} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
-              <span className="text-sm font-mono font-medium text-foreground">{t.name}</span>
-              <span className="text-xs text-muted-foreground">{t.desc}</span>
+          {techStack.map((item) => (
+            <div key={item.name} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
+              <span className="text-sm font-mono font-medium text-foreground">{item.name}</span>
+              <span className="text-xs text-muted-foreground">{item.desc}</span>
             </div>
           ))}
         </div>
@@ -147,7 +159,7 @@ export default function About() {
           onClick={() => openUrl('https://swift.moe')}
         >
           <ExternalLink className="w-4 h-4" />
-          個人網站
+          {a.website}
         </Button>
       </div>
 
