@@ -8,7 +8,8 @@ import {
   Users,
   BarChart3,
   Settings,
-  Warehouse
+  Warehouse,
+  Info
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -58,8 +59,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Settings */}
-      <div className="px-2 py-3 border-t border-sidebar-border">
+      {/* Settings + About */}
+      <div className="px-2 py-3 border-t border-sidebar-border space-y-0.5">
         <NavLink
           to="/settings"
           className={({ isActive }) =>
@@ -73,6 +74,20 @@ export function Sidebar() {
         >
           <Settings className="w-4 h-4 shrink-0" />
           設定
+        </NavLink>
+        <NavLink
+          to="/about"
+          className={({ isActive }) =>
+            cn(
+              'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors titlebar-no-drag',
+              isActive
+                ? 'bg-primary/15 text-primary font-medium'
+                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            )
+          }
+        >
+          <Info className="w-4 h-4 shrink-0" />
+          關於
         </NavLink>
       </div>
     </aside>

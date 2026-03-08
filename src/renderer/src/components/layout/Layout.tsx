@@ -13,7 +13,8 @@ const pageTitles: Record<string, string> = {
   '/suppliers': '供應商管理',
   '/customers': '客戶管理',
   '/reports': '報表分析',
-  '/settings': '系統設定'
+  '/settings': '系統設定',
+  '/about': '關於 SkillCraft IMS'
 }
 
 export function Layout() {
