@@ -60,7 +60,7 @@ export default function About() {
           <div className="flex items-start gap-3">
             <GraduationCap className="w-4 h-4 text-primary mt-0.5 shrink-0" />
             <div>
-              <div className="text-sm font-medium">潘昱如</div>
+              <div className="text-sm font-medium">潘昱如　PAN, YU-RU</div>
               <div className="text-xs text-muted-foreground">國立台北護理健康大學 · 資訊管理系</div>
             </div>
           </div>
@@ -107,7 +107,7 @@ export default function About() {
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm pl-7">
             <span className="text-muted-foreground">指導老師</span>
-            <span>陳彥宏 YEN-HUNG CHEN</span>
+            <span>陳彥宏博士　Dr. YEN-HUNG CHEN</span>
             <span className="text-muted-foreground">學校</span>
             <span>國立台北護理健康大學</span>
             <span className="text-muted-foreground">系所</span>
