@@ -2,7 +2,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Wand2 } from 'lucide-react'
+import { Plus, Trash2, Wand2, AlertTriangle } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,6 +44,17 @@ export function SaleForm({ open, onOpenChange }: { open: boolean; onOpenChange: 
 
   const items = watch('items')
   const total = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0), 0)
+
+  // 逐行計算庫存不足警告
+  const stockWarnings = items.map((item) => {
+    const product = products?.find((p) => p.id === Number(item.product_id))
+    if (!product || !item.product_id) return null
+    if ((item.quantity || 0) > product.stock_qty) {
+      return `庫存不足：現有 ${product.stock_qty} 件`
+    }
+    return null
+  })
+  const hasStockError = stockWarnings.some(Boolean)
 
   const fillMock = () => {
     const firstProduct = products?.find((p) => p.stock_qty > 0) ?? products?.[0]
@@ -98,22 +109,34 @@ export function SaleForm({ open, onOpenChange }: { open: boolean; onOpenChange: 
                 <span>商品</span><span>數量</span><span>售價 (NT$)</span><span></span>
               </div>
               {fields.map((field, i) => (
-                <div key={field.id} className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 items-center">
-                  <Select onValueChange={(v) => handleProductChange(i, v)}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="選擇商品" /></SelectTrigger>
-                    <SelectContent>
-                      {products?.map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          [{p.sku}] {p.name} (庫存:{p.stock_qty})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input type="number" min={1} className="h-9" {...register(`items.${i}.quantity`)} />
-                  <Input type="number" min={0} className="h-9" {...register(`items.${i}.unit_price`)} />
-                  <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive shrink-0" onClick={() => remove(i)} disabled={fields.length === 1}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                <div key={field.id} className="space-y-1">
+                  <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 items-center">
+                    <Select onValueChange={(v) => handleProductChange(i, v)}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="選擇商品" /></SelectTrigger>
+                      <SelectContent>
+                        {products?.map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)}>
+                            [{p.sku}] {p.name} (庫存:{p.stock_qty})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number" min={1}
+                      className={`h-9 ${stockWarnings[i] ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      {...register(`items.${i}.quantity`)}
+                    />
+                    <Input type="number" min={0} className="h-9" {...register(`items.${i}.unit_price`)} />
+                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive shrink-0" onClick={() => remove(i)} disabled={fields.length === 1}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  {stockWarnings[i] && (
+                    <div className="flex items-center gap-1 text-xs text-destructive pl-1">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />
+                      {stockWarnings[i]}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -133,7 +156,9 @@ export function SaleForm({ open, onOpenChange }: { open: boolean; onOpenChange: 
               <Wand2 className="w-3.5 h-3.5" />Mock 資料
             </Button>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-            <Button type="submit" disabled={isSubmitting || mutation.isPending}>建立銷售單</Button>
+            <Button type="submit" disabled={isSubmitting || mutation.isPending || hasStockError}>
+              建立銷售單
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

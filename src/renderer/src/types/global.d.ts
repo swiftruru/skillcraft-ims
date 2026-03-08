@@ -105,6 +105,9 @@ declare global {
       shell: {
         openExternal(url: string): Promise<void>
       }
+      demo: {
+        purge(): Promise<void>
+      }
     }
   }
 }

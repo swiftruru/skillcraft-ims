@@ -1,5 +1,41 @@
-import { ipcMain } from 'electron'
+import { ipcMain, Notification } from 'electron'
 import { SaleModel } from '../db/models/sale.model'
+import { getDb } from '../db'
+
+function notifyLowStockAfterSale(soldProductIds: number[]): void {
+  if (!Notification.isSupported() || soldProductIds.length === 0) return
+  try {
+    const db = getDb()
+    const placeholders = soldProductIds.map(() => '?').join(',')
+    const nowLow = db
+      .prepare(
+        `SELECT name, stock_qty, reorder_pt FROM products
+         WHERE id IN (${placeholders}) AND stock_qty <= reorder_pt`
+      )
+      .all(...soldProductIds) as { name: string; stock_qty: number; reorder_pt: number }[]
+
+    if (nowLow.length === 0) return
+
+    const outOfStock = nowLow.filter((p) => p.stock_qty === 0)
+    const lines = nowLow.slice(0, 3).map((p) =>
+      p.stock_qty === 0 ? `${p.name}（已售完）` : `${p.name}（剩 ${p.stock_qty}）`
+    )
+    const extra = nowLow.length > 3 ? `…等共 ${nowLow.length} 項` : ''
+
+    const title =
+      outOfStock.length > 0
+        ? `⚠️ ${outOfStock.length} 項商品已售完`
+        : `⚠️ ${nowLow.length} 項商品庫存低於補貨點`
+
+    new Notification({
+      title,
+      body: lines.join('、') + extra,
+      silent: false
+    }).show()
+  } catch {
+    // 靜默忽略通知錯誤
+  }
+}
 
 export function registerSalesIpc(): void {
   ipcMain.handle('sales:getAll', (_e, filters) => SaleModel.findAll(filters))
@@ -7,7 +43,15 @@ export function registerSalesIpc(): void {
   ipcMain.handle('sales:create', (_e, data) => SaleModel.create(data))
   ipcMain.handle('sales:complete', (_e, id: number) => {
     try {
-      return { success: true, data: SaleModel.complete(id) }
+      // 取得售出的商品 ID，用於完成後檢查庫存
+      const order = SaleModel.findById(id)
+      const soldProductIds = (order?.items ?? []).map((i) => i.product_id)
+
+      const result = SaleModel.complete(id)
+      if (result) {
+        notifyLowStockAfterSale(soldProductIds)
+      }
+      return { success: true, data: result }
     } catch (err: unknown) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }

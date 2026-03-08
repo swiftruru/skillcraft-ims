@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   TrendingUp,
   TrendingDown,
@@ -7,12 +8,17 @@ import {
   DollarSign,
   BarChart2,
   ShoppingBag,
-  Clock
+  Clock,
+  ShoppingCart,
+  CheckSquare,
+  Square
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency, formatDate, calcChangePercent } from '@/lib/utils'
+import { useToast } from '@/components/ui/use-toast'
 import {
   LineChart,
   Line,
@@ -25,7 +31,7 @@ import {
   Bar,
   Cell
 } from 'recharts'
-import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem } from '@/types/schema'
+import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 const CATEGORY_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
@@ -33,6 +39,9 @@ const CATEGORY_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', 
 export default function Dashboard() {
   const t = useLang()
   const d = t.dashboard
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set())
 
   const { data: kpis, isLoading: kpisLoading } = useQuery<DashboardKPIs>({
     queryKey: ['reports', 'kpis'],
@@ -58,6 +67,39 @@ export default function Dashboard() {
     queryKey: ['sales', 'all', { status: 'pending' }],
     queryFn: () => window.electronAPI.sales.getAll({ status: 'pending' })
   })
+
+  const { data: suggestions } = useQuery<PurchaseSuggestion[]>({
+    queryKey: ['inventory', 'suggestions'],
+    queryFn: () => window.electronAPI.inventory.getPurchaseSuggestions()
+  })
+
+  const createPOMutation = useMutation({
+    mutationFn: (items: { product_id: number; quantity: number; unit_price: number }[]) =>
+      window.electronAPI.inventory.createPurchaseFromSuggestions(items),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory', 'suggestions'] })
+      setSelectedSuggestions(new Set())
+      toast({ title: '採購單已建立', variant: 'success' })
+    },
+    onError: () => toast({ title: '建立失敗', variant: 'destructive' })
+  })
+
+  const toggleSuggestion = (id: number) => {
+    setSelectedSuggestions((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleCreatePO = () => {
+    const items = (suggestions ?? [])
+      .filter((s) => selectedSuggestions.has(s.product_id))
+      .map((s) => ({ product_id: s.product_id, quantity: s.suggested_qty, unit_price: s.buy_price }))
+    if (items.length === 0) return
+    createPOMutation.mutate(items)
+  }
 
   if (kpisLoading) return <LoadingSpinner />
 
@@ -279,6 +321,81 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Purchase Suggestions */}
+      {suggestions && suggestions.length > 0 && (
+        <Card className="border-orange-400/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4 text-orange-400" />
+                補貨建議
+                <Badge variant="warning">{suggestions.length}</Badge>
+              </CardTitle>
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                disabled={selectedSuggestions.size === 0 || createPOMutation.isPending}
+                onClick={handleCreatePO}
+              >
+                <ShoppingCart className="w-3 h-3" />
+                建立採購單（{selectedSuggestions.size} 項）
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-0">
+              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-4 text-xs text-muted-foreground px-1 pb-2 border-b border-border">
+                <span></span>
+                <span>商品</span>
+                <span className="text-right">現有庫存</span>
+                <span className="text-right">建議補貨</span>
+                <span className="text-right">預估費用</span>
+              </div>
+              {suggestions.map((item) => {
+                const selected = selectedSuggestions.has(item.product_id)
+                return (
+                  <div
+                    key={item.product_id}
+                    className={`grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-4 items-center py-2 border-b border-border/50 last:border-0 cursor-pointer hover:bg-muted/30 rounded px-1 transition-colors ${selected ? 'bg-orange-400/5' : ''}`}
+                    onClick={() => toggleSuggestion(item.product_id)}
+                  >
+                    <span className={selected ? 'text-orange-400' : 'text-muted-foreground'}>
+                      {selected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium">{item.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{item.sku}</div>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-sm font-semibold ${item.stock_qty === 0 ? 'text-red-400' : 'text-yellow-400'}`}>
+                        {item.stock_qty}
+                      </span>
+                      <div className="text-xs text-muted-foreground">補貨點 {item.reorder_pt}</div>
+                    </div>
+                    <div className="text-right text-sm font-semibold text-blue-400">
+                      +{item.suggested_qty}
+                    </div>
+                    <div className="text-right text-sm text-muted-foreground">
+                      {formatCurrency(item.estimated_cost)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
+              <span>點選勾選要採購的項目</span>
+              <span className="font-semibold text-foreground">
+                預估總費用：{formatCurrency(
+                  (suggestions ?? [])
+                    .filter((s) => selectedSuggestions.has(s.product_id))
+                    .reduce((sum, s) => sum + s.estimated_cost, 0)
+                )}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

@@ -18,7 +18,10 @@ export function registerSettingsIpc(): void {
       serviceAccountKeyPath: settings['serviceAccountKeyPath'] ?? '',
       syncIntervalMinutes: parseInt(settings['syncIntervalMinutes'] ?? '30'),
       autoSyncEnabled: settings['autoSyncEnabled'] === 'true',
-      dbPath: join(app.getPath('userData'), 'ims.db')
+      dbPath: join(app.getPath('userData'), 'ims.db'),
+      companyName: settings['companyName'] ?? '',
+      companyAddress: settings['companyAddress'] ?? '',
+      companyPhone: settings['companyPhone'] ?? ''
     }
   })
 

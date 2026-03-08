@@ -21,67 +21,167 @@ interface ItemRow {
   unit_price: number
 }
 
+interface CompanyInfo {
+  name: string
+  address: string
+  phone: string
+}
+
 function formatCurrency(n: number) {
   return 'NT$ ' + n.toLocaleString('zh-TW')
 }
 
-function buildHtml(type: 'sales' | 'purchase', order: OrderRow, items: ItemRow[]): string {
+function getStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    completed: '已完成',
+    received: '已收貨',
+    cancelled: '已取消',
+    pending: '待處理'
+  }
+  return map[status] ?? status
+}
+
+function getStatusColor(status: string): string {
+  const map: Record<string, string> = {
+    completed: 'background:#dcfce7;color:#15803d',
+    received: 'background:#dbeafe;color:#1d4ed8',
+    cancelled: 'background:#fee2e2;color:#b91c1c',
+    pending: 'background:#fef9c3;color:#a16207'
+  }
+  return map[status] ?? 'background:#f3f4f6;color:#374151'
+}
+
+function buildHtml(
+  type: 'sales' | 'purchase',
+  order: OrderRow,
+  items: ItemRow[],
+  company: CompanyInfo
+): string {
   const title = type === 'purchase' ? '採購單' : '銷售單'
   const partyLabel = type === 'purchase' ? '供應商' : '客戶'
   const partyName = (type === 'purchase' ? order.supplier_name : order.customer_name) ?? '-'
+
   const rows = items
     .map(
-      (i) =>
-        `<tr>
-          <td>${i.product_name}</td>
-          <td>${i.sku}</td>
-          <td style="text-align:right">${i.quantity}</td>
-          <td>${i.unit}</td>
-          <td style="text-align:right">${formatCurrency(i.unit_price)}</td>
-          <td style="text-align:right">${formatCurrency(i.quantity * i.unit_price)}</td>
-        </tr>`
+      (item, idx) => `
+      <tr style="${idx % 2 === 1 ? 'background:#f9fafb' : ''}">
+        <td style="padding:9px 12px">${item.product_name}</td>
+        <td style="padding:9px 12px;color:#6b7280;font-family:monospace;font-size:12px">${item.sku}</td>
+        <td style="padding:9px 12px;text-align:center">${item.quantity} ${item.unit}</td>
+        <td style="padding:9px 12px;text-align:right">${formatCurrency(item.unit_price)}</td>
+        <td style="padding:9px 12px;text-align:right;font-weight:600">${formatCurrency(item.quantity * item.unit_price)}</td>
+      </tr>`
     )
     .join('')
+
+  const companyBlock = company.name
+    ? `<div style="font-size:20px;font-weight:700;color:#1e293b;margin-bottom:4px">${company.name}</div>
+       ${company.address ? `<div style="font-size:12px;color:#64748b;margin-bottom:2px">${company.address}</div>` : ''}
+       ${company.phone ? `<div style="font-size:12px;color:#64748b">電話：${company.phone}</div>` : ''}`
+    : `<div style="font-size:20px;font-weight:700;color:#1e293b">SkillCraft IMS</div>`
 
   return `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <style>
-  body { font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif; margin: 40px; color: #1a1a1a; font-size: 13px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .subtitle { color: #555; font-size: 13px; margin-bottom: 24px; }
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin-bottom: 24px; font-size: 13px; }
-  .meta-grid span { color: #666; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  thead th { background: #f0f0f0; padding: 7px 10px; text-align: left; border-bottom: 2px solid #ccc; }
-  tbody td { padding: 7px 10px; border-bottom: 1px solid #eee; }
-  .total-row { text-align: right; font-size: 15px; font-weight: bold; margin-top: 16px; padding-top: 8px; border-top: 2px solid #ccc; }
-  .notes { margin-top: 16px; color: #666; font-size: 12px; }
-  .footer { margin-top: 40px; font-size: 11px; color: #999; text-align: center; border-top: 1px solid #eee; padding-top: 12px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+    color: #1e293b;
+    font-size: 13px;
+    background: #fff;
+  }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body>
-  <h1>SkillCraft IMS</h1>
-  <div class="subtitle">${title} ${order.order_no}</div>
-  <div class="meta-grid">
-    <div><span>${partyLabel}：</span>${partyName}</div>
-    <div><span>訂單日期：</span>${order.order_date}</div>
-    <div><span>狀態：</span>${order.status === 'completed' ? '已完成' : order.status === 'received' ? '已收貨' : order.status === 'cancelled' ? '已取消' : '待處理'}</div>
+<div style="padding:40px 48px;max-width:800px;margin:0 auto">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:24px;border-bottom:3px solid #4f46e5;margin-bottom:28px">
+    <div>${companyBlock}</div>
+    <div style="text-align:right">
+      <div style="font-size:24px;font-weight:800;color:#4f46e5;letter-spacing:-0.5px">${title}</div>
+      <div style="font-size:13px;font-family:monospace;color:#475569;margin-top:4px">${order.order_no}</div>
+      <div style="margin-top:8px;display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;${getStatusColor(order.status)}">${getStatusLabel(order.status)}</div>
+    </div>
   </div>
-  <table>
+
+  <!-- Meta info -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 32px;margin-bottom:28px;padding:16px 20px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+    <div>
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">${partyLabel}</div>
+      <div style="font-weight:600;font-size:14px">${partyName}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">訂單日期</div>
+      <div style="font-weight:600;font-size:14px">${order.order_date}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">列印日期</div>
+      <div style="font-size:13px">${new Date().toLocaleDateString('zh-TW')}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">品項數量</div>
+      <div style="font-size:13px">${items.length} 項</div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
     <thead>
-      <tr>
-        <th>商品名稱</th><th>SKU</th>
-        <th style="text-align:right">數量</th><th>單位</th>
-        <th style="text-align:right">單價</th><th style="text-align:right">小計</th>
+      <tr style="background:#4f46e5">
+        <th style="padding:10px 12px;text-align:left;color:#fff;font-size:12px;font-weight:600;border-radius:6px 0 0 0">商品名稱</th>
+        <th style="padding:10px 12px;text-align:left;color:#fff;font-size:12px;font-weight:600">SKU</th>
+        <th style="padding:10px 12px;text-align:center;color:#fff;font-size:12px;font-weight:600">數量</th>
+        <th style="padding:10px 12px;text-align:right;color:#fff;font-size:12px;font-weight:600">單價</th>
+        <th style="padding:10px 12px;text-align:right;color:#fff;font-size:12px;font-weight:600;border-radius:0 6px 0 0">小計</th>
       </tr>
     </thead>
-    <tbody>${rows}</tbody>
+    <tbody style="border:1px solid #e2e8f0;border-top:none">
+      ${rows}
+    </tbody>
   </table>
-  <div class="total-row">合計：${formatCurrency(order.total_amount)}</div>
-  ${order.notes ? `<div class="notes">備註：${order.notes}</div>` : ''}
-  <div class="footer">由 SkillCraft IMS 產生 · ${new Date().toLocaleString('zh-TW')}</div>
+
+  <!-- Total -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:32px">
+    <div style="min-width:220px">
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;color:#64748b;font-size:13px;border-top:1px solid #e2e8f0">
+        <span>小計</span>
+        <span>${formatCurrency(order.total_amount)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:10px 12px;background:#4f46e5;color:#fff;font-size:15px;font-weight:700;border-radius:0 0 6px 6px">
+        <span>合計</span>
+        <span>${formatCurrency(order.total_amount)}</span>
+      </div>
+    </div>
+  </div>
+
+  ${order.notes ? `
+  <!-- Notes -->
+  <div style="padding:12px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;margin-bottom:32px">
+    <div style="font-size:11px;color:#92400e;font-weight:600;margin-bottom:4px">備註</div>
+    <div style="font-size:13px;color:#78350f">${order.notes}</div>
+  </div>` : ''}
+
+  <!-- Signature -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-bottom:32px">
+    ${['製單人', '審核', '收貨確認'].map(label => `
+    <div>
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:24px">${label}</div>
+      <div style="border-bottom:1px solid #cbd5e1;height:1px"></div>
+    </div>`).join('')}
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center;font-size:11px;color:#94a3b8;padding-top:16px;border-top:1px solid #f1f5f9">
+    由 SkillCraft IMS 產生 · ${new Date().toLocaleString('zh-TW')}
+  </div>
+
+</div>
 </body>
 </html>`
 }
@@ -125,12 +225,33 @@ export function registerPrintIpc(): void {
 
     if (!order) throw new Error('找不到訂單')
 
-    const html = buildHtml(type, order, items)
+    // 讀取公司資訊
+    const settingRows = db
+      .prepare('SELECT key, value FROM app_settings WHERE key IN (?, ?, ?)')
+      .all('companyName', 'companyAddress', 'companyPhone') as { key: string; value: string }[]
+    const s: Record<string, string> = {}
+    for (const row of settingRows) s[row.key] = row.value
+    const company: CompanyInfo = {
+      name: s['companyName'] ?? '',
+      address: s['companyAddress'] ?? '',
+      phone: s['companyPhone'] ?? ''
+    }
 
-    const win = new BrowserWindow({ width: 800, height: 1100, show: false, webPreferences: { nodeIntegration: false } })
+    const html = buildHtml(type, order, items, company)
+
+    const win = new BrowserWindow({
+      width: 900,
+      height: 1200,
+      show: false,
+      webPreferences: { nodeIntegration: false }
+    })
     await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+    await new Promise((resolve) => setTimeout(resolve, 300))
 
-    const pdfBuffer = await win.webContents.printToPDF({ margins: { marginType: 'printableArea' }, pageSize: 'A4' })
+    const pdfBuffer = await win.webContents.printToPDF({
+      margins: { marginType: 'printableArea' },
+      pageSize: 'A4'
+    })
     win.close()
 
     const { canceled, filePath } = await dialog.showSaveDialog({
