@@ -12,8 +12,36 @@ import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, Ma
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
 
+function getDaysForPeriod(period: string): number {
+  const now = new Date()
+  switch (period) {
+    case 'this-month': {
+      return now.getDate()
+    }
+    case 'last-month': {
+      const d = new Date(now.getFullYear(), now.getMonth(), 0)
+      return d.getDate() + now.getDate()
+    }
+    case 'this-quarter': {
+      const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+      return Math.ceil((now.getTime() - qStart.getTime()) / 86400000) + 1
+    }
+    default: return Number(period)
+  }
+}
+
+const PERIODS = [
+  { label: '7 天', value: '7' },
+  { label: '30 天', value: '30' },
+  { label: '本月', value: 'this-month' },
+  { label: '上月', value: 'last-month' },
+  { label: '本季', value: 'this-quarter' },
+  { label: '90 天', value: '90' },
+]
+
 export default function Reports() {
-  const [trendDays, setTrendDays] = useState(30)
+  const [period, setPeriod] = useState('30')
+  const trendDays = getDaysForPeriod(period)
 
   const { data: trend, isLoading: trendLoading } = useQuery<SalesTrendPoint[]>({
     queryKey: ['reports', 'salesTrend', trendDays],
@@ -59,15 +87,15 @@ export default function Reports() {
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-muted-foreground">分析期間</h2>
         <div className="flex gap-2">
-          {[7, 30, 90].map((d) => (
+          {PERIODS.map((p) => (
             <Button
-              key={d}
+              key={p.value}
               size="sm"
-              variant={trendDays === d ? 'default' : 'outline'}
+              variant={period === p.value ? 'default' : 'outline'}
               className="h-7 text-xs"
-              onClick={() => setTrendDays(d)}
+              onClick={() => setPeriod(p.value)}
             >
-              {d} 天
+              {p.label}
             </Button>
           ))}
         </div>

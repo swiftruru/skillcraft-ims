@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable, type Column } from '@/components/common/DataTable'
@@ -19,6 +19,7 @@ export default function Purchases() {
   const [receiveId, setReceiveId] = useState<number | null>(null)
   const [cancelId, setCancelId] = useState<number | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
     queryKey: ['purchases', 'all', search],
@@ -123,6 +124,19 @@ export default function Purchases() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="搜尋訂單號或供應商..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          disabled={exporting}
+          onClick={async () => {
+            setExporting(true)
+            await window.electronAPI.export.purchases()
+            setExporting(false)
+          }}
+        >
+          <Download className="w-4 h-4" />
+          {exporting ? '匯出中...' : '匯出 CSV'}
+        </Button>
         <Button onClick={() => setFormOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" />
           新增採購單
