@@ -130,7 +130,7 @@ export function registerPrintIpc(): void {
     const win = new BrowserWindow({ width: 800, height: 1100, show: false, webPreferences: { nodeIntegration: false } })
     await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
 
-    const pdfBuffer = await win.webContents.printToPDF({ marginsType: 1, pageSize: 'A4' })
+    const pdfBuffer = await win.webContents.printToPDF({ margins: { marginType: 'printableArea' }, pageSize: 'A4' })
     win.close()
 
     const { canceled, filePath } = await dialog.showSaveDialog({
