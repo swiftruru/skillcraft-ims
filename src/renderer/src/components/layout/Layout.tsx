@@ -1,31 +1,28 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { StatusBar } from './StatusBar'
 import { CommandPalette } from '../common/CommandPalette'
 import { Toaster } from '../ui/toaster'
 import { ShortcutOverlay } from '../common/ShortcutOverlay'
-
-const pageTitles: Record<string, string> = {
-  '/': '總覽 Dashboard',
-  '/products': '商品管理',
-  '/purchases': '採購管理',
-  '/sales': '銷售管理',
-  '/suppliers': '供應商管理',
-  '/customers': '客戶管理',
-  '/reports': '報表分析',
-  '/settings': '系統設定',
-  '/about': '關於 SkillCraft IMS',
-  '/stock-take': '庫存盤點',
-  '/inventory-history': '庫存異動歷史'
-}
+import { DemoController } from '../demo/DemoController'
+import { useLang } from '@/lib/useLang'
+import { purgeDemoData } from '@/lib/purgeDemoData'
 
 export function Layout() {
   const location = useLocation()
-  const title = pageTitles[location.pathname] ?? 'SkillCraft IMS'
+  const queryClient = useQueryClient()
+  const t = useLang()
+  const title = t.pageTitles[location.pathname as keyof typeof t.pageTitles] ?? 'SkillCraft IMS'
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [shortcutOpen, setShortcutOpen] = useState(false)
+
+  // 每次 App 啟動時自動清理遺留 Demo 資料
+  useEffect(() => {
+    purgeDemoData().then(() => queryClient.invalidateQueries())
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -64,6 +61,7 @@ export function Layout() {
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ShortcutOverlay open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
+      <DemoController />
       <Toaster />
     </div>
   )

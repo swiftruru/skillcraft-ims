@@ -10,9 +10,14 @@ import { PurchaseForm } from '@/components/purchases/PurchaseForm'
 import { PurchaseDetail } from '@/components/purchases/PurchaseDetail'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import type { PurchaseOrder } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
+import { useDemoStore } from '@/stores/demo.store'
 
 export default function Purchases() {
   const queryClient = useQueryClient()
+  const t = useLang()
+  const p = t.purchases
+  const spotlight = useDemoStore((s) => s.spotlight)
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [detailId, setDetailId] = useState<number | null>(null)
@@ -46,12 +51,12 @@ export default function Purchases() {
   })
 
   const columns: Column<PurchaseOrder>[] = [
-    { key: 'order_no', label: '訂單號', sortable: true, className: 'font-mono text-xs w-36' },
-    { key: 'supplier_name', label: '供應商', sortable: true },
-    { key: 'order_date', label: '訂單日期', sortable: true, render: (v) => formatDate(String(v)) },
+    { key: 'order_no', label: p.orderNo, sortable: true, className: 'font-mono text-xs w-36' },
+    { key: 'supplier_name', label: p.supplier, sortable: true },
+    { key: 'order_date', label: p.orderDate, sortable: true, render: (v) => formatDate(String(v)) },
     {
       key: 'status',
-      label: '狀態',
+      label: t.common.status,
       sortable: true,
       render: (v) => (
         <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(String(v))}`}>
@@ -61,7 +66,7 @@ export default function Purchases() {
     },
     {
       key: 'total_amount',
-      label: '金額',
+      label: t.common.amount,
       sortable: true,
       className: 'text-right w-28',
       render: (v) => formatCurrency(Number(v))
@@ -77,35 +82,40 @@ export default function Purchases() {
           </Button>
           <Button
             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"
-            title="匯出 PDF"
+            title={t.common.exportPdf}
             onClick={() => window.electronAPI.print.pdf({ type: 'purchase', id: row.id as number })}
           >
             <Printer className="w-3.5 h-3.5" />
           </Button>
           {row.status === 'pending' && (
             <>
+              {spotlight?.type === 'purchase' && spotlight.id === row.id ? (
+                <span className="relative inline-flex items-center justify-center">
+                  <span className="absolute inset-0 rounded-md ring-2 ring-green-400 animate-ping opacity-75" />
+                  <Button
+                    variant="ghost" size="icon"
+                    className="h-7 w-7 text-green-400 ring-2 ring-green-400 ring-offset-1 ring-offset-background bg-green-400/15"
+                    onClick={() => setReceiveId(row.id)} title={p.receiveTitle}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  variant="ghost" size="icon" className="h-7 w-7 text-green-400"
+                  onClick={() => setReceiveId(row.id)} title={p.receiveTitle}
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+                </Button>
+              )}
               <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-green-400"
-                onClick={() => setReceiveId(row.id)}
-                title="確認收貨"
-              >
-                <CheckCircle className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-yellow-400"
-                onClick={() => setCancelId(row.id)}
-                title="取消訂單"
+                variant="ghost" size="icon" className="h-7 w-7 text-yellow-400"
+                onClick={() => setCancelId(row.id)} title={p.cancelTitle}
               >
                 <XCircle className="w-3.5 h-3.5" />
               </Button>
               <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-destructive"
+                variant="ghost" size="icon" className="h-7 w-7 text-destructive"
                 onClick={() => setDeleteId(row.id)}
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -122,24 +132,18 @@ export default function Purchases() {
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="搜尋訂單號或供應商..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder={p.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Button
-          variant="outline"
-          className="gap-2"
-          disabled={exporting}
-          onClick={async () => {
-            setExporting(true)
-            await window.electronAPI.export.purchases()
-            setExporting(false)
-          }}
+          variant="outline" className="gap-2" disabled={exporting}
+          onClick={async () => { setExporting(true); await window.electronAPI.export.purchases(); setExporting(false) }}
         >
           <Download className="w-4 h-4" />
-          {exporting ? '匯出中...' : '匯出 CSV'}
+          {exporting ? t.common.exporting : t.common.exportCsv}
         </Button>
         <Button onClick={() => setFormOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" />
-          新增採購單
+          {p.addOrder}
         </Button>
       </div>
 
@@ -151,43 +155,37 @@ export default function Purchases() {
             data={(orders ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
-            emptyMessage="沒有採購單"
+            emptyMessage={p.emptyMessage}
           />
         )}
       </div>
 
       <PurchaseForm open={formOpen} onOpenChange={setFormOpen} />
-
       {detailId !== null && (
-        <PurchaseDetail
-          id={detailId}
-          open={detailId !== null}
-          onOpenChange={(open) => !open && setDetailId(null)}
-        />
+        <PurchaseDetail id={detailId} open={detailId !== null} onOpenChange={(open) => !open && setDetailId(null)} />
       )}
-
       <ConfirmDialog
         open={receiveId !== null}
         onOpenChange={(open) => !open && setReceiveId(null)}
-        title="確認收貨"
-        description="確認收貨後，系統將自動更新各商品的庫存數量，此操作無法復原。"
+        title={p.receiveTitle}
+        description={p.receiveDesc}
         onConfirm={() => receiveId && receiveMutation.mutate(receiveId)}
-        confirmLabel="確認收貨"
+        confirmLabel={p.receiveTitle}
         variant="default"
       />
       <ConfirmDialog
         open={cancelId !== null}
         onOpenChange={(open) => !open && setCancelId(null)}
-        title="取消採購單"
-        description="取消後此採購單將無法再收貨。"
+        title={p.cancelTitle}
+        description={p.cancelDesc}
         onConfirm={() => cancelId && cancelMutation.mutate(cancelId)}
-        confirmLabel="取消訂單"
+        confirmLabel={p.cancelTitle}
       />
       <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="刪除採購單"
-        description="刪除後無法復原，確認刪除此採購單？"
+        title={p.deleteTitle}
+        description={p.deleteDesc}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
       />
     </div>

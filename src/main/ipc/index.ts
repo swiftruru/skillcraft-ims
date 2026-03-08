@@ -13,6 +13,7 @@ import { registerDbIpc } from './db.ipc'
 import { registerImportIpc } from './import.ipc'
 import { registerStocktakeIpc } from './stocktake.ipc'
 import { registerPrintIpc } from './print.ipc'
+import { registerDemoIpc } from './demo.ipc'
 
 export function registerAllIpcHandlers(): void {
   registerProductsIpc()
@@ -30,4 +31,5 @@ export function registerAllIpcHandlers(): void {
   registerImportIpc()
   registerStocktakeIpc()
   registerPrintIpc()
+  registerDemoIpc()
 }

@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2, Search, Sun, Moon } from 'lucide-react'
+import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2, Search, Sun, Moon, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDate } from '@/lib/utils'
 import { useThemeStore } from '@/stores/theme.store'
+import { useLangStore } from '@/stores/lang.store'
+import { useLang } from '@/lib/useLang'
+import { useDemoStore } from '@/stores/demo.store'
+import { purgeDemoData } from '@/lib/purgeDemoData'
 
 type SyncState = 'idle' | 'running' | 'success' | 'error'
 
@@ -11,7 +15,16 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
   const queryClient = useQueryClient()
   const [syncState, setSyncState] = useState<SyncState>('idle')
   const { theme, toggleTheme } = useThemeStore()
+  const { toggleLang } = useLangStore()
+  const t = useLang()
   const [syncMessage, setSyncMessage] = useState('')
+  const { startDemo } = useDemoStore()
+
+  const handleStartDemo = async () => {
+    await purgeDemoData()
+    queryClient.invalidateQueries()
+    startDemo()
+  }
 
   const { data: kpis } = useQuery({
     queryKey: ['reports', 'kpis'],
@@ -29,7 +42,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
 
   const handleSync = async () => {
     setSyncState('running')
-    setSyncMessage('同步中...')
+    setSyncMessage(t.header.syncing)
 
     window.electronAPI.sync.onProgress((data) => {
       setSyncMessage(data.message)
@@ -39,15 +52,15 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
       const result = await window.electronAPI.sync.trigger('bidirectional')
       if (result.success) {
         setSyncState('success')
-        setSyncMessage(`同步完成，共 ${result.recordsSynced} 筆`)
+        setSyncMessage(t.header.syncDone(result.recordsSynced ?? 0))
         queryClient.invalidateQueries()
       } else {
         setSyncState('error')
-        setSyncMessage(result.error ?? '同步失敗')
+        setSyncMessage(result.error ?? t.header.syncFailed)
       }
     } catch {
       setSyncState('error')
-      setSyncMessage('同步失敗')
+      setSyncMessage(t.header.syncFailed)
     } finally {
       window.electronAPI.sync.removeListeners()
       setTimeout(() => setSyncState('idle'), 3000)
@@ -67,7 +80,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
           className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-3 py-1.5 hover:bg-muted transition-colors w-48"
         >
           <Search className="w-3 h-3" />
-          <span>搜尋...</span>
+          <span>{t.header.search}</span>
           <kbd className="ml-auto text-[10px] bg-background border border-border rounded px-1 py-0.5">⌘K</kbd>
         </button>
 
@@ -75,7 +88,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
         {lowStockCount > 0 && (
           <div className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 px-2.5 py-1 rounded-full">
             <AlertTriangle className="w-3 h-3" />
-            {lowStockCount} 項低庫存
+            {t.header.lowStock(lowStockCount)}
           </div>
         )}
 
@@ -100,9 +113,30 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
         )}
         {syncState === 'idle' && lastSync && (
           <span className="text-xs text-muted-foreground">
-            上次同步：{formatDate(lastSync.synced_at ?? '')}
+            {t.header.lastSync}{formatDate(lastSync.synced_at ?? '')}
           </span>
         )}
+
+        {/* Live Demo button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleStartDemo}
+          className="h-8 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+        >
+          <Play className="w-3 h-3" />
+          Live Demo
+        </Button>
+
+        {/* Language toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleLang}
+          className="h-8 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          {t.header.switchLang}
+        </Button>
 
         {/* Theme toggle */}
         <Button
@@ -110,7 +144,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
           size="icon"
           onClick={toggleTheme}
           className="h-8 w-8 text-muted-foreground hover:text-foreground"
-          title={theme === 'dark' ? '切換亮色模式' : '切換深色模式'}
+          title={theme === 'dark' ? t.header.toLight : t.header.toDark}
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </Button>
@@ -124,7 +158,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
           className="h-8 text-xs gap-1.5"
         >
           <RefreshCw className={`w-3 h-3 ${syncState === 'running' ? 'animate-spin' : ''}`} />
-          同步 Sheets
+          {t.header.syncSheets}
         </Button>
       </div>
     </header>

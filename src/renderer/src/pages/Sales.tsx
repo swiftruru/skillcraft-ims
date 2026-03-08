@@ -10,9 +10,14 @@ import { SaleForm } from '@/components/sales/SaleForm'
 import { SaleDetail } from '@/components/sales/SaleDetail'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import type { SalesOrder } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
+import { useDemoStore } from '@/stores/demo.store'
 
 export default function Sales() {
   const queryClient = useQueryClient()
+  const t = useLang()
+  const s = t.sales
+  const spotlight = useDemoStore((st) => st.spotlight)
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [detailId, setDetailId] = useState<number | null>(null)
@@ -51,12 +56,12 @@ export default function Sales() {
   })
 
   const columns: Column<SalesOrder>[] = [
-    { key: 'order_no', label: '訂單號', sortable: true, className: 'font-mono text-xs w-36' },
-    { key: 'customer_name', label: '客戶', sortable: true },
-    { key: 'order_date', label: '訂單日期', sortable: true, render: (v) => formatDate(String(v)) },
+    { key: 'order_no', label: s.orderNo, sortable: true, className: 'font-mono text-xs w-36' },
+    { key: 'customer_name', label: s.customer, sortable: true },
+    { key: 'order_date', label: s.orderDate, sortable: true, render: (v) => formatDate(String(v)) },
     {
       key: 'status',
-      label: '狀態',
+      label: t.common.status,
       sortable: true,
       render: (v) => (
         <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(String(v))}`}>
@@ -66,7 +71,7 @@ export default function Sales() {
     },
     {
       key: 'total_amount',
-      label: '金額',
+      label: t.common.amount,
       sortable: true,
       className: 'text-right w-28',
       render: (v) => formatCurrency(Number(v))
@@ -82,22 +87,35 @@ export default function Sales() {
           </Button>
           <Button
             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"
-            title="匯出 PDF"
+            title={t.common.exportPdf}
             onClick={() => window.electronAPI.print.pdf({ type: 'sales', id: row.id as number })}
           >
             <Printer className="w-3.5 h-3.5" />
           </Button>
           {row.status === 'pending' && (
             <>
-              <Button
-                variant="ghost" size="icon" className="h-7 w-7 text-green-400"
-                onClick={() => setCompleteId(row.id)} title="完成銷售"
-              >
-                <CheckCircle className="w-3.5 h-3.5" />
-              </Button>
+              {spotlight?.type === 'sales' && spotlight.id === row.id ? (
+                <span className="relative inline-flex items-center justify-center">
+                  <span className="absolute inset-0 rounded-md ring-2 ring-green-400 animate-ping opacity-75" />
+                  <Button
+                    variant="ghost" size="icon"
+                    className="h-7 w-7 text-green-400 ring-2 ring-green-400 ring-offset-1 ring-offset-background bg-green-400/15"
+                    onClick={() => setCompleteId(row.id)} title={s.completeTitle}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  variant="ghost" size="icon" className="h-7 w-7 text-green-400"
+                  onClick={() => setCompleteId(row.id)} title={s.completeTitle}
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+                </Button>
+              )}
               <Button
                 variant="ghost" size="icon" className="h-7 w-7 text-yellow-400"
-                onClick={() => setCancelId(row.id)} title="取消"
+                onClick={() => setCancelId(row.id)} title={s.cancelTitle}
               >
                 <XCircle className="w-3.5 h-3.5" />
               </Button>
@@ -129,24 +147,18 @@ export default function Sales() {
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="搜尋訂單號或客戶..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder={s.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Button
-          variant="outline"
-          className="gap-2"
-          disabled={exporting}
-          onClick={async () => {
-            setExporting(true)
-            await window.electronAPI.export.sales()
-            setExporting(false)
-          }}
+          variant="outline" className="gap-2" disabled={exporting}
+          onClick={async () => { setExporting(true); await window.electronAPI.export.sales(); setExporting(false) }}
         >
           <Download className="w-4 h-4" />
-          {exporting ? '匯出中...' : '匯出 CSV'}
+          {exporting ? t.common.exporting : t.common.exportCsv}
         </Button>
         <Button onClick={() => setFormOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" />
-          新增銷售單
+          {s.addOrder}
         </Button>
       </div>
 
@@ -158,7 +170,7 @@ export default function Sales() {
             data={(orders ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
-            emptyMessage="沒有銷售單"
+            emptyMessage={s.emptyMessage}
           />
         )}
       </div>
@@ -170,25 +182,25 @@ export default function Sales() {
       <ConfirmDialog
         open={completeId !== null}
         onOpenChange={(open) => !open && setCompleteId(null)}
-        title="完成銷售"
-        description="完成後系統將自動扣除各商品庫存，請確認庫存足夠。"
+        title={s.completeTitle}
+        description={s.completeDesc}
         onConfirm={() => completeId && completeMutation.mutate(completeId)}
-        confirmLabel="確認完成"
+        confirmLabel={s.completeTitle}
         variant="default"
       />
       <ConfirmDialog
         open={cancelId !== null}
         onOpenChange={(open) => !open && setCancelId(null)}
-        title="取消銷售單"
-        description="取消後此訂單將無法再完成。"
+        title={s.cancelTitle}
+        description={s.cancelDesc}
         onConfirm={() => cancelId && cancelMutation.mutate(cancelId)}
-        confirmLabel="取消訂單"
+        confirmLabel={s.cancelTitle}
       />
       <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="刪除銷售單"
-        description="刪除後無法復原。"
+        title={s.deleteTitle}
+        description={s.deleteDesc}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
       />
     </div>
