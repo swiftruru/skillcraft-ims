@@ -149,17 +149,19 @@ export default function Reports() {
             <FileDown className="w-3 h-3" />
             {pdfExporting ? '產生中...' : '匯出月報 PDF'}
           </Button>
-          {PERIODS.map((p) => (
-            <Button
-              key={p.value}
-              size="sm"
-              variant={period === p.value ? 'default' : 'outline'}
-              className="h-7 text-xs"
-              onClick={() => setPeriod(p.value)}
-            >
-              {p.label}
-            </Button>
-          ))}
+          <span data-tour="report-range" className="flex gap-1 flex-wrap">
+            {PERIODS.map((p) => (
+              <Button
+                key={p.value}
+                size="sm"
+                variant={period === p.value ? 'default' : 'outline'}
+                className="h-7 text-xs"
+                onClick={() => setPeriod(p.value)}
+              >
+                {p.label}
+              </Button>
+            ))}
+          </span>
         </div>
       </div>
       {period === 'custom' && (

@@ -113,7 +113,7 @@ export default function Purchases() {
               {getStatusLabel(String(v))}
             </span>
             {isOverdue && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-400">逾期</span>
+              <span data-tour="overdue-badge" className="text-xs px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-400">逾期</span>
             )}
           </div>
         )
@@ -136,6 +136,7 @@ export default function Purchases() {
             <Eye className="w-3.5 h-3.5" />
           </Button>
           <Button
+            data-tour="order-clone"
             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
             title="複製訂單"
             onClick={() => handleClone(row.id as number)}
@@ -214,7 +215,7 @@ export default function Purchases() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder={p.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Input type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title="開始日期" />
+        <Input data-tour="date-filter" type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title="開始日期" />
         <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title="結束日期" />
         {(dateFrom || dateTo) && (
           <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => { setDateFrom(''); setDateTo('') }}>清除</button>

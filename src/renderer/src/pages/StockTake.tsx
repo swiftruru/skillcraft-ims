@@ -80,7 +80,7 @@ function ListView({ onSelect, autoCreate }: { onSelect: (id: number) => void; au
           <p className="text-sm">{s.emptyMessage}</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div data-tour="stocktake-chart" className="rounded-lg border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">

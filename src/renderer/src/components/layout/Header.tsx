@@ -80,6 +80,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
       <div className="flex items-center gap-3 titlebar-no-drag">
         {/* Global search button */}
         <button
+          data-tour="cmd-palette"
           onClick={onSearchClick}
           className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-3 py-1.5 hover:bg-muted transition-colors w-48"
         >
@@ -90,7 +91,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
 
         {/* Low stock alert */}
         {lowStockCount > 0 && (
-          <div className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 px-2.5 py-1 rounded-full">
+          <div data-tour="low-stock-header" className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 px-2.5 py-1 rounded-full">
             <AlertTriangle className="w-3 h-3" />
             {t.header.lowStock(lowStockCount)}
           </div>
@@ -154,10 +155,11 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
         </Button>
 
         {/* Notification Bell */}
-        <NotificationBell />
+        <span data-tour="notifications"><NotificationBell /></span>
 
         {/* Theme toggle */}
         <Button
+          data-tour="theme"
           variant="ghost"
           size="icon"
           onClick={toggleTheme}

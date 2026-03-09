@@ -7,6 +7,7 @@ export interface UxTourStep {
   uxHighlight: { zh: string; en: string }
   route: string
   lookHere?: { zh: string; en: string }
+  targetSelector?: string
 }
 
 export const UX_TOUR_STEPS: UxTourStep[] = [
@@ -35,6 +36,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '全域搜尋', en: 'Global Search' },
     title: { zh: '全域搜尋（命令面板）', en: 'Global Search (Command Palette)' },
     route: '/',
+    targetSelector: '[data-tour="cmd-palette"]',
     description: {
       zh: '按下 ⌘K（Mac）或 Ctrl+K（Windows）即可開啟命令面板，直接搜尋商品、供應商、客戶，一鍵跳轉至詳細頁面。',
       en: 'Press ⌘K (Mac) or Ctrl+K (Windows) to open the command palette — search products, suppliers, customers, and jump instantly to their detail pages.'
@@ -54,6 +56,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '主題切換', en: 'Theme' },
     title: { zh: '深淺色主題切換', en: 'Dark / Light Theme Toggle' },
     route: '/',
+    targetSelector: '[data-tour="theme"]',
     description: {
       zh: '點擊 Header 右側的 Sun / Moon 圖示，可即時在深色與亮色模式之間切換，偏好設定透過 localStorage 自動儲存。',
       en: 'Click the Sun / Moon icon on the right side of the Header to instantly toggle between dark and light mode. Preference is auto-saved via localStorage.'
@@ -73,6 +76,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '庫存警示', en: 'Low Stock Alert' },
     title: { zh: '低庫存紅/黃色警示', en: 'Low Stock Red / Yellow Alert' },
     route: '/products',
+    targetSelector: '[data-tour="low-stock-header"]',
     description: {
       zh: '商品表格的庫存欄位自動以顏色標示健康狀態：庫存為 0 顯示紅色警告，低於補貨點顯示黃色提醒，正常庫存則為一般顯示。Header 也會顯示全局低庫存計數。',
       en: 'The stock column auto-colors health status: red for 0 stock, yellow for below reorder point, normal for healthy. The Header also shows a global low-stock count.'
@@ -92,6 +96,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '快速操作', en: 'Quick Action' },
     title: { zh: '快速採購一鍵補貨', en: 'Quick Purchase Button' },
     route: '/products',
+    targetSelector: '[data-tour="quick-purchase"]',
     description: {
       zh: '每個商品列的右側有一個購物車圖示，點擊可開啟快速採購對話框，自動預填：補貨數量（補貨點 − 現有庫存）、進價、供應商選項，一鍵建立採購單。',
       en: 'Each product row has a shopping cart icon. Clicking opens a Quick Purchase dialog, auto-filled with: reorder quantity (reorder point − current stock), buy price, and supplier options — one click to create a PO.'
@@ -111,6 +116,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '自動化', en: 'Automation' },
     title: { zh: '自動 SKU 號碼產生', en: 'Auto SKU Generation' },
     route: '/products',
+    targetSelector: '[data-tour="add-product"]',
     description: {
       zh: '在新增商品表單中，先選擇類別，再點擊 SKU 欄位旁的魔杖按鈕，系統自動依類別前綴（ELEC / PERI / STAT / PKG / MISC）產生唯一流水號 SKU。',
       en: 'In the Add Product form, select a category first, then click the wand button next to the SKU field. The system auto-generates a unique sequential SKU with category prefix (ELEC / PERI / STAT / PKG / MISC).'
@@ -130,6 +136,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '操作效率', en: 'Efficiency' },
     title: { zh: '訂單一鍵複製', en: 'One-click Order Clone' },
     route: '/purchases',
+    targetSelector: '[data-tour="order-clone"]',
     description: {
       zh: '採購單（及銷售單）列表的每列右側有一個複製（Copy）按鈕，點擊可快速複製整筆訂單的所有內容為新草稿，適合向同一供應商週期性重複下單。',
       en: 'Each purchase (and sale) order row has a Copy button on the right. Clicking clones the entire order — supplier, products, quantities, prices — as a new draft, perfect for periodic repeat orders.'
@@ -149,6 +156,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '資料篩選', en: 'Data Filter' },
     title: { zh: '日期區間篩選', en: 'Date Range Filter' },
     route: '/purchases',
+    targetSelector: '[data-tour="date-filter"]',
     description: {
       zh: '採購管理頁（及銷售管理頁）頂部提供「開始日期」和「結束日期」兩個日期輸入框，快速縮小訂單範圍，並附有「清除」連結快速重置。',
       en: 'The Purchases (and Sales) page provides "Start Date" and "End Date" inputs at the top for quickly narrowing order scope, with a "Clear" link for instant reset.'
@@ -168,6 +176,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '狀態識別', en: 'Status ID' },
     title: { zh: '逾期採購單橘色警示', en: 'Overdue PO Badge' },
     route: '/purchases',
+    targetSelector: '[data-tour="overdue-badge"]',
     description: {
       zh: '超過 30 天仍在「待確認」狀態的採購單，狀態欄會自動顯示橘色「逾期」標籤，無需手動計算建立日期，提醒跟進供應商到貨進度。',
       en: 'Purchase orders remaining "pending" for 30+ days automatically show an orange "逾期" (Overdue) badge in the status column — no manual date calculation needed. Prompts follow-up on delivery.'
@@ -187,6 +196,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '報表自訂', en: 'Custom Reports' },
     title: { zh: '報表自訂日期範圍', en: 'Custom Report Date Range' },
     route: '/reports',
+    targetSelector: '[data-tour="report-range"]',
     description: {
       zh: '報表分析頁面的期間選擇器新增「自訂」選項，點選後顯示開始/結束日期輸入框，可分析任意時段的銷售趨勢、採購 vs 銷售對比、熱銷商品排行等圖表。',
       en: 'The report period selector now includes a "Custom" option. Selecting it reveals start/end date inputs for analyzing sales trends, purchase vs. sales comparisons, and top product rankings for any arbitrary time range.'
@@ -206,6 +216,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '通知系統', en: 'Notifications' },
     title: { zh: '通知中心', en: 'Notification Center' },
     route: '/',
+    targetSelector: '[data-tour="notifications"]',
     description: {
       zh: 'Header 右側的鈴鐺圖示顯示未讀通知數量。每次銷售完成後，若商品庫存低於補貨點，系統自動生成通知，點擊通知可直接跳轉至相關頁面。',
       en: 'The bell icon in the Header shows unread notifications. After each sale, if any product falls below its reorder point, the system auto-generates a notification. Clicking a notification jumps to the relevant page.'
@@ -225,6 +236,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     tag: { zh: '視覺化分析', en: 'Visual Analytics' },
     title: { zh: '盤點差異長條圖', en: 'Stocktake Variance Chart' },
     route: '/stock-take',
+    targetSelector: '[data-tour="stocktake-chart"]',
     description: {
       zh: '完成盤點後，系統自動產生橫向長條圖，對比每個商品的「帳面庫存（藍色）」與「實際盤點數量（綠色）」，差異欄位以顏色區分正數（盤盈）與負數（盤虧）。',
       en: 'After completing a stocktake, the system auto-generates a horizontal bar chart comparing "book stock (blue)" vs "actual counted (green)" for each item, with the variance column color-coded for positive (surplus) and negative (loss).'

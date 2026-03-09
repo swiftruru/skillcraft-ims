@@ -167,6 +167,7 @@ export default function Products() {
       render: (_v, row) => (
         <div className="flex justify-end gap-1">
           <Button
+            data-tour="quick-purchase"
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-blue-400 hover:text-blue-500"
@@ -277,7 +278,7 @@ export default function Products() {
           <Download className="w-4 h-4" />
           {exporting ? t.common.exporting : t.common.exportCsv}
         </Button>
-        <Button onClick={() => { setEditProduct(null); setFormOpen(true) }} className="gap-2">
+        <Button data-tour="add-product" onClick={() => { setEditProduct(null); setFormOpen(true) }} className="gap-2">
           <Plus className="w-4 h-4" />
           {p.addProduct}
         </Button>
