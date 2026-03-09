@@ -32,3 +32,10 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 9. **鍵盤快捷鍵面板**：`?` 鍵開啟 ShortcutOverlay（target 為 input/textarea/select 時忽略）；`Esc` 關閉；面板列出所有快捷鍵的 label + key badge；不使用 Dialog，改用 fixed overlay + backdrop。
 
 10. **DataTable 分頁**：DataTable 支援 `pageSize` prop（預設 15）；分頁狀態為元件內部 `useState(1)`；排序欄位變更時重置到第 1 頁；分頁列顯示「第 X / Y 頁」與上一頁／下一頁按鈕（`variant="outline" size="sm"`）；資料總筆數 ≤ pageSize 時不顯示分頁列。
+
+11. **側邊欄徽章（Sidebar Badge）**：Sidebar 以 `useQuery(['reports', 'kpis'], ..., { staleTime: 1000 * 60 * 2 })` 取得 KPI 數值，在特定導覽項目右側顯示計數徽章：
+    - **商品** → 低庫存數量（`lowStockCount > 0` 時顯示，黃底褐字）
+    - **採購** → 待處理採購單數（`pendingPurchasesCount > 0` 時顯示）
+    - **銷售** → 待處理銷售單數（`pendingSalesOrders > 0` 時顯示）
+    - 徽章直接追加在 label 右方：`<span className="ml-auto text-xs rounded-full px-1.5 py-0.5 ...">N</span>`
+    - 徽章數值為 0 時不渲染，避免版面偏移；低庫存用 `bg-yellow-500/20 text-yellow-600`，待處理訂單用 `bg-primary/15 text-primary`

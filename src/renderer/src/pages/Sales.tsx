@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable, type Column } from '@/components/common/DataTable'
@@ -23,6 +23,7 @@ export default function Sales() {
   const [detailId, setDetailId] = useState<number | null>(null)
   const [completeId, setCompleteId] = useState<number | null>(null)
   const [cancelId, setCancelId] = useState<number | null>(null)
+  const [returnId, setReturnId] = useState<number | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
@@ -48,6 +49,20 @@ export default function Sales() {
   const cancelMutation = useMutation({
     mutationFn: (id: number) => window.electronAPI.sales.cancel(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sales'] })
+  })
+
+  const returnMutation = useMutation({
+    mutationFn: (id: number) => window.electronAPI.sales.return(id),
+    onSuccess: (result) => {
+      if ((result as { success: boolean }).success) {
+        queryClient.invalidateQueries({ queryKey: ['sales'] })
+        queryClient.invalidateQueries({ queryKey: ['products'] })
+        queryClient.invalidateQueries({ queryKey: ['reports'] })
+        queryClient.invalidateQueries({ queryKey: ['adjustments'] })
+      } else {
+        setError(result.error ?? '退貨失敗')
+      }
+    }
   })
 
   const deleteMutation = useMutation({
@@ -92,6 +107,15 @@ export default function Sales() {
           >
             <Printer className="w-3.5 h-3.5" />
           </Button>
+          {row.status === 'completed' && (
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7 text-orange-400 hover:text-orange-500"
+              title="退貨"
+              onClick={() => setReturnId(row.id)}
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
           {row.status === 'pending' && (
             <>
               {spotlight?.type === 'sales' && spotlight.id === row.id ? (
@@ -195,6 +219,14 @@ export default function Sales() {
         description={s.cancelDesc}
         onConfirm={() => cancelId && cancelMutation.mutate(cancelId)}
         confirmLabel={s.cancelTitle}
+      />
+      <ConfirmDialog
+        open={returnId !== null}
+        onOpenChange={(open) => !open && setReturnId(null)}
+        title="確認退貨"
+        description="退貨後庫存將自動回補，此操作不可撤銷。確定要退貨嗎？"
+        onConfirm={() => returnId && returnMutation.mutate(returnId)}
+        confirmLabel="確認退貨"
       />
       <ConfirmDialog
         open={deleteId !== null}

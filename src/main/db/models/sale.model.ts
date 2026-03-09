@@ -131,10 +131,38 @@ export const SaleModel = {
     return result.changes > 0
   },
 
+  return(id: number): SalesOrder | null {
+    const db = getDb()
+    const order = this.findById(id)
+    if (!order || order.status !== 'completed') throw new Error('只有已完成的銷售單可以退貨')
+
+    const updateOrder = db.prepare(
+      `UPDATE sales_orders SET status = 'returned' WHERE id = ? AND status = 'completed'`
+    )
+    const restoreStock = db.prepare(
+      `UPDATE products SET stock_qty = stock_qty + ?, updated_at = datetime('now') WHERE id = ?`
+    )
+    const insertAdj = db.prepare(
+      `INSERT INTO inventory_adjustments (product_id, delta, reason, note, adjusted_at)
+       VALUES (?, ?, '退貨入庫', ?, datetime('now'))`
+    )
+
+    db.transaction(() => {
+      const changed = updateOrder.run(id).changes
+      if (changed === 0) throw new Error('退貨失敗：狀態不符')
+      for (const item of order.items ?? []) {
+        restoreStock.run(item.quantity, item.product_id)
+        insertAdj.run(item.product_id, item.quantity, `銷售退貨 ${order.order_no}`)
+      }
+    })()
+
+    return this.findById(id)
+  },
+
   delete(id: number): boolean {
     const db = getDb()
     const order = this.findById(id)
-    if (!order || order.status === 'completed') return false
+    if (!order || order.status === 'completed' || order.status === 'returned') return false
     return db.prepare('DELETE FROM sales_orders WHERE id = ?').run(id).changes > 0
   }
 }

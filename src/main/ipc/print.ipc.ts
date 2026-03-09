@@ -36,7 +36,8 @@ function getStatusLabel(status: string): string {
     completed: '已完成',
     received: '已收貨',
     cancelled: '已取消',
-    pending: '待處理'
+    pending: '待處理',
+    returned: '已退貨'
   }
   return map[status] ?? status
 }
@@ -46,7 +47,8 @@ function getStatusColor(status: string): string {
     completed: 'background:#dcfce7;color:#15803d',
     received: 'background:#dbeafe;color:#1d4ed8',
     cancelled: 'background:#fee2e2;color:#b91c1c',
-    pending: 'background:#fef9c3;color:#a16207'
+    pending: 'background:#fef9c3;color:#a16207',
+    returned: 'background:#ffedd5;color:#c2410c'
   }
   return map[status] ?? 'background:#f3f4f6;color:#374151'
 }

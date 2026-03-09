@@ -83,7 +83,7 @@ export interface SalesOrder {
   order_no: string
   customer_id: number | null
   customer_name?: string
-  status: 'pending' | 'completed' | 'cancelled'
+  status: 'pending' | 'completed' | 'cancelled' | 'returned'
   order_date: string
   total_amount: number
   notes: string | null
@@ -128,6 +128,7 @@ export interface DashboardKPIs {
   lowStockCount: number
   totalProducts: number
   pendingSalesOrders: number
+  pendingPurchasesCount: number
 }
 
 export interface SalesTrendPoint {
@@ -261,4 +262,16 @@ export interface StockTakeItem {
 
 export interface StockTakeDetail extends StockTake {
   items: StockTakeItem[]
+}
+
+export interface SlowMovingItem {
+  id: number
+  name: string
+  sku: string
+  category: string
+  stock_qty: number
+  buy_price: number
+  updated_at: string
+  days_idle: number
+  stock_value: number
 }

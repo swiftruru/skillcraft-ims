@@ -44,6 +44,7 @@ declare global {
         create(data: unknown): Promise<import('./schema').SalesOrder>
         complete(id: number): Promise<{ success: boolean; data?: import('./schema').SalesOrder; error?: string }>
         cancel(id: number): Promise<boolean>
+        return(id: number): Promise<{ success: boolean; data?: import('./schema').SalesOrder; error?: string }>
         delete(id: number): Promise<boolean>
       }
       reports: {
@@ -55,6 +56,7 @@ declare global {
         marginAnalysis(): Promise<import('./schema').MarginItem[]>
         supplierStats(): Promise<import('./schema').SupplierStat[]>
         customerStats(): Promise<import('./schema').CustomerStat[]>
+        slowMoving(days?: number): Promise<import('./schema').SlowMovingItem[]>
       }
       sync: {
         trigger(direction: 'push' | 'pull' | 'bidirectional'): Promise<{ success: boolean; recordsSynced?: number; error?: string }>

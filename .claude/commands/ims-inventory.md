@@ -62,3 +62,14 @@ description: 當使用者要求新增或修改進貨、銷售、庫存異動、�
     - 篩選：reason 下拉（全部 / 盤點修正 / 損耗報廢 / 手動調整 …）+ 商品名稱/SKU 搜尋
     - 匯出：右上角「匯出 CSV」按鈕呼叫既有 `export:adjustments` IPC
     - 預設顯示最新 200 筆，`adjusted_at DESC`
+
+11. **銷售退貨規範**：`sales:return` IPC 只接受 `completed` 狀態的訂單，在同一個 transaction 內完成：
+    ```
+    UPDATE sales_orders SET status='returned' WHERE id=? AND status='completed'
+    UPDATE products SET stock_qty = stock_qty + ?, updated_at=datetime('now') WHERE id=?  （每個品項）
+    INSERT INTO inventory_adjustments (product_id, delta, reason, note) VALUES (?, ?, '退貨入庫', '銷售退貨 #{order_no}')
+    ```
+    - `returned` 狀態為終態，不可再次退貨；IPC 層驗證 status='completed' 才執行，否則 throw Error
+    - UI 只在 completed 訂單列表中顯示「退貨」按鈕，點擊後彈出 ConfirmDialog 確認
+    - 完成後 invalidate `['sales']`、`['products']`、`['reports']`、`['adjustments']` query cache
+    - PDF 狀態標籤補充 'returned' → '已退貨'（橘色背景）；`SalesOrder.status` type 更新為 `'pending' | 'completed' | 'cancelled' | 'returned'`

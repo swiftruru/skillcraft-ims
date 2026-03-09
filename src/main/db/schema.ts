@@ -88,7 +88,7 @@ export interface SalesOrder {
   order_no: string
   customer_id: number | null
   customer_name?: string
-  status: 'pending' | 'completed' | 'cancelled'
+  status: 'pending' | 'completed' | 'cancelled' | 'returned'
   order_date: string
   total_amount: number
   notes: string | null

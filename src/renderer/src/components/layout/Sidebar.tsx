@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   Package,
@@ -15,15 +16,22 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLang } from '@/lib/useLang'
+import type { DashboardKPIs } from '@/types/schema'
 
 export function Sidebar() {
   const t = useLang()
 
+  const { data: kpis } = useQuery<DashboardKPIs>({
+    queryKey: ['reports', 'kpis'],
+    queryFn: () => window.electronAPI.reports.kpis(),
+    staleTime: 1000 * 60 * 2
+  })
+
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: t.nav.dashboard, end: true },
-    { to: '/products', icon: Package, label: t.nav.products },
-    { to: '/purchases', icon: ShoppingCart, label: t.nav.purchases },
-    { to: '/sales', icon: TrendingUp, label: t.nav.sales },
+    { to: '/products', icon: Package, label: t.nav.products, badge: kpis?.lowStockCount, badgeStyle: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400' },
+    { to: '/purchases', icon: ShoppingCart, label: t.nav.purchases, badge: kpis?.pendingPurchasesCount, badgeStyle: 'bg-primary/15 text-primary' },
+    { to: '/sales', icon: TrendingUp, label: t.nav.sales, badge: kpis?.pendingSalesOrders, badgeStyle: 'bg-primary/15 text-primary' },
     { to: '/suppliers', icon: Truck, label: t.nav.suppliers },
     { to: '/customers', icon: Users, label: t.nav.customers },
     { to: '/reports', icon: BarChart3, label: t.nav.reports },
@@ -64,7 +72,12 @@ export function Sidebar() {
             }
           >
             <item.icon className="w-4 h-4 shrink-0" />
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {item.badge != null && item.badge > 0 && (
+              <span className={cn('text-xs font-semibold rounded-full px-1.5 py-0.5 leading-none tabular-nums', item.badgeStyle)}>
+                {item.badge}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

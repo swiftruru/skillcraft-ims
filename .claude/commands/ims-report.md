@@ -20,3 +20,9 @@ description: 當使用者要求新增或修改 Dashboard、KPI 卡片、圖表�
 7. **毛利分析**：`reports:marginAnalysis` IPC 回傳 `MarginItem[]`；毛利率 ≥30% 顯示 `text-green-400`，10–30% 顯示 `text-yellow-400`，<10% 顯示 `text-destructive`；queryKey 為 `['reports', 'marginAnalysis']`。
 
 8. **供應商/客戶統計**：`reports:supplierStats` 和 `reports:customerStats` 回傳各自的統計陣列；供應商顯示採購次數與收貨總金額；客戶顯示訂單次數與完成總金額；queryKey 分別為 `['reports', 'supplierStats']` 和 `['reports', 'customerStats']`。
+
+9. **停滯品分析（Slow-Moving Inventory）**：`reports:slowMoving` IPC 接受 `days: 30 | 60 | 90` 參數，回傳 `SlowMovingItem[]`：
+   - SQL 邏輯：`products.updated_at < date('now', '-N days') AND stock_qty > 0`（`updated_at` 隨每次庫存異動更新，可代表最後移動日）
+   - 回傳欄位：`id, name, sku, category, stock_qty, buy_price, updated_at, days_idle, stock_value`
+   - queryKey：`['reports', 'slowMoving', days]`，`staleTime: 1000 * 60 * 5`
+   - UI 在 Reports 頁面以獨立卡片呈現；天數切換 30/60/90 按鈕（`variant="outline" size="sm"`）；顯示商品名稱、SKU、庫存、庫存價值、最後異動天數；天數越長顯示越深的警示色（30天→黃色，60天→橘色，90天→紅色）

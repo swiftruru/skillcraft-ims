@@ -8,7 +8,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts'
-import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat } from '@/types/schema'
+import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat, SlowMovingItem } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
@@ -33,6 +33,7 @@ export default function Reports() {
   const t = useLang()
   const r = t.reports
   const [period, setPeriod] = useState('30')
+  const [slowDays, setSlowDays] = useState(60)
   const trendDays = getDaysForPeriod(period)
 
   const PERIODS = [
@@ -73,6 +74,11 @@ export default function Reports() {
   const { data: customerStats } = useQuery<CustomerStat[]>({
     queryKey: ['reports', 'customerStats'],
     queryFn: () => window.electronAPI.reports.customerStats(),
+    staleTime: 1000 * 60 * 5
+  })
+  const { data: slowMoving } = useQuery<SlowMovingItem[]>({
+    queryKey: ['reports', 'slowMoving', slowDays],
+    queryFn: () => window.electronAPI.reports.slowMoving(slowDays),
     staleTime: 1000 * 60 * 5
   })
 
@@ -324,6 +330,77 @@ export default function Reports() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Slow-Moving Inventory */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">停滯品分析</CardTitle>
+            <div className="flex gap-1">
+              {[30, 60, 90].map((d) => (
+                <Button
+                  key={d}
+                  variant={slowDays === d ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setSlowDays(d)}
+                >
+                  {d} 天
+                </Button>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            庫存量 &gt; 0 但超過 {slowDays} 天未有任何異動的商品
+          </p>
+        </CardHeader>
+        <CardContent>
+          {!slowMoving || slowMoving.length === 0 ? (
+            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">
+              {slowDays} 天內無停滯品
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs text-muted-foreground">
+                    <th className="text-left px-3 py-2 font-medium">商品名稱</th>
+                    <th className="text-left px-3 py-2 font-medium font-mono">SKU</th>
+                    <th className="text-left px-3 py-2 font-medium">{t.products.category}</th>
+                    <th className="text-right px-3 py-2 font-medium">庫存</th>
+                    <th className="text-right px-3 py-2 font-medium">庫存價值</th>
+                    <th className="text-right px-3 py-2 font-medium">停滯天數</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {slowMoving.map((item) => {
+                    const idleColor = item.days_idle >= 90
+                      ? 'text-destructive'
+                      : item.days_idle >= 60
+                        ? 'text-orange-400'
+                        : 'text-yellow-400'
+                    return (
+                      <tr key={item.id} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium">{item.name}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{item.sku}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{item.category}</td>
+                        <td className="px-3 py-2 text-right">{formatNumber(item.stock_qty)}</td>
+                        <td className="px-3 py-2 text-right">{formatCurrency(item.stock_value)}</td>
+                        <td className={`px-3 py-2 text-right font-semibold tabular-nums ${idleColor}`}>
+                          {item.days_idle} 天
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <p className="text-xs text-muted-foreground text-right mt-2 px-3">
+                共 {slowMoving.length} 項停滯品，庫存價值合計 {formatCurrency(slowMoving.reduce((s, i) => s + i.stock_value, 0))}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

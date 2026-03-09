@@ -67,6 +67,12 @@ export function registerReportsIpc(): void {
         .get() as { cnt: number }
     ).cnt
 
+    const pendingPurchasesCount = (
+      db
+        .prepare(`SELECT COUNT(*) as cnt FROM purchase_orders WHERE status = 'pending'`)
+        .get() as { cnt: number }
+    ).cnt
+
     return {
       totalInventoryValue: inventoryValue,
       monthlyRevenue,
@@ -75,7 +81,8 @@ export function registerReportsIpc(): void {
       monthlyGrossProfitPrev: prevMonthGrossProfit,
       lowStockCount,
       totalProducts,
-      pendingSalesOrders
+      pendingSalesOrders,
+      pendingPurchasesCount
     }
   })
 
@@ -179,5 +186,20 @@ export function registerReportsIpc(): void {
          GROUP BY c.id ORDER BY total_spent DESC`
       )
       .all()
+  })
+
+  ipcMain.handle('reports:slowMoving', (_e, days: number = 60) => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT id, name, sku, category, stock_qty, buy_price, updated_at,
+                CAST(julianday('now') - julianday(updated_at) AS INTEGER) as days_idle,
+                ROUND(stock_qty * buy_price, 2) as stock_value
+         FROM products
+         WHERE stock_qty > 0
+           AND updated_at < datetime('now', '-' || ? || ' days')
+         ORDER BY days_idle DESC`
+      )
+      .all(days)
   })
 }

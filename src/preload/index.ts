@@ -57,6 +57,7 @@ const electronAPI = {
     create: (data: unknown) => ipcRenderer.invoke('sales:create', data),
     complete: (id: number) => ipcRenderer.invoke('sales:complete', id),
     cancel: (id: number) => ipcRenderer.invoke('sales:cancel', id),
+    return: (id: number) => ipcRenderer.invoke('sales:return', id),
     delete: (id: number) => ipcRenderer.invoke('sales:delete', id)
   },
 
@@ -69,7 +70,8 @@ const electronAPI = {
     lowStock: () => ipcRenderer.invoke('reports:lowStock'),
     marginAnalysis: () => ipcRenderer.invoke('reports:marginAnalysis'),
     supplierStats: () => ipcRenderer.invoke('reports:supplierStats'),
-    customerStats: () => ipcRenderer.invoke('reports:customerStats')
+    customerStats: () => ipcRenderer.invoke('reports:customerStats'),
+    slowMoving: (days?: number) => ipcRenderer.invoke('reports:slowMoving', days)
   },
 
   // Sync

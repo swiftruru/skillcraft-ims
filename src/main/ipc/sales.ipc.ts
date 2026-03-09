@@ -57,5 +57,13 @@ export function registerSalesIpc(): void {
     }
   })
   ipcMain.handle('sales:cancel', (_e, id: number) => SaleModel.cancel(id))
+  ipcMain.handle('sales:return', (_e, id: number) => {
+    try {
+      const result = SaleModel.return(id)
+      return { success: true, data: result }
+    } catch (err: unknown) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
   ipcMain.handle('sales:delete', (_e, id: number) => SaleModel.delete(id))
 }
