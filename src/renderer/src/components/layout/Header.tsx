@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2, Search, Sun, Moon, Play, Sparkles } from 'lucide-react'
+import { modKey } from '@/lib/platform'
 import { Button } from '@/components/ui/button'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDate } from '@/lib/utils'
@@ -86,7 +87,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
         >
           <Search className="w-3 h-3" />
           <span>{t.header.search}</span>
-          <kbd className="ml-auto text-[10px] bg-background border border-border rounded px-1 py-0.5">⌘K</kbd>
+          <kbd className="ml-auto text-[10px] bg-background border border-border rounded px-1 py-0.5">{modKey}K</kbd>
         </button>
 
         {/* Low stock alert */}

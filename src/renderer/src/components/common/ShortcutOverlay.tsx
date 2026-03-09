@@ -1,4 +1,5 @@
 import { useLang } from '@/lib/useLang'
+import { modKey } from '@/lib/platform'
 
 interface ShortcutOverlayProps {
   open: boolean
@@ -15,7 +16,7 @@ export function ShortcutOverlay({ open, onClose }: ShortcutOverlayProps) {
   const sc = t.shortcuts
 
   const shortcuts: ShortcutEntry[] = [
-    { label: sc.globalSearch, keys: ['⌘K', 'Ctrl+K'] },
+    { label: sc.globalSearch, keys: [`${modKey}K`] },
     { label: sc.showShortcuts, keys: ['?'] },
     { label: sc.closeDialog, keys: ['Esc'] },
     { label: sc.goHome, keys: ['G', 'H'] },
