@@ -40,6 +40,12 @@ description: 當使用者要求新增或修改 Dashboard、KPI 卡片、圖表�
     - UI：`ProductDetailDialog` 新增「採購價格」tab，以 LineChart 顯示歷史單價趨勢；下方表格列出每筆明細（日期、訂單號、數量、單價）
     - 無採購記錄時顯示空白提示
 
+13. **採購 vs 銷售對比圖**：`reports:purchaseVsSales(days?)` IPC 回傳雙軸時序資料：
+    - SQL：左聯接採購（`purchase_orders` status='received'）與銷售（`sales_orders` status='completed'），依日期 GROUP BY，回傳 `{ date, purchase_amount, sales_amount }[]`
+    - 參數 `days` 預設 30，queryKey 為 `['reports', 'purchaseVsSales', days]`，`staleTime: 1000 * 60 * 5`
+    - UI：Reports 頁面新增「採購 vs 銷售」卡片，使用 Recharts `BarChart`（groupped，兩條 Bar）；採購用 `#3b82f6`（藍），銷售用 `#10b981`（綠）；同一個期間選擇器控制 days
+    - 無資料時顯示空白提示；type：`PurchaseVsSalesPoint { date: string; purchase_amount: number; sales_amount: number }`
+
 9. **停滯品分析（Slow-Moving Inventory）**：`reports:slowMoving` IPC 接受 `days: 30 | 60 | 90` 參數，回傳 `SlowMovingItem[]`：
    - SQL 邏輯：`products.updated_at < date('now', '-N days') AND stock_qty > 0`（`updated_at` 隨每次庫存異動更新，可代表最後移動日）
    - 回傳欄位：`id, name, sku, category, stock_qty, buy_price, updated_at, days_idle, stock_value`

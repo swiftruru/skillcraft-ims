@@ -291,6 +291,12 @@ export interface PriceHistoryItem {
   quantity: number
 }
 
+export interface PurchaseVsSalesPoint {
+  date: string
+  purchase_amount: number
+  sales_amount: number
+}
+
 export interface AppNotification {
   id: number
   type: string

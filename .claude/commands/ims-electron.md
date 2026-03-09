@@ -38,6 +38,11 @@ description: 當使用者要求新增或修改 Electron 主程序功能，如視
 
 8. **排程每日通知**：SchedulerService 除了同步排程外，另起一個 `'0 9 * * *'` cron job（每天早上 9 點）發送庫存摘要通知；此排程不依賴 autoSyncEnabled 設定，無條件啟動；通知內容包含低庫存數量與待處理訂單數量。
 
+10. **庫存預警自動通知**：`sales:complete` 後檢查售出品項庫存，若有商品跌至補貨點以下，除 OS Notification 外，必須同時呼叫 `insertNotification` 寫入 `app_notifications`：
+    - import：`import { insertNotification } from './notifications.ipc'`
+    - type：`'low_stock'`；title：`'⚠️ 庫存預警'`；body：`'${name} 庫存剩 ${stock_qty}，低於補貨點 ${reorder_pt}'`（每個品項各寫一筆）；link：`'/products'`
+    - 上限：每次最多寫 5 筆，避免同一批銷售大量寫入通知
+
 9. **定期自動備份規範**：`SchedulerService` 新增自動備份 cron job：
    - 排程設定：`backupSchedule`（預設 `'0 2 * * *'` 每天凌晨 2 點），由 `app_settings` 中 `autoBackupEnabled`（`'true'`/`'false'`）控制是否啟動
    - 備份路徑：`app.getPath('documents')/SkillCraft IMS Backups/ims-backup-YYYY-MM-DD.db`；超過 30 天的備份自動刪除（`fs.readdirSync` 掃目錄後 `fs.unlinkSync`）

@@ -203,6 +203,34 @@ export function registerReportsIpc(): void {
       .all(days)
   })
 
+  ipcMain.handle('reports:purchaseVsSales', (_e, days: number = 30) => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT date_series.date,
+                COALESCE(p.purchase_amount, 0) as purchase_amount,
+                COALESCE(s.sales_amount, 0) as sales_amount
+         FROM (
+           SELECT order_date as date FROM purchase_orders WHERE order_date >= date('now', '-' || ? || ' days')
+           UNION
+           SELECT order_date as date FROM sales_orders WHERE order_date >= date('now', '-' || ? || ' days')
+         ) date_series
+         LEFT JOIN (
+           SELECT order_date, COALESCE(SUM(total_amount), 0) as purchase_amount
+           FROM purchase_orders WHERE status = 'received' AND order_date >= date('now', '-' || ? || ' days')
+           GROUP BY order_date
+         ) p ON p.order_date = date_series.date
+         LEFT JOIN (
+           SELECT order_date, COALESCE(SUM(total_amount), 0) as sales_amount
+           FROM sales_orders WHERE status = 'completed' AND order_date >= date('now', '-' || ? || ' days')
+           GROUP BY order_date
+         ) s ON s.order_date = date_series.date
+         GROUP BY date_series.date
+         ORDER BY date_series.date ASC`
+      )
+      .all(days, days, days, days)
+  })
+
   ipcMain.handle('reports:topCustomers', () => {
     const db = getDb()
     return db

@@ -9,7 +9,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts'
-import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat, SlowMovingItem, TopCustomerItem } from '@/types/schema'
+import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat, SlowMovingItem, TopCustomerItem, PurchaseVsSalesPoint } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
@@ -91,6 +91,11 @@ export default function Reports() {
     queryFn: () => window.electronAPI.reports.topCustomers(),
     staleTime: 1000 * 60 * 5
   })
+  const { data: purchaseVsSales } = useQuery<PurchaseVsSalesPoint[]>({
+    queryKey: ['reports', 'purchaseVsSales', trendDays],
+    queryFn: () => window.electronAPI.reports.purchaseVsSales(trendDays),
+    staleTime: 1000 * 60 * 5
+  })
 
   return (
     <div className="p-6 space-y-6">
@@ -163,6 +168,36 @@ export default function Reports() {
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
                 <Line type="monotone" dataKey="revenue" name={r.revenue} stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
               </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">{r.noData}</div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Purchase vs Sales */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium">採購 vs 銷售（{trendDays}d）</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {purchaseVsSales && purchaseVsSales.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={purchaseVsSales}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => v.slice(5)} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                  formatter={(v: number, name: string) => [formatCurrency(v), name === 'purchase_amount' ? '採購' : '銷售']}
+                />
+                <Legend
+                  formatter={(value) => value === 'purchase_amount' ? '採購' : '銷售'}
+                  wrapperStyle={{ fontSize: '12px' }}
+                />
+                <Bar dataKey="purchase_amount" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="sales_amount" fill="#10b981" radius={[2, 2, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">{r.noData}</div>

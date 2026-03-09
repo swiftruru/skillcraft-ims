@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ArrowLeft, CheckCircle2, Trash2, ClipboardCheck, Wand2 } from 'lucide-react'
@@ -35,8 +35,12 @@ function ListView({ onSelect, autoCreate }: { onSelect: (id: number) => void; au
     onError: (e) => toast({ title: (e as Error).message, variant: 'destructive' })
   })
 
+  const autoCreated = useRef(false)
   useEffect(() => {
-    if (autoCreate) createMutation.mutate()
+    if (autoCreate && !autoCreated.current) {
+      autoCreated.current = true
+      createMutation.mutate()
+    }
   }, [])
 
   const deleteMutation = useMutation({

@@ -1,6 +1,7 @@
 import { ipcMain, Notification } from 'electron'
 import { SaleModel } from '../db/models/sale.model'
 import { getDb } from '../db'
+import { insertNotification } from './notifications.ipc'
 
 function notifyLowStockAfterSale(soldProductIds: number[]): void {
   if (!Notification.isSupported() || soldProductIds.length === 0) return
@@ -32,6 +33,16 @@ function notifyLowStockAfterSale(soldProductIds: number[]): void {
       body: lines.join('、') + extra,
       silent: false
     }).show()
+
+    // 同步寫入應用內通知（最多 5 筆）
+    nowLow.slice(0, 5).forEach((p) => {
+      insertNotification(
+        'low_stock',
+        '⚠️ 庫存預警',
+        `${p.name} 庫存剩 ${p.stock_qty}，低於補貨點 ${p.reorder_pt}`,
+        '/products'
+      )
+    })
   } catch {
     // 靜默忽略通知錯誤
   }
