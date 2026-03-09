@@ -2,6 +2,15 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ArrowLeft, CheckCircle2, Trash2, ClipboardCheck, Wand2 } from 'lucide-react'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend
+} from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -229,6 +238,35 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
         <span>{counted} / {take.items.length} {s.countedQty}</span>
         <span>{s.difference}: <span className={`font-semibold ${diffs > 0 ? 'text-yellow-400' : 'text-foreground'}`}>{diffs}</span></span>
       </div>
+
+      {/* Variance Chart for completed stocktakes */}
+      {!isDraft && (() => {
+        const diffItems = take.items.filter(
+          (i) => i.counted_qty !== null && i.counted_qty !== i.system_qty
+        )
+        if (!diffItems.length) return null
+        const chartData = diffItems.map((i) => ({
+          name: i.product_name.length > 10 ? i.product_name.slice(0, 10) + '…' : i.product_name,
+          帳面數量: i.system_qty,
+          實際盤點: i.counted_qty
+        }))
+        const chartHeight = Math.min(400, Math.max(200, diffItems.length * 44))
+        return (
+          <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">差異分析（{diffItems.length} 項有差異）</p>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <BarChart layout="vertical" data={chartData} margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="帳面數量" fill="#3b82f6" radius={[0, 3, 3, 0]} maxBarSize={16} />
+                <Bar dataKey="實際盤點" fill="#10b981" radius={[0, 3, 3, 0]} maxBarSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )
+      })()}
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">

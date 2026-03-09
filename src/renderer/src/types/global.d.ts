@@ -16,6 +16,7 @@ declare global {
         getAdjustmentHistory(productId: number): Promise<import('./schema').InventoryAdjustment[]>
         getAllAdjustments(filters?: { search?: string; reason?: string; dateFrom?: string; dateTo?: string; limit?: number }): Promise<import('./schema').InventoryAdjustment[]>
         batchDelete(ids: number[]): Promise<{ deleted: number; skipped: number }>
+        batchUpdate(ids: number[], data: { category?: string }): Promise<{ updated: number }>
         getPriceHistory(productId: number): Promise<import('./schema').PriceHistoryItem[]>
       }
       suppliers: {

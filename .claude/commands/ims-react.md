@@ -77,3 +77,22 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - **銷售** → 待處理銷售單數（`pendingSalesOrders > 0` 時顯示）
     - 徽章直接追加在 label 右方：`<span className="ml-auto text-xs rounded-full px-1.5 py-0.5 ...">N</span>`
     - 徽章數值為 0 時不渲染，避免版面偏移；低庫存用 `bg-yellow-500/20 text-yellow-600`，待處理訂單用 `bg-primary/15 text-primary`
+
+17. **盤點差異視覺化（StockTake Variance Chart）**：StockTake `DetailView` 已完成狀態時，在表格上方新增「差異分析」卡片：
+    - 只在 `take.status === 'completed'` 且有差異商品時顯示
+    - 使用 Recharts `BarChart layout="vertical"`，每商品顯示「帳面數量」（藍色 `#3b82f6`）與「實際盤點」（綠色 `#10b981`）兩條 Bar
+    - 篩選條件：`item.counted_qty !== null && item.counted_qty !== item.system_qty`
+    - 商品名稱顯示在 Y 軸（`YAxis dataKey="name" type="category"`），X 軸為數量
+    - 無差異時不顯示此卡片；height 依差異數量動態計算（每項 40px，最少 200px，最多 400px）
+
+18. **商品快速採購（Quick Purchase Dialog）**：Products 表格每行動作按鈕區新增「快速採購」按鈕（`ShoppingCart` icon）：
+    - 元件命名 `QuickPurchaseDialog`，位於 `src/renderer/src/components/purchases/QuickPurchaseDialog.tsx`
+    - Props：`product: Product | null, open: boolean, onOpenChange: (v: boolean) => void`
+    - 表單欄位：供應商（Select，`suppliers:getAll()` 載入，可選「不指定」）、數量（預設 `Math.max(1, product.reorder_pt - product.stock_qty)`）、單價（預設 `product.buy_price`）
+    - 送出呼叫 `purchases:create`，payload `{ supplier_id, order_date: today, notes: null, items: [{ product_id, quantity, unit_price }] }`
+    - 成功後 `invalidate(['purchases'])` + toast success，關閉 dialog
+
+19. **商品批次調整分類（Batch Category Update）**：Products 批次操作浮動列新增「調整分類」按鈕：
+    - IPC：`products:batchUpdate(ids: number[], data: { category: string })` → `UPDATE products SET category=?, updated_at=datetime('now') WHERE id IN (...)`；回傳 `{ updated: number }`
+    - 批次操作列點擊「調整分類」後，出現一個 inline 的 `<Select>` 讓使用者選擇現有分類，選擇後立即執行更新
+    - 更新後 `invalidate(['products'])`，清空 `selectedIds`，顯示 toast success

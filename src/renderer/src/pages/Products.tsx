@@ -14,12 +14,15 @@ import { AdjustInventoryDialog } from '@/components/products/AdjustInventoryDial
 import { ProductDetailDialog } from '@/components/products/ProductDetailDialog'
 import { PurchaseSuggestionDialog } from '@/components/inventory/PurchaseSuggestionDialog'
 import { ImportCsvDialog } from '@/components/products/ImportCsvDialog'
+import { QuickPurchaseDialog } from '@/components/purchases/QuickPurchaseDialog'
 import { formatCurrency, formatNumber } from '@/lib/utils'
+import { useToast } from '@/components/ui/use-toast'
 import type { Product } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 export default function Products() {
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const t = useLang()
   const p = t.products
   const [search, setSearch] = useState('')
@@ -35,6 +38,7 @@ export default function Products() {
   const [importOpen, setImportOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+  const [quickPurchaseProduct, setQuickPurchaseProduct] = useState<Product | null>(null)
 
   const { data: categories } = useQuery<string[]>({
     queryKey: ['products', 'categories'],
@@ -68,6 +72,17 @@ export default function Products() {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       setSelectedIds(new Set())
     }
+  })
+
+  const batchUpdateMutation = useMutation({
+    mutationFn: ({ ids, category }: { ids: number[]; category: string }) =>
+      window.electronAPI.products.batchUpdate(ids, { category }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      setSelectedIds(new Set())
+      toast({ title: `已更新 ${res.updated} 項分類`, variant: 'success' })
+    },
+    onError: () => toast({ title: '更新失敗', variant: 'destructive' })
   })
 
   const allIds = (products ?? []).map((p) => p.id)
@@ -151,6 +166,15 @@ export default function Products() {
       className: 'w-36 text-right',
       render: (_v, row) => (
         <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-blue-400 hover:text-blue-500"
+            title="快速採購"
+            onClick={() => setQuickPurchaseProduct(row as unknown as Product)}
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -300,6 +324,16 @@ export default function Products() {
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-card border border-border rounded-xl shadow-2xl px-4 py-2.5">
           <span className="text-sm text-muted-foreground">已選 {selectedIds.size} 項</span>
+          <Select onValueChange={(cat) => batchUpdateMutation.mutate({ ids: Array.from(selectedIds), category: cat })}>
+            <SelectTrigger className="h-8 text-xs w-28">
+              <SelectValue placeholder="調整分類" />
+            </SelectTrigger>
+            <SelectContent>
+              {(categories ?? []).map((cat) => (
+                <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="destructive"
             size="sm"
@@ -317,6 +351,12 @@ export default function Products() {
         title="批次刪除商品"
         description={`確定要刪除選取的 ${selectedIds.size} 項商品嗎？有庫存的商品將被略過，此操作不可撤銷。`}
         onConfirm={() => batchDeleteMutation.mutate(Array.from(selectedIds))}
+      />
+
+      <QuickPurchaseDialog
+        product={quickPurchaseProduct}
+        open={quickPurchaseProduct !== null}
+        onOpenChange={(open) => !open && setQuickPurchaseProduct(null)}
       />
 
       <ConfirmDialog

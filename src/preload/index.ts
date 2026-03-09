@@ -19,6 +19,7 @@ const electronAPI = {
     getAllAdjustments: (filters?: { search?: string; reason?: string; dateFrom?: string; dateTo?: string; limit?: number }) =>
       ipcRenderer.invoke('products:getAllAdjustments', filters),
     batchDelete: (ids: number[]) => ipcRenderer.invoke('products:batchDelete', ids),
+    batchUpdate: (ids: number[], data: { category?: string }) => ipcRenderer.invoke('products:batchUpdate', ids, data),
     getPriceHistory: (productId: number) => ipcRenderer.invoke('products:getPriceHistory', productId)
   },
 

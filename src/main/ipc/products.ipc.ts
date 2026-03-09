@@ -60,4 +60,18 @@ export function registerProductsIpc(): void {
       )
       .all(productId)
   })
+
+  ipcMain.handle('products:batchUpdate', (_e, ids: number[], data: { category?: string }) => {
+    const db = getDb()
+    if (!ids.length) return { updated: 0 }
+    const placeholders = ids.map(() => '?').join(', ')
+    let updated = 0
+    if (data.category !== undefined) {
+      const result = db
+        .prepare(`UPDATE products SET category = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`)
+        .run(data.category, ...ids)
+      updated = result.changes
+    }
+    return { updated }
+  })
 }
