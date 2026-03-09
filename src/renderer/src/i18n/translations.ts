@@ -64,7 +64,8 @@ export const translations = {
       view: '查看',
       clearDates: '清除',
       mockData: 'Mock 資料',
-      returned: '已退貨'
+      returned: '已退貨',
+      pagination: (page: number, total: number, count: number) => `第 ${page} / ${total} 頁　共 ${count} 筆`
     },
     status: {
       pending: '待確認',
@@ -530,7 +531,8 @@ export const translations = {
       view: 'View',
       clearDates: 'Clear',
       mockData: 'Mock Fill',
-      returned: 'Returned'
+      returned: 'Returned',
+      pagination: (page: number, total: number, count: number) => `Page ${page} / ${total}  ·  ${count} records`
     },
     status: {
       pending: 'Pending',

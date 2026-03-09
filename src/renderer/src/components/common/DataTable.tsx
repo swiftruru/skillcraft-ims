@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useLang } from '@/lib/useLang'
 
 export interface Column<T> {
   key: keyof T | string
@@ -29,6 +30,7 @@ export function DataTable<T extends Record<string, unknown>>({
   emptyMessage = '沒有資料',
   pageSize = 15
 }: DataTableProps<T>) {
+  const t = useLang()
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>(null)
   const [page, setPage] = useState(1)
@@ -128,7 +130,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
       {showPagination && (
         <div className="flex items-center justify-between px-4 py-2 border-t border-border text-xs text-muted-foreground">
-          <span>第 {page} / {totalPages} 頁　共 {sorted.length} 筆</span>
+          <span>{t.common.pagination(page, totalPages, sorted.length)}</span>
           <div className="flex items-center gap-1">
             <Button
               variant="outline"
