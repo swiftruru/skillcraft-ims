@@ -119,7 +119,7 @@ export const ProductModel = {
       .all(productId)
   },
 
-  getAllAdjustments(filters?: { search?: string; reason?: string; limit?: number }) {
+  getAllAdjustments(filters?: { search?: string; reason?: string; dateFrom?: string; dateTo?: string; limit?: number }) {
     const db = getDb()
     const conditions: string[] = []
     const params: unknown[] = []
@@ -131,6 +131,14 @@ export const ProductModel = {
     if (filters?.search) {
       conditions.push('(p.name LIKE ? OR p.sku LIKE ?)')
       params.push(`%${filters.search}%`, `%${filters.search}%`)
+    }
+    if (filters?.dateFrom) {
+      conditions.push("date(a.adjusted_at) >= date(?)")
+      params.push(filters.dateFrom)
+    }
+    if (filters?.dateTo) {
+      conditions.push("date(a.adjusted_at) <= date(?)")
+      params.push(filters.dateTo)
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''

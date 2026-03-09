@@ -1,7 +1,9 @@
 import { ExternalLink, Mail, Globe, Github, GraduationCap, BookOpen, Cpu, Sparkles } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { useLang } from '@/lib/useLang'
 import { useLangStore } from '@/stores/lang.store'
+import type { AppSettings } from '@/types/schema'
 
 export default function About() {
   const t = useLang()
@@ -9,6 +11,12 @@ export default function About() {
   const { lang } = useLangStore()
   const isEn = lang === 'en'
   const openUrl = (url: string) => window.electronAPI.shell.openExternal(url)
+
+  const { data: settings } = useQuery<AppSettings>({
+    queryKey: ['settings'],
+    queryFn: () => window.electronAPI.settings.get()
+  })
+  const appVersion = settings?.appVersion ?? '0.2.0'
 
   const techStack = [
     { name: 'Electron 34', desc: isEn ? 'Cross-platform desktop framework' : '跨平台桌面框架' },
@@ -29,7 +37,7 @@ export default function About() {
           <Cpu className="w-8 h-8" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight">SkillCraft IMS</h1>
-        <p className="text-sm text-muted-foreground">Inventory Management System · v0.1.0</p>
+        <p className="text-sm text-muted-foreground">Inventory Management System · v{appVersion}</p>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           {isEn
             ? 'A cross-platform inventory system integrating Electron desktop, SQLite local database, Google Sheets cloud sync, and Claude Code AI Skills.'

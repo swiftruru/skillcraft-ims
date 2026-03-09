@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Download, History } from 'lucide-react'
+import { Search, Download, History, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -21,13 +21,19 @@ export default function InventoryHistory() {
   const h = t.inventoryHistory
   const [search, setSearch] = useState('')
   const [reason, setReason] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+
+  const hasDateFilter = dateFrom || dateTo
 
   const { data: records, isLoading } = useQuery<InventoryAdjustment[]>({
-    queryKey: ['adjustments', 'all', search, reason],
+    queryKey: ['adjustments', 'all', search, reason, dateFrom, dateTo],
     queryFn: () =>
       window.electronAPI.products.getAllAdjustments({
         search: search || undefined,
-        reason: reason || undefined
+        reason: reason || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined
       })
   })
 
@@ -43,8 +49,8 @@ export default function InventoryHistory() {
   return (
     <div className="p-6 space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[180px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9"
@@ -63,6 +69,31 @@ export default function InventoryHistory() {
             <option key={r} value={r}>{h.reasons[r as keyof typeof h.reasons] ?? r}</option>
           ))}
         </select>
+        {/* Date range */}
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <span className="text-muted-foreground text-sm">—</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          {hasDateFilter && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo('') }}
+              className="text-muted-foreground hover:text-foreground"
+              title="清除日期篩選"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
         <Button variant="outline" onClick={handleExport} className="gap-2 ml-auto">
           <Download className="w-4 h-4" />
           {t.common.exportCsv}

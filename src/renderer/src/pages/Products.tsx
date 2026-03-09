@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ProductForm } from '@/components/products/ProductForm'
 import { AdjustInventoryDialog } from '@/components/products/AdjustInventoryDialog'
-import { AdjustmentHistoryDialog } from '@/components/products/AdjustmentHistoryDialog'
+import { ProductDetailDialog } from '@/components/products/ProductDetailDialog'
 import { PurchaseSuggestionDialog } from '@/components/inventory/PurchaseSuggestionDialog'
 import { ImportCsvDialog } from '@/components/products/ImportCsvDialog'
 import { formatCurrency, formatNumber } from '@/lib/utils'
@@ -25,7 +25,7 @@ export default function Products() {
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [adjustProduct, setAdjustProduct] = useState<Product | null>(null)
-  const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null)
   const [exporting, setExporting] = useState(false)
   const [suggestionOpen, setSuggestionOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -42,7 +42,14 @@ export default function Products() {
 
   const columns: Column<Product>[] = [
     { key: 'sku', label: 'SKU', sortable: true, className: 'font-mono text-xs w-32' },
-    { key: 'name', label: p.title, sortable: true },
+    { key: 'name', label: p.title, sortable: true, render: (v, row) => (
+      <button
+        className="text-left hover:text-primary hover:underline transition-colors"
+        onClick={() => setDetailProduct(row as unknown as Product)}
+      >
+        {String(v)}
+      </button>
+    )},
     { key: 'category', label: p.category, sortable: true, render: (v) => (
       <Badge variant="secondary" className="text-xs">{String(v)}</Badge>
     )},
@@ -86,7 +93,7 @@ export default function Products() {
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
             title={p.adjustHistory}
-            onClick={() => setHistoryProduct(row as unknown as Product)}
+            onClick={() => setDetailProduct(row as unknown as Product)}
           >
             <History className="w-3.5 h-3.5" />
           </Button>
@@ -188,10 +195,10 @@ export default function Products() {
         onOpenChange={(open) => { setFormOpen(open); if (!open) setEditProduct(null) }}
         product={editProduct}
       />
-      <AdjustmentHistoryDialog
-        open={historyProduct !== null}
-        onOpenChange={(open) => !open && setHistoryProduct(null)}
-        product={historyProduct}
+      <ProductDetailDialog
+        open={detailProduct !== null}
+        onOpenChange={(open) => !open && setDetailProduct(null)}
+        product={detailProduct}
       />
       <AdjustInventoryDialog
         open={adjustProduct !== null}

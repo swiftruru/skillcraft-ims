@@ -168,6 +168,7 @@ export interface AppSettings {
   syncIntervalMinutes: number
   autoSyncEnabled: boolean
   dbPath: string
+  appVersion: string
   companyName: string
   companyAddress: string
   companyPhone: string

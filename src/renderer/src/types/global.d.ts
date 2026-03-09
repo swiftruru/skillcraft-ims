@@ -14,7 +14,7 @@ declare global {
         getLowStock(): Promise<import('./schema').LowStockItem[]>
         adjust(productId: number, delta: number, reason: string, note?: string): Promise<import('./schema').Product>
         getAdjustmentHistory(productId: number): Promise<import('./schema').InventoryAdjustment[]>
-        getAllAdjustments(filters?: { search?: string; reason?: string; limit?: number }): Promise<import('./schema').InventoryAdjustment[]>
+        getAllAdjustments(filters?: { search?: string; reason?: string; dateFrom?: string; dateTo?: string; limit?: number }): Promise<import('./schema').InventoryAdjustment[]>
       }
       suppliers: {
         getAll(search?: string): Promise<import('./schema').Supplier[]>
