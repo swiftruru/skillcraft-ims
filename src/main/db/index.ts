@@ -11,6 +11,7 @@ import stockTakesSql from './migrations/006_stock_takes.sql?raw'
 import demoStockTakesSql from './migrations/007_demo_stock_takes.sql?raw'
 import demoAdjustmentsSql from './migrations/008_demo_adjustments.sql?raw'
 import appNotificationsSql from './migrations/009_app_notifications.sql?raw'
+import fixReturnedStatusSql from './migrations/010_fix_returned_status.sql?raw'
 
 let db: Database.Database | null = null
 
@@ -56,7 +57,8 @@ async function runMigrations(database: Database.Database): Promise<void> {
     { name: '006_stock_takes', sql: stockTakesSql },
     { name: '007_demo_stock_takes', sql: demoStockTakesSql },
     { name: '008_demo_adjustments', sql: demoAdjustmentsSql },
-    { name: '009_app_notifications', sql: appNotificationsSql }
+    { name: '009_app_notifications', sql: appNotificationsSql },
+    { name: '010_fix_returned_status', sql: fixReturnedStatusSql }
   ]
 
   for (const migration of migrations) {
