@@ -122,6 +122,13 @@ declare global {
       demo: {
         purge(): Promise<void>
       }
+      mockData: {
+        generate(options: { scale: 'S' | 'M' | 'L'; scenario: 'normal' | 'warning' | 'empty' }): Promise<{
+          success: boolean
+          counts: { suppliers: number; customers: number; products: number; purchaseOrders: number; salesOrders: number; adjustments: number }
+          error?: string
+        }>
+      }
       notifications: {
         getAll(): Promise<import('./schema').AppNotification[]>
         markRead(id: number): Promise<boolean>

@@ -3,71 +3,118 @@ name: generate-mock-data
 description: 當使用者要求產生測試資料、填充範例資料或壓力測試系統時觸發。
 ---
 
-## Mock 資料生成規範
+## Mock 資料生成規範（In-App 版本）
 
-1. **資料庫確認**：執行前先確認資料庫存在，並查詢現有各資料表的筆數。
+本功能透過 Electron IPC 在 app 內部直接產生 Mock 資料，不需要外部 script。
 
-   ```bash
-   DB=~/Library/Application\ Support/skillcraft-ims/ims.db
-   ls -lh "$DB" || echo "資料庫尚未建立，請先啟動 SkillCraft IMS app"
+### 架構說明
 
-   sqlite3 "$DB" "
-   SELECT
-     (SELECT COUNT(*) FROM suppliers) as suppliers,
-     (SELECT COUNT(*) FROM customers) as customers,
-     (SELECT COUNT(*) FROM products) as products,
-     (SELECT COUNT(*) FROM purchase_orders) as purchase_orders,
-     (SELECT COUNT(*) FROM sales_orders) as sales_orders
-   " -column -header
-   ```
+- **IPC Handler**：`src/main/ipc/mockdata.ipc.ts` 負責所有資料生成邏輯
+- **IPC 通道**：`mockdata:generate(options)` → 接受規模與情境參數
+- **Preload Bridge**：`window.electronAPI.mockData.generate(options)`
+- **UI 入口**：`src/renderer/src/pages/Settings.tsx` 中的「Demo 資料產生」Card
 
-2. **前置詢問**：若無命令列參數，詢問三個設定：
-   - **規模**：S（20 商品）/ M（50 商品，預設）/ L（100 商品）
-   - **情境**：Normal（正常庫存）/ Warning（30% 低庫存）/ Empty（20% 庫存歸零）
-   - **模式**：Append（追加）/ Reset（清除後重新寫入）
+### 參數規格
 
-3. **Reset 模式備份**：選擇 Reset 模式時，必須先備份資料庫再執行清除。
+```typescript
+interface MockDataOptions {
+  scale: 'S' | 'M' | 'L'   // S=30商品, M=60商品(預設), L=100商品
+  scenario: 'normal' | 'warning' | 'empty'
+  // normal: 所有庫存正常
+  // warning: 約 30% 商品低於補貨點
+  // empty: 約 20% 商品庫存歸零、20% 低庫存
+}
 
-   ```bash
-   cp "$DB" "${DB}.backup.$(date +%Y%m%d%H%M%S)"
-   ```
+interface MockDataResult {
+  success: boolean
+  counts: {
+    suppliers: number
+    customers: number
+    products: number
+    purchaseOrders: number
+    salesOrders: number
+    adjustments: number
+  }
+  error?: string
+}
+```
 
-4. **事務性寫入**：使用 `better-sqlite3` 以單一 Transaction 寫入所有資料，包含供應商、客戶、商品、採購單（含品項）、銷售單（含品項），任何錯誤均 rollback。
+### 資料清除順序（清除前備份 DB）
 
-   ```javascript
-   const Database = require('better-sqlite3')
-   const path = require('path')
-   const os = require('os')
+```typescript
+// 依外鍵依賴順序刪除
+db.exec(`
+  DELETE FROM stock_take_items;
+  DELETE FROM stock_takes;
+  DELETE FROM inventory_adjustments;
+  DELETE FROM sale_items;
+  DELETE FROM sales_orders;
+  DELETE FROM purchase_items;
+  DELETE FROM purchase_orders;
+  DELETE FROM products;
+  DELETE FROM customers;
+  DELETE FROM suppliers;
+`)
+```
 
-   const DB_PATH = path.join(os.homedir(), 'Library/Application Support/skillcraft-ims/ims.db')
-   const MODE = 'append'     // 'append' | 'reset'
-   const SCENARIO = 'normal' // 'normal' | 'warning' | 'empty'
-   const CONFIG = { suppliers: 5, customers: 8, products: 50, purchaseOrders: 80, salesOrders: 150, daysBack: 90 }
+### 資料生成規格
 
-   const db = new Database(DB_PATH)
-   db.pragma('journal_mode = WAL')
-   db.pragma('foreign_keys = ON')
+#### 供應商（8 家）
+台灣電子供應商、鴻鑫科技、捷騰資訊、大統辦公用品、永豐包裝材料、聯發文具行、星海電腦、承恩五金
 
-   db.transaction(() => {
-     if (MODE === 'reset') {
-       db.exec(`DELETE FROM sale_items; DELETE FROM sales_orders;
-                DELETE FROM purchase_items; DELETE FROM purchase_orders;
-                DELETE FROM products; DELETE FROM customers; DELETE FROM suppliers;`)
-     }
-     // 依序寫入供應商、客戶、商品、採購單、銷售單
-     // 商品庫存依 SCENARIO 調整：warning 模式約 33% 低庫存，empty 模式約 20% 庫存歸零
-   })()
-   ```
+#### 客戶（12 家，混合企業與個人）
+企業：台積電採購部、鴻海科技採購處、遠傳電信、統一超商、誠品文化...
+個人：陳大明、林小花、王建志...
 
-5. **驗證與後續提示**：寫入完成後查詢各表筆數確認結果，並提示使用者重新整理 app（Cmd+R）及可執行的後續 skill（`/inventory-report`、`/reorder-alert`、`/sales-analysis`）。
+#### 商品類別與 SKU 前綴
+| 類別 | SKU前綴 | 數量占比 |
+|------|---------|---------|
+| 電子產品 | ELEC | 25% |
+| 電腦周邊 | PERI | 20% |
+| 文具 | STAT | 20% |
+| 包裝材料 | PKG | 15% |
+| 辦公用品 | OFFI | 20% |
 
-   ```bash
-   sqlite3 "$DB" "
-   SELECT '供應商' as table_name, COUNT(*) as count FROM suppliers
-   UNION ALL SELECT '客戶', COUNT(*) FROM customers
-   UNION ALL SELECT '商品', COUNT(*) FROM products
-   UNION ALL SELECT '採購單', COUNT(*) FROM purchase_orders
-   UNION ALL SELECT '銷售單', COUNT(*) FROM sales_orders
-   UNION ALL SELECT '低庫存商品', COUNT(*) FROM products WHERE stock_qty <= reorder_pt
-   " -column -header
-   ```
+#### 採購單數量
+- S: 40筆, M: 80筆, L: 150筆
+- 狀態分布：60% received, 25% pending, 10% cancelled, 5% returned
+- 時間分布：過去 90 天，近 30 天佔比較高（加權隨機）
+
+#### 銷售單數量
+- S: 80筆, M: 160筆, L: 300筆
+- 狀態分布：70% completed, 20% pending, 7% cancelled, 3% returned
+- 時間分布：同採購單，近 30 天佔比較高
+
+#### 庫存情境
+- `normal`: stock_qty = reorder_pt * (3 ~ 10 倍)
+- `warning`: 70% 正常，30% stock_qty = reorder_pt * (0.3 ~ 0.9)
+- `empty`: 60% 正常，20% stock_qty = reorder_pt * (0.3 ~ 0.9)，20% stock_qty = 0
+
+#### 時間分布演算法（近期偏重）
+```typescript
+function randomDateWithBias(daysBack: number): string {
+  // 指數分布，近期機率較高
+  const u = Math.random()
+  const days = Math.floor(-Math.log(1 - u * (1 - Math.exp(-daysBack/20))) * 20)
+  const d = new Date()
+  d.setDate(d.getDate() - Math.min(days, daysBack))
+  d.setHours(Math.floor(Math.random() * 10) + 8)  // 8am ~ 6pm
+  d.setMinutes(Math.floor(Math.random() * 60))
+  return d.toISOString().slice(0, 16).replace('T', ' ')
+}
+```
+
+### UI 設計（Settings 頁面）
+
+新增「Demo 資料產生」Card（加在 Data Management Card 上方）：
+- 規模選擇：3 個 Radio/Button（S / M / L）
+- 情境選擇：3 個 Button（正常庫存 / 低庫存警示 / 偶有缺貨）
+- 說明文字：顯示預估產生的資料筆數
+- 「產生 Demo 資料」按鈕：destructive 紅色邊框（強調會清除現有資料）
+- Loading 狀態：顯示 Spinner + "正在產生 Demo 資料..."
+- 成功後顯示各表筆數摘要（綠色）
+
+### 驗證與後續
+
+寫入完成後回傳各表筆數，UI 顯示摘要。
+提示使用者可接著執行 `/inventory-report`、`/reorder-alert`、`/sales-analysis`。

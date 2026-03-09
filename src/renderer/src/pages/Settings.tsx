@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud, Database } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,20 @@ import { useLang } from '@/lib/useLang'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 type DbOpStatus = { type: 'idle' | 'loading' | 'success' | 'error'; msg?: string }
+type MockScale = 'S' | 'M' | 'L'
+type MockScenario = 'normal' | 'warning' | 'empty'
+type MockStatus = { type: 'idle' | 'loading' | 'success' | 'error'; msg?: string; counts?: Record<string, number> }
+
+const SCALE_CONFIG: Record<MockScale, { products: number; purchases: number; sales: number }> = {
+  S: { products: 30, purchases: 40, sales: 80 },
+  M: { products: 60, purchases: 80, sales: 160 },
+  L: { products: 100, purchases: 150, sales: 300 },
+}
+const SCENARIO_CONFIG: Record<MockScenario, { label: string; desc: string }> = {
+  normal: { label: '正常庫存', desc: '所有商品庫存充足' },
+  warning: { label: '低庫存警示', desc: '約 30% 商品低於補貨點' },
+  empty: { label: '偶有缺貨', desc: '約 20% 商品庫存歸零' },
+}
 
 type CompanyForm = { companyName: string; companyAddress: string; companyPhone: string }
 type SheetsForm = { googleSheetId: string; serviceAccountKeyPath: string; syncIntervalMinutes: number; autoSyncEnabled: boolean }
@@ -29,6 +43,9 @@ export default function Settings() {
   const [sheetsSaveStatus, setSheetsSaveStatus] = useState<Status>('idle')
   const [backupStatus, setBackupStatus] = useState<DbOpStatus>({ type: 'idle' })
   const [restoreStatus, setRestoreStatus] = useState<DbOpStatus>({ type: 'idle' })
+  const [mockScale, setMockScale] = useState<MockScale>('M')
+  const [mockScenario, setMockScenario] = useState<MockScenario>('normal')
+  const [mockStatus, setMockStatus] = useState<MockStatus>({ type: 'idle' })
 
   const { data: settings } = useQuery<AppSettings>({
     queryKey: ['settings'],
@@ -131,6 +148,17 @@ export default function Settings() {
     if (!result.success) {
       setRestoreStatus({ type: 'error', msg: result.error ?? s.restoreFailed })
       setTimeout(() => setRestoreStatus({ type: 'idle' }), 4000)
+    }
+  }
+
+  const handleGenerateMock = async () => {
+    setMockStatus({ type: 'loading' })
+    const result = await window.electronAPI.mockData.generate({ scale: mockScale, scenario: mockScenario })
+    if (result.success) {
+      queryClient.invalidateQueries()
+      setMockStatus({ type: 'success', counts: result.counts })
+    } else {
+      setMockStatus({ type: 'error', msg: result.error })
     }
   }
 
@@ -278,6 +306,94 @@ export default function Settings() {
             <span className="text-muted-foreground shrink-0">{s.dbPath}</span>
             <span className="font-mono text-xs break-all">{settings?.dbPath ?? t.common.loading}</span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Demo Data Generation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Database className="w-4 h-4" />
+            Demo 資料產生
+          </CardTitle>
+          <CardDescription>一鍵清除現有資料並產生豐富的 Mock 資料，讓系統所有功能立即可以展示</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Scale */}
+          <div className="space-y-1.5">
+            <Label>資料規模</Label>
+            <div className="flex gap-2">
+              {(['S', 'M', 'L'] as MockScale[]).map(scale => (
+                <button
+                  key={scale}
+                  onClick={() => setMockScale(scale)}
+                  className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${mockScale === scale ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'}`}
+                >
+                  <span className="font-bold">{scale}</span>
+                  <span className="block text-[10px] font-normal opacity-75">{SCALE_CONFIG[scale].products} 商品</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Scenario */}
+          <div className="space-y-1.5">
+            <Label>庫存情境</Label>
+            <div className="flex flex-col gap-1.5">
+              {(['normal', 'warning', 'empty'] as MockScenario[]).map(sc => (
+                <button
+                  key={sc}
+                  onClick={() => setMockScenario(sc)}
+                  className={`flex items-center justify-between px-3 py-2 rounded-md border text-sm transition-colors text-left ${mockScenario === sc ? 'bg-primary/10 border-primary text-foreground' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'}`}
+                >
+                  <span className="font-medium">{SCENARIO_CONFIG[sc].label}</span>
+                  <span className="text-xs">{SCENARIO_CONFIG[sc].desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Estimated counts */}
+          <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            預計產生：供應商 8 家、客戶 12 家、商品 {SCALE_CONFIG[mockScale].products} 項、採購單 {SCALE_CONFIG[mockScale].purchases} 筆、銷售單 {SCALE_CONFIG[mockScale].sales} 筆
+          </div>
+
+          {/* Generate button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGenerateMock}
+            disabled={mockStatus.type === 'loading'}
+            className="w-full border-red-600/50 text-red-400 hover:bg-red-600/10 hover:border-red-500"
+          >
+            {mockStatus.type === 'loading'
+              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />正在產生 Demo 資料...</>
+              : <><Database className="w-4 h-4 mr-2" />產生 Demo 資料（清除現有資料）</>}
+          </Button>
+
+          {/* Result */}
+          {mockStatus.type === 'success' && mockStatus.counts && (
+            <div className="rounded-md border border-green-500/20 bg-green-500/5 px-3 py-2.5 text-xs space-y-1.5">
+              <div className="flex items-center gap-1.5 text-green-400 font-medium">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Demo 資料產生完成，請切換頁面查看
+              </div>
+              <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-muted-foreground mt-1">
+                <span>供應商：{mockStatus.counts.suppliers}</span>
+                <span>客戶：{mockStatus.counts.customers}</span>
+                <span>商品：{mockStatus.counts.products}</span>
+                <span>採購單：{mockStatus.counts.purchaseOrders}</span>
+                <span>銷售單：{mockStatus.counts.salesOrders}</span>
+                <span>庫存調整：{mockStatus.counts.adjustments}</span>
+              </div>
+            </div>
+          )}
+          {mockStatus.type === 'error' && (
+            <div className="flex items-center gap-2 text-sm text-red-400">
+              <XCircle className="w-4 h-4 shrink-0" />
+              {mockStatus.msg}
+            </div>
+          )}
         </CardContent>
       </Card>
 

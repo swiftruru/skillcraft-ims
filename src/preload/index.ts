@@ -169,6 +169,12 @@ const electronAPI = {
     purge: () => ipcRenderer.invoke('demo:purge')
   },
 
+  // Mock data generation
+  mockData: {
+    generate: (options: { scale: 'S' | 'M' | 'L'; scenario: 'normal' | 'warning' | 'empty' }) =>
+      ipcRenderer.invoke('mockdata:generate', options)
+  },
+
   // Notifications
   notifications: {
     getAll: () => ipcRenderer.invoke('notifications:getAll'),
