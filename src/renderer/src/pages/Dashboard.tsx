@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   TrendingUp,
@@ -11,7 +12,9 @@ import {
   Clock,
   ShoppingCart,
   CheckSquare,
-  Square
+  Square,
+  Plus,
+  ClipboardList
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -39,6 +42,7 @@ const CATEGORY_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', 
 export default function Dashboard() {
   const t = useLang()
   const d = t.dashboard
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set())
@@ -118,6 +122,22 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Quick Actions */}
+      <div className="flex gap-3 flex-wrap">
+        <Button variant="outline" size="sm" className="gap-2"
+          onClick={() => navigate('/purchases', { state: { openForm: true } })}>
+          <Plus className="w-4 h-4" />新增採購單
+        </Button>
+        <Button variant="outline" size="sm" className="gap-2"
+          onClick={() => navigate('/sales', { state: { openForm: true } })}>
+          <Plus className="w-4 h-4" />新增銷售單
+        </Button>
+        <Button variant="outline" size="sm" className="gap-2"
+          onClick={() => navigate('/stock-take', { state: { createNew: true } })}>
+          <ClipboardList className="w-4 h-4" />開始盤點
+        </Button>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard

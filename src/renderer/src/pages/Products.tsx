@@ -4,6 +4,7 @@ import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History,
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DataTable, type Column } from '@/components/common/DataTable'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -21,6 +22,8 @@ export default function Products() {
   const t = useLang()
   const p = t.products
   const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('__all__')
+  const [stockFilter, setStockFilter] = useState('__all__')
   const [formOpen, setFormOpen] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -30,10 +33,26 @@ export default function Products() {
   const [suggestionOpen, setSuggestionOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
-  const { data: products, isLoading } = useQuery<Product[]>({
-    queryKey: ['products', 'all', search],
-    queryFn: () => window.electronAPI.products.getAll({ search: search || undefined })
+  const { data: categories } = useQuery<string[]>({
+    queryKey: ['products', 'categories'],
+    queryFn: () => window.electronAPI.products.getCategories(),
+    staleTime: 1000 * 60 * 5
   })
+
+  const { data: allProducts, isLoading } = useQuery<Product[]>({
+    queryKey: ['products', 'all', search, categoryFilter, stockFilter === 'low'],
+    queryFn: () => window.electronAPI.products.getAll({
+      search: search || undefined,
+      category: categoryFilter !== '__all__' ? categoryFilter : undefined,
+      lowStock: stockFilter === 'low' ? true : undefined
+    })
+  })
+
+  const products = stockFilter === 'zero'
+    ? (allProducts ?? []).filter((p) => p.stock_qty === 0)
+    : allProducts
+
+  const hasFilter = categoryFilter !== '__all__' || stockFilter !== '__all__'
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => window.electronAPI.products.delete(id),
@@ -130,7 +149,7 @@ export default function Products() {
   return (
     <div className="p-6 space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -140,6 +159,35 @@ export default function Products() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-32 h-9 text-sm">
+            <SelectValue placeholder="全部分類" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">全部分類</SelectItem>
+            {(categories ?? []).map((cat) => (
+              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={stockFilter} onValueChange={setStockFilter}>
+          <SelectTrigger className="w-28 h-9 text-sm">
+            <SelectValue placeholder="全部" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">全部</SelectItem>
+            <SelectItem value="low">低庫存</SelectItem>
+            <SelectItem value="zero">零庫存</SelectItem>
+          </SelectContent>
+        </Select>
+        {hasFilter && (
+          <button
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => { setCategoryFilter('__all__'); setStockFilter('__all__') }}
+          >
+            清除篩選
+          </button>
+        )}
         <Button variant="outline" className="gap-2" onClick={() => setSuggestionOpen(true)}>
           <ShoppingCart className="w-4 h-4" />
           {p.purchaseSuggestion}

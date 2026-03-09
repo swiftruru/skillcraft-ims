@@ -120,10 +120,45 @@ export const PurchaseModel = {
     return result.changes > 0
   },
 
+  return(id: number): PurchaseOrder | null {
+    const db = getDb()
+    const order = this.findById(id)
+    if (!order || order.status !== 'received') throw new Error('只有已收貨的採購單可以退貨')
+
+    const updateOrder = db.prepare(
+      `UPDATE purchase_orders SET status = 'returned' WHERE id = ? AND status = 'received'`
+    )
+    const checkStock = db.prepare('SELECT stock_qty FROM products WHERE id = ?')
+    const deductStock = db.prepare(
+      `UPDATE products SET stock_qty = stock_qty - ?, updated_at = datetime('now') WHERE id = ?`
+    )
+    const insertAdj = db.prepare(
+      `INSERT INTO inventory_adjustments (product_id, delta, reason, note, adjusted_at)
+       VALUES (?, ?, '採購退貨', ?, datetime('now'))`
+    )
+
+    db.transaction(() => {
+      const changed = updateOrder.run(id).changes
+      if (changed === 0) throw new Error('退貨失敗：狀態不符')
+      for (const item of order.items ?? []) {
+        const product = checkStock.get(item.product_id) as { stock_qty: number }
+        if (!product || product.stock_qty < item.quantity) {
+          throw new Error(
+            `庫存不足：商品 ID ${item.product_id} 現有庫存 ${product?.stock_qty ?? 0}，無法退貨 ${item.quantity}`
+          )
+        }
+        deductStock.run(item.quantity, item.product_id)
+        insertAdj.run(item.product_id, -item.quantity, `採購退貨 ${order.order_no}`)
+      }
+    })()
+
+    return this.findById(id)
+  },
+
   delete(id: number): boolean {
     const db = getDb()
     const order = this.findById(id)
-    if (!order || order.status === 'received') return false
+    if (!order || order.status === 'received' || order.status === 'returned') return false
     return db.prepare('DELETE FROM purchase_orders WHERE id = ?').run(id).changes > 0
   }
 }

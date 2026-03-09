@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, Wand2 } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Wand2, Eye } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,6 +13,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import type { Customer, CustomerCreate } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
+import { CustomerDetailDialog } from '@/components/customers/CustomerDetailDialog'
 
 const schema = z.object({
   name: z.string().min(1, '客戶名稱必填'),
@@ -31,6 +32,7 @@ export default function Customers() {
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
+  const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const { data: customers, isLoading } = useQuery<Customer[]>({
@@ -77,13 +79,18 @@ export default function Customers() {
   }
 
   const columns: Column<Customer>[] = [
-    { key: 'name', label: c.name, sortable: true },
+    { key: 'name', label: c.name, sortable: true, render: (v, row) => (
+      <button className="text-left hover:text-primary hover:underline transition-colors" onClick={() => setDetailCustomer(row as unknown as Customer)}>
+        {String(v)}
+      </button>
+    )},
     { key: 'contact', label: c.contact },
     { key: 'phone', label: c.phone },
     { key: 'email', label: c.email },
     { key: 'address', label: c.address },
-    { key: 'id', label: '', className: 'w-20 text-right', render: (_v, row) => (
+    { key: 'id', label: '', className: 'w-28 text-right', render: (_v, row) => (
       <div className="flex justify-end gap-1">
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setDetailCustomer(row as unknown as Customer)}><Eye className="w-3.5 h-3.5" /></Button>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(row as unknown as Customer)}><Edit2 className="w-3.5 h-3.5" /></Button>
         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(row.id as number)}><Trash2 className="w-3.5 h-3.5" /></Button>
       </div>
@@ -130,6 +137,7 @@ export default function Customers() {
         </DialogContent>
       </Dialog>
       <ConfirmDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)} title={c.deleteTitle} description={c.deleteDesc} onConfirm={() => deleteId && deleteMutation.mutate(deleteId)} />
+      <CustomerDetailDialog customer={detailCustomer} open={detailCustomer !== null} onOpenChange={(open) => !open && setDetailCustomer(null)} />
     </div>
   )
 }

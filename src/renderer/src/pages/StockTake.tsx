@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ArrowLeft, CheckCircle2, Trash2, ClipboardCheck, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,7 @@ import { useLang } from '@/lib/useLang'
 
 // ── List view ────────────────────────────────────────────────────────────────
 
-function ListView({ onSelect }: { onSelect: (id: number) => void }) {
+function ListView({ onSelect, autoCreate }: { onSelect: (id: number) => void; autoCreate?: boolean }) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const t = useLang()
@@ -33,6 +34,10 @@ function ListView({ onSelect }: { onSelect: (id: number) => void }) {
     },
     onError: (e) => toast({ title: (e as Error).message, variant: 'destructive' })
   })
+
+  useEffect(() => {
+    if (autoCreate) createMutation.mutate()
+  }, [])
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => window.electronAPI.stocktake.delete(id),
@@ -280,10 +285,17 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function StockTakePage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const autoCreate = !!(location.state as { createNew?: boolean } | null)?.createNew
+
+  useEffect(() => {
+    if (autoCreate) navigate(location.pathname, { replace: true, state: null })
+  }, [])
 
   if (selectedId !== null) {
     return <DetailView id={selectedId} onBack={() => setSelectedId(null)} />
   }
-  return <ListView onSelect={setSelectedId} />
+  return <ListView onSelect={setSelectedId} autoCreate={autoCreate} />
 }

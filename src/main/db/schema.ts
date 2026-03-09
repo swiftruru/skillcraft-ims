@@ -50,7 +50,7 @@ export interface PurchaseOrder {
   order_no: string
   supplier_id: number | null
   supplier_name?: string
-  status: 'pending' | 'received' | 'cancelled'
+  status: 'pending' | 'received' | 'cancelled' | 'returned'
   order_date: string
   receive_date: string | null
   total_amount: number

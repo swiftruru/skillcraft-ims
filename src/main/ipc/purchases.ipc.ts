@@ -7,5 +7,13 @@ export function registerPurchasesIpc(): void {
   ipcMain.handle('purchases:create', (_e, data) => PurchaseModel.create(data))
   ipcMain.handle('purchases:receive', (_e, id: number) => PurchaseModel.receive(id))
   ipcMain.handle('purchases:cancel', (_e, id: number) => PurchaseModel.cancel(id))
+  ipcMain.handle('purchases:return', (_e, id: number) => {
+    try {
+      const data = PurchaseModel.return(id)
+      return { success: true, data }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
   ipcMain.handle('purchases:delete', (_e, id: number) => PurchaseModel.delete(id))
 }

@@ -33,6 +33,24 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 
 10. **DataTable 分頁**：DataTable 支援 `pageSize` prop（預設 15）；分頁狀態為元件內部 `useState(1)`；排序欄位變更時重置到第 1 頁；分頁列顯示「第 X / Y 頁」與上一頁／下一頁按鈕（`variant="outline" size="sm"`）；資料總筆數 ≤ pageSize 時不顯示分頁列。
 
+12. **商品進階篩選**：Products 頁面在搜尋框右側加入兩個下拉篩選器：
+    - **分類篩選**：`useQuery(['products', 'categories'])` 取得所有分類；選項為「全部分類」+ 各分類名稱；value 存為 `category` state，傳入 `products:getAll({ category, search })`
+    - **庫存狀態篩選**：固定選項「全部 / 低庫存 / 零庫存」；「低庫存」傳 `lowStock: true`，「零庫存」在 frontend filter（`stock_qty === 0`）；queryKey 加入 `{ category, stockFilter }` 以精確快取
+    - 兩個篩選器使用 shadcn `<Select>`，`size="sm"` 樣式，寬度 `w-32`；任一條件非預設值時顯示「清除篩選」連結
+
+13. **客戶/供應商詳情彈窗**：點擊客戶/供應商名稱開啟詳情 Dialog：
+    - IPC：`customers:getOrders(id)` 回傳 `SalesOrder[]`（依 `created_at DESC` 最多 20 筆）；`suppliers:getOrders(id)` 回傳 `PurchaseOrder[]`
+    - 彈窗上半部顯示聯絡資訊（name、contact、phone、email、address）
+    - 統計列：客戶顯示「訂單數 / 完成數 / 累計消費」；供應商顯示「訂單數 / 收貨數 / 累計採購」
+    - 下半部為訂單歷史表格：訂單號、日期、狀態 badge、金額；queryKey 為 `['customers', 'orders', id]` / `['suppliers', 'orders', id]`，`staleTime: 1000 * 60`
+    - 元件命名 `CustomerDetailDialog` / `SupplierDetailDialog`，位於 `src/renderer/src/components/customers/` 和 `suppliers/`
+
+14. **Dashboard 快速操作卡**：Dashboard 頂部（KPI Cards 之前）新增快速操作列：
+    - 三個按鈕：「+ 新增採購單」、「+ 新增銷售單」、「開始盤點」
+    - 使用 `useNavigate` 搭配 React Router state `{ openForm: true }` 跳轉目標頁面
+    - 目標頁（Purchases、Sales、StockTake）在 `useEffect` 中讀取 `location.state?.openForm`，若為 true 則自動開啟新增表單，讀取後清除 history state
+    - 快速操作列樣式：`flex gap-3 flex-wrap`，按鈕 `variant="outline" size="sm" gap-2`
+
 11. **側邊欄徽章（Sidebar Badge）**：Sidebar 以 `useQuery(['reports', 'kpis'], ..., { staleTime: 1000 * 60 * 2 })` 取得 KPI 數值，在特定導覽項目右側顯示計數徽章：
     - **商品** → 低庫存數量（`lowStockCount > 0` 時顯示，黃底褐字）
     - **採購** → 待處理採購單數（`pendingPurchasesCount > 0` 時顯示）

@@ -26,7 +26,8 @@ const electronAPI = {
     getById: (id: number) => ipcRenderer.invoke('suppliers:getById', id),
     create: (data: unknown) => ipcRenderer.invoke('suppliers:create', data),
     update: (id: number, data: unknown) => ipcRenderer.invoke('suppliers:update', id, data),
-    delete: (id: number) => ipcRenderer.invoke('suppliers:delete', id)
+    delete: (id: number) => ipcRenderer.invoke('suppliers:delete', id),
+    getOrders: (supplierId: number) => ipcRenderer.invoke('suppliers:getOrders', supplierId)
   },
 
   // Customers
@@ -35,7 +36,8 @@ const electronAPI = {
     getById: (id: number) => ipcRenderer.invoke('customers:getById', id),
     create: (data: unknown) => ipcRenderer.invoke('customers:create', data),
     update: (id: number, data: unknown) => ipcRenderer.invoke('customers:update', id, data),
-    delete: (id: number) => ipcRenderer.invoke('customers:delete', id)
+    delete: (id: number) => ipcRenderer.invoke('customers:delete', id),
+    getOrders: (customerId: number) => ipcRenderer.invoke('customers:getOrders', customerId)
   },
 
   // Purchases
@@ -46,6 +48,7 @@ const electronAPI = {
     create: (data: unknown) => ipcRenderer.invoke('purchases:create', data),
     receive: (id: number) => ipcRenderer.invoke('purchases:receive', id),
     cancel: (id: number) => ipcRenderer.invoke('purchases:cancel', id),
+    return: (id: number) => ipcRenderer.invoke('purchases:return', id),
     delete: (id: number) => ipcRenderer.invoke('purchases:delete', id)
   },
 

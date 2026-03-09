@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable, type Column } from '@/components/common/DataTable'
@@ -18,12 +19,23 @@ export default function Purchases() {
   const t = useLang()
   const p = t.purchases
   const spotlight = useDemoStore((s) => s.spotlight)
+  const location = useLocation()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+
+  useEffect(() => {
+    if ((location.state as { openForm?: boolean } | null)?.openForm) {
+      setFormOpen(true)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [])
   const [detailId, setDetailId] = useState<number | null>(null)
   const [receiveId, setReceiveId] = useState<number | null>(null)
   const [cancelId, setCancelId] = useState<number | null>(null)
+  const [returnId, setReturnId] = useState<number | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
 
   const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
@@ -43,6 +55,20 @@ export default function Purchases() {
   const cancelMutation = useMutation({
     mutationFn: (id: number) => window.electronAPI.purchases.cancel(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['purchases'] })
+  })
+
+  const returnMutation = useMutation({
+    mutationFn: (id: number) => window.electronAPI.purchases.return(id),
+    onSuccess: (result) => {
+      if ((result as { success: boolean }).success) {
+        queryClient.invalidateQueries({ queryKey: ['purchases'] })
+        queryClient.invalidateQueries({ queryKey: ['products'] })
+        queryClient.invalidateQueries({ queryKey: ['reports'] })
+        queryClient.invalidateQueries({ queryKey: ['adjustments'] })
+      } else {
+        setError(result.error ?? '退貨失敗')
+      }
+    }
   })
 
   const deleteMutation = useMutation({
@@ -87,6 +113,15 @@ export default function Purchases() {
           >
             <Printer className="w-3.5 h-3.5" />
           </Button>
+          {row.status === 'received' && (
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7 text-orange-400 hover:text-orange-500"
+              title="退貨"
+              onClick={() => setReturnId(row.id)}
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
           {row.status === 'pending' && (
             <>
               {spotlight?.type === 'purchase' && spotlight.id === row.id ? (
@@ -129,6 +164,15 @@ export default function Purchases() {
 
   return (
     <div className="p-6 space-y-4">
+      {error && (
+        <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+          <XCircle className="w-4 h-4 shrink-0" />
+          {error}
+          <Button variant="ghost" size="icon" className="ml-auto h-6 w-6" onClick={() => setError(null)}>
+            ×
+          </Button>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -180,6 +224,14 @@ export default function Purchases() {
         description={p.cancelDesc}
         onConfirm={() => cancelId && cancelMutation.mutate(cancelId)}
         confirmLabel={p.cancelTitle}
+      />
+      <ConfirmDialog
+        open={returnId !== null}
+        onOpenChange={(open) => !open && setReturnId(null)}
+        title="確認採購退貨"
+        description="退貨後庫存將自動扣減，並寫入異動記錄，此操作不可撤銷。確定要退貨嗎？"
+        onConfirm={() => returnId && returnMutation.mutate(returnId)}
+        confirmLabel="確認退貨"
       />
       <ConfirmDialog
         open={deleteId !== null}

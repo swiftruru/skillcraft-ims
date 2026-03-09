@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,8 +19,17 @@ export default function Sales() {
   const t = useLang()
   const s = t.sales
   const spotlight = useDemoStore((st) => st.spotlight)
+  const location = useLocation()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+
+  useEffect(() => {
+    if ((location.state as { openForm?: boolean } | null)?.openForm) {
+      setFormOpen(true)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [])
   const [detailId, setDetailId] = useState<number | null>(null)
   const [completeId, setCompleteId] = useState<number | null>(null)
   const [cancelId, setCancelId] = useState<number | null>(null)

@@ -22,6 +22,7 @@ declare global {
         create(data: unknown): Promise<import('./schema').Supplier>
         update(id: number, data: unknown): Promise<import('./schema').Supplier | null>
         delete(id: number): Promise<boolean>
+        getOrders(supplierId: number): Promise<import('./schema').PurchaseOrder[]>
       }
       customers: {
         getAll(search?: string): Promise<import('./schema').Customer[]>
@@ -29,6 +30,7 @@ declare global {
         create(data: unknown): Promise<import('./schema').Customer>
         update(id: number, data: unknown): Promise<import('./schema').Customer | null>
         delete(id: number): Promise<boolean>
+        getOrders(customerId: number): Promise<import('./schema').SalesOrder[]>
       }
       purchases: {
         getAll(filters?: { status?: string; search?: string }): Promise<import('./schema').PurchaseOrder[]>
@@ -36,6 +38,7 @@ declare global {
         create(data: unknown): Promise<import('./schema').PurchaseOrder>
         receive(id: number): Promise<import('./schema').PurchaseOrder | null>
         cancel(id: number): Promise<boolean>
+        return(id: number): Promise<{ success: boolean; data?: import('./schema').PurchaseOrder; error?: string }>
         delete(id: number): Promise<boolean>
       }
       sales: {
