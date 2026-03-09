@@ -17,7 +17,9 @@ const electronAPI = {
     getAdjustmentHistory: (productId: number) =>
       ipcRenderer.invoke('products:getAdjustmentHistory', productId),
     getAllAdjustments: (filters?: { search?: string; reason?: string; dateFrom?: string; dateTo?: string; limit?: number }) =>
-      ipcRenderer.invoke('products:getAllAdjustments', filters)
+      ipcRenderer.invoke('products:getAllAdjustments', filters),
+    batchDelete: (ids: number[]) => ipcRenderer.invoke('products:batchDelete', ids),
+    getPriceHistory: (productId: number) => ipcRenderer.invoke('products:getPriceHistory', productId)
   },
 
   // Suppliers
@@ -74,7 +76,8 @@ const electronAPI = {
     marginAnalysis: () => ipcRenderer.invoke('reports:marginAnalysis'),
     supplierStats: () => ipcRenderer.invoke('reports:supplierStats'),
     customerStats: () => ipcRenderer.invoke('reports:customerStats'),
-    slowMoving: (days?: number) => ipcRenderer.invoke('reports:slowMoving', days)
+    slowMoving: (days?: number) => ipcRenderer.invoke('reports:slowMoving', days),
+    topCustomers: () => ipcRenderer.invoke('reports:topCustomers')
   },
 
   // Sync
@@ -127,7 +130,8 @@ const electronAPI = {
   // Database backup/restore
   db: {
     backup: () => ipcRenderer.invoke('db:backup'),
-    restore: () => ipcRenderer.invoke('db:restore')
+    restore: () => ipcRenderer.invoke('db:restore'),
+    autoBackup: () => ipcRenderer.invoke('db:autoBackup')
   },
 
   // CSV import
@@ -147,7 +151,8 @@ const electronAPI = {
 
   // PDF print
   print: {
-    pdf: (opts: { type: 'sales' | 'purchase'; id: number }) => ipcRenderer.invoke('print:pdf', opts)
+    pdf: (opts: { type: 'sales' | 'purchase'; id: number }) => ipcRenderer.invoke('print:pdf', opts),
+    exportMonthlyPdf: (opts: { year: number; month: number }) => ipcRenderer.invoke('reports:exportMonthlyPdf', opts)
   },
 
   // Shell
@@ -158,6 +163,13 @@ const electronAPI = {
   // Demo
   demo: {
     purge: () => ipcRenderer.invoke('demo:purge')
+  },
+
+  // Notifications
+  notifications: {
+    getAll: () => ipcRenderer.invoke('notifications:getAll'),
+    markRead: (id: number) => ipcRenderer.invoke('notifications:markRead', id),
+    markAllRead: () => ipcRenderer.invoke('notifications:markAllRead')
   }
 }
 

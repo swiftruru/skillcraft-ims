@@ -24,8 +24,8 @@ export const PurchaseModel = {
       params.push(filters.status)
     }
     if (filters?.search) {
-      query += ' AND (po.order_no LIKE ? OR s.name LIKE ?)'
-      params.push(`%${filters.search}%`, `%${filters.search}%`)
+      query += ' AND (po.order_no LIKE ? OR s.name LIKE ? OR po.notes LIKE ?)'
+      params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`)
     }
     query += ' ORDER BY po.created_at DESC'
     return db.prepare(query).all(...params) as PurchaseOrder[]

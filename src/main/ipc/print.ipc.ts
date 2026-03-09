@@ -188,6 +188,161 @@ function buildHtml(
 </html>`
 }
 
+
+function buildMonthlyReportHtml(
+  year: number,
+  month: number,
+  db: import('better-sqlite3').Database
+): string {
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`
+
+  // KPI
+  const revenue = (db.prepare(
+    `SELECT COALESCE(SUM(total_amount),0) as v FROM sales_orders WHERE status='completed' AND strftime('%Y-%m',order_date)=?`
+  ).get(monthStr) as { v: number }).v
+  const grossProfit = (db.prepare(
+    `SELECT COALESCE(SUM((si.unit_price-p.buy_price)*si.quantity),0) as v
+     FROM sale_items si JOIN products p ON si.product_id=p.id JOIN sales_orders so ON si.sales_order_id=so.id
+     WHERE so.status='completed' AND strftime('%Y-%m',so.order_date)=?`
+  ).get(monthStr) as { v: number }).v
+  const marginPct = revenue > 0 ? Math.round(grossProfit / revenue * 100) : 0
+  const lowStockCount = (db.prepare(
+    `SELECT COUNT(*) as v FROM products WHERE stock_qty<=reorder_pt`
+  ).get() as { v: number }).v
+
+  // Top 5 products
+  const topProducts = db.prepare(
+    `SELECT p.name, SUM(si.quantity) as qty, ROUND(SUM(si.quantity*si.unit_price),0) as rev
+     FROM sale_items si JOIN products p ON si.product_id=p.id JOIN sales_orders so ON si.sales_order_id=so.id
+     WHERE so.status='completed' AND strftime('%Y-%m',so.order_date)=?
+     GROUP BY p.id ORDER BY rev DESC LIMIT 5`
+  ).all(monthStr) as { name: string; qty: number; rev: number }[]
+
+  // Top 5 customers
+  const topCustomers = db.prepare(
+    `SELECT c.name, COUNT(*) as cnt, SUM(so.total_amount) as total
+     FROM sales_orders so JOIN customers c ON so.customer_id=c.id
+     WHERE so.status='completed' AND strftime('%Y-%m',so.order_date)=?
+     GROUP BY c.id ORDER BY total DESC LIMIT 5`
+  ).all(monthStr) as { name: string; cnt: number; total: number }[]
+
+  // Low stock items
+  const lowStockItems = db.prepare(
+    `SELECT name, sku, stock_qty, reorder_pt FROM products WHERE stock_qty<=reorder_pt ORDER BY stock_qty ASC LIMIT 10`
+  ).all() as { name: string; sku: string; stock_qty: number; reorder_pt: number }[]
+
+  const topProductRows = topProducts.map((p, i) =>
+    `<tr style="${i%2===1?'background:#f9fafb':''}">
+      <td style="padding:8px 12px">${i+1}</td>
+      <td style="padding:8px 12px;font-weight:600">${p.name}</td>
+      <td style="padding:8px 12px;text-align:right">${p.qty}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:600;color:#4f46e5">${formatCurrency(p.rev)}</td>
+    </tr>`
+  ).join('')
+
+  const topCustomerRows = topCustomers.map((c, i) =>
+    `<tr style="${i%2===1?'background:#f9fafb':''}">
+      <td style="padding:8px 12px">${i+1}</td>
+      <td style="padding:8px 12px;font-weight:600">${c.name}</td>
+      <td style="padding:8px 12px;text-align:right">${c.cnt}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:600;color:#16a34a">${formatCurrency(c.total)}</td>
+    </tr>`
+  ).join('')
+
+  const lowStockRows = lowStockItems.map((item) =>
+    `<tr>
+      <td style="padding:8px 12px">${item.name}</td>
+      <td style="padding:8px 12px;font-family:monospace;font-size:11px;color:#6b7280">${item.sku}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:600;color:${item.stock_qty===0?'#dc2626':'#d97706'}">${item.stock_qty}</td>
+      <td style="padding:8px 12px;text-align:right;color:#6b7280">${item.reorder_pt}</td>
+    </tr>`
+  ).join('')
+
+  return `<!DOCTYPE html>
+<html lang="zh-TW">
+<head><meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Microsoft JhengHei','PingFang TC','Noto Sans TC',sans-serif; color: #1e293b; font-size: 13px; background: #fff; }
+@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+<div style="padding:40px 48px;max-width:800px;margin:0 auto">
+
+  <!-- Title -->
+  <div style="text-align:center;padding-bottom:24px;border-bottom:3px solid #4f46e5;margin-bottom:32px">
+    <div style="font-size:28px;font-weight:800;color:#4f46e5">月報 ${year} 年 ${month} 月</div>
+    <div style="font-size:12px;color:#94a3b8;margin-top:6px">產生時間：${new Date().toLocaleString('zh-TW')}</div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:32px">
+    ${[
+      { label: '本月營收', value: formatCurrency(revenue), color: '#4f46e5' },
+      { label: '毛利', value: formatCurrency(grossProfit), color: '#16a34a' },
+      { label: '毛利率', value: marginPct + '%', color: marginPct >= 30 ? '#16a34a' : marginPct >= 10 ? '#d97706' : '#dc2626' },
+      { label: '低庫存商品', value: lowStockCount + ' 項', color: '#d97706' }
+    ].map(k => `
+    <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;text-align:center">
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:6px">${k.label}</div>
+      <div style="font-size:20px;font-weight:700;color:${k.color}">${k.value}</div>
+    </div>`).join('')}
+  </div>
+
+  <!-- Top Products -->
+  <div style="margin-bottom:28px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0">前 5 名商品</div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#4f46e5">
+        <th style="padding:8px 12px;text-align:left;color:#fff;font-size:12px">#</th>
+        <th style="padding:8px 12px;text-align:left;color:#fff;font-size:12px">商品</th>
+        <th style="padding:8px 12px;text-align:right;color:#fff;font-size:12px">銷售數量</th>
+        <th style="padding:8px 12px;text-align:right;color:#fff;font-size:12px">銷售金額</th>
+      </tr></thead>
+      <tbody style="border:1px solid #e2e8f0;border-top:none">${topProductRows || '<tr><td colspan="4" style="padding:12px;text-align:center;color:#94a3b8">本月無銷售記錄</td></tr>'}</tbody>
+    </table>
+  </div>
+
+  <!-- Top Customers -->
+  <div style="margin-bottom:28px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0">前 5 名客戶</div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#16a34a">
+        <th style="padding:8px 12px;text-align:left;color:#fff;font-size:12px">#</th>
+        <th style="padding:8px 12px;text-align:left;color:#fff;font-size:12px">客戶</th>
+        <th style="padding:8px 12px;text-align:right;color:#fff;font-size:12px">訂單數</th>
+        <th style="padding:8px 12px;text-align:right;color:#fff;font-size:12px">消費金額</th>
+      </tr></thead>
+      <tbody style="border:1px solid #e2e8f0;border-top:none">${topCustomerRows || '<tr><td colspan="4" style="padding:12px;text-align:center;color:#94a3b8">本月無客戶訂單</td></tr>'}</tbody>
+    </table>
+  </div>
+
+  <!-- Low Stock -->
+  <div>
+    <div style="font-size:14px;font-weight:700;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0">低庫存清單（${lowStockItems.length} 項）</div>
+    ${lowStockItems.length > 0 ? `
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#d97706">
+        <th style="padding:8px 12px;text-align:left;color:#fff;font-size:12px">商品名稱</th>
+        <th style="padding:8px 12px;text-align:left;color:#fff;font-size:12px">SKU</th>
+        <th style="padding:8px 12px;text-align:right;color:#fff;font-size:12px">現有庫存</th>
+        <th style="padding:8px 12px;text-align:right;color:#fff;font-size:12px">補貨點</th>
+      </tr></thead>
+      <tbody style="border:1px solid #e2e8f0;border-top:none">${lowStockRows}</tbody>
+    </table>` : '<div style="padding:12px;color:#94a3b8;text-align:center">目前無低庫存商品</div>'}
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center;font-size:11px;color:#94a3b8;padding-top:24px;margin-top:32px;border-top:1px solid #f1f5f9">
+    由 SkillCraft IMS 自動產生 · ${new Date().toLocaleString('zh-TW')}
+  </div>
+
+</div>
+</body>
+</html>`
+}
+
 export function registerPrintIpc(): void {
   ipcMain.handle('print:pdf', async (_e, { type, id }: { type: 'sales' | 'purchase'; id: number }) => {
     const db = getDb()
@@ -264,6 +419,28 @@ export function registerPrintIpc(): void {
 
     if (canceled || !filePath) return { success: false }
 
+    writeFileSync(filePath, pdfBuffer)
+    return { success: true, filePath }
+  })
+
+  ipcMain.handle('reports:exportMonthlyPdf', async (_e, { year, month }: { year: number; month: number }) => {
+    const db = getDb()
+    const html = buildMonthlyReportHtml(year, month, db)
+
+    const win = new BrowserWindow({ width: 900, height: 1200, show: false, webPreferences: { nodeIntegration: false } })
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+    await new Promise((resolve) => setTimeout(resolve, 400))
+
+    const pdfBuffer = await win.webContents.printToPDF({ margins: { marginType: 'printableArea' }, pageSize: 'A4' })
+    win.close()
+
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: '儲存月報 PDF',
+      defaultPath: `monthly-report-${year}-${String(month).padStart(2, '0')}.pdf`,
+      filters: [{ name: 'PDF 檔案', extensions: ['pdf'] }]
+    })
+
+    if (canceled || !filePath) return { success: false }
     writeFileSync(filePath, pdfBuffer)
     return { success: true, filePath }
   })

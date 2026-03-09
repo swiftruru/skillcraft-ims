@@ -8,6 +8,7 @@ import { useLangStore } from '@/stores/lang.store'
 import { useLang } from '@/lib/useLang'
 import { useDemoStore } from '@/stores/demo.store'
 import { purgeDemoData } from '@/lib/purgeDemoData'
+import { NotificationBell } from './NotificationBell'
 
 type SyncState = 'idle' | 'running' | 'success' | 'error'
 
@@ -137,6 +138,9 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
         >
           {t.header.switchLang}
         </Button>
+
+        {/* Notification Bell */}
+        <NotificationBell />
 
         {/* Theme toggle */}
         <Button

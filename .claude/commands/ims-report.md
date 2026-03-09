@@ -21,6 +21,25 @@ description: 當使用者要求新增或修改 Dashboard、KPI 卡片、圖表�
 
 8. **供應商/客戶統計**：`reports:supplierStats` 和 `reports:customerStats` 回傳各自的統計陣列；供應商顯示採購次數與收貨總金額；客戶顯示訂單次數與完成總金額；queryKey 分別為 `['reports', 'supplierStats']` 和 `['reports', 'customerStats']`。
 
+10. **銷售業績排行（Top Customers）**：`reports:topCustomers` IPC 回傳 `TopCustomerItem[]`：
+    - SQL：JOIN `sales_orders`（status IN completed/returned）+ `customers`，GROUP BY customer_id，SUM(total_amount) AS total_spent，COUNT(*) AS order_count
+    - 回傳欄位：`customer_id, name, order_count, total_spent`，ORDER BY total_spent DESC LIMIT 10
+    - queryKey：`['reports', 'topCustomers']`，`staleTime: 1000 * 60 * 5`
+    - UI：Reports 頁面新增「銷售業績排行」卡片，以橫向 BarChart（Recharts `HorizontalBarChart` 或 `BarChart layout="vertical"`）呈現 top 5；卡片下方顯示完整 top 10 排名列表（名次、客戶名、訂單數、累計金額）
+
+11. **月報 PDF 匯出**：`reports:exportMonthlyPdf` IPC 使用 Electron `BrowserWindow.loadURL` + `printToPDF` 產生月報：
+    - 參數：`year: number, month: number`（預設當月）
+    - 內容：月份標題、KPI 摘要（4 張卡片數值文字）、前 5 名商品、前 5 名客戶、低庫存清單
+    - 使用現有 `print.ipc.ts` 的 HTML 模板模式，以 inline CSS 樣式化，不依賴 renderer CSS
+    - 月報報表 HTML 產生邏輯放在 `src/main/ipc/print.ipc.ts`，新增 `type: 'monthly-report'` 分支
+    - UI：Reports 頁面右上角「匯出月報 PDF」按鈕（`variant="outline" size="sm"`），點擊後跳出月份選擇（預設當月），確認後呼叫 IPC
+
+12. **商品採購價格歷史**：`products:getPriceHistory(productId)` IPC 查詢該商品的所有採購記錄：
+    - SQL：JOIN `purchase_items` + `purchase_orders`（status='received'），回傳 `{ order_date, order_no, unit_price, quantity }[]`，ORDER BY order_date DESC LIMIT 20
+    - queryKey：`['products', 'priceHistory', productId]`，`staleTime: 1000 * 60 * 5`
+    - UI：`ProductDetailDialog` 新增「採購價格」tab，以 LineChart 顯示歷史單價趨勢；下方表格列出每筆明細（日期、訂單號、數量、單價）
+    - 無採購記錄時顯示空白提示
+
 9. **停滯品分析（Slow-Moving Inventory）**：`reports:slowMoving` IPC 接受 `days: 30 | 60 | 90` 參數，回傳 `SlowMovingItem[]`：
    - SQL 邏輯：`products.updated_at < date('now', '-N days') AND stock_qty > 0`（`updated_at` 隨每次庫存異動更新，可代表最後移動日）
    - 回傳欄位：`id, name, sku, category, stock_qty, buy_price, updated_at, days_idle, stock_value`

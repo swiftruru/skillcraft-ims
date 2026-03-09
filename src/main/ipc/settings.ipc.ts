@@ -1,6 +1,7 @@
 import { ipcMain, app, shell } from 'electron'
 import { getDb } from '../db'
 import { join } from 'path'
+import { SchedulerService } from '../services/scheduler.service'
 
 export function registerSettingsIpc(): void {
   ipcMain.handle('settings:get', () => {
@@ -18,6 +19,7 @@ export function registerSettingsIpc(): void {
       serviceAccountKeyPath: settings['serviceAccountKeyPath'] ?? '',
       syncIntervalMinutes: parseInt(settings['syncIntervalMinutes'] ?? '30'),
       autoSyncEnabled: settings['autoSyncEnabled'] === 'true',
+      autoBackupEnabled: settings['autoBackupEnabled'] === 'true',
       dbPath: join(app.getPath('userData'), 'ims.db'),
       appVersion: app.getVersion(),
       companyName: settings['companyName'] ?? '',
@@ -40,6 +42,10 @@ export function registerSettingsIpc(): void {
         upsert.run(key, String(value))
       }
     })()
+    // Restart backup scheduler if auto backup setting changed
+    if ('autoBackupEnabled' in data) {
+      SchedulerService.getInstance().scheduleAutoBackup()
+    }
     return true
   })
 

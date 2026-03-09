@@ -15,6 +15,8 @@ declare global {
         adjust(productId: number, delta: number, reason: string, note?: string): Promise<import('./schema').Product>
         getAdjustmentHistory(productId: number): Promise<import('./schema').InventoryAdjustment[]>
         getAllAdjustments(filters?: { search?: string; reason?: string; dateFrom?: string; dateTo?: string; limit?: number }): Promise<import('./schema').InventoryAdjustment[]>
+        batchDelete(ids: number[]): Promise<{ deleted: number; skipped: number }>
+        getPriceHistory(productId: number): Promise<import('./schema').PriceHistoryItem[]>
       }
       suppliers: {
         getAll(search?: string): Promise<import('./schema').Supplier[]>
@@ -60,6 +62,7 @@ declare global {
         supplierStats(): Promise<import('./schema').SupplierStat[]>
         customerStats(): Promise<import('./schema').CustomerStat[]>
         slowMoving(days?: number): Promise<import('./schema').SlowMovingItem[]>
+        topCustomers(): Promise<import('./schema').TopCustomerItem[]>
       }
       sync: {
         trigger(direction: 'push' | 'pull' | 'bidirectional'): Promise<{ success: boolean; recordsSynced?: number; error?: string }>
@@ -92,6 +95,7 @@ declare global {
       db: {
         backup(): Promise<{ success: boolean; filePath?: string; error?: string }>
         restore(): Promise<{ success: boolean; error?: string }>
+        autoBackup(): Promise<{ success: boolean; filePath?: string; error?: string }>
       }
       import: {
         csv(): Promise<{ success: boolean; imported: number; skipped: number; errors: string[]; error?: string }>
@@ -106,12 +110,18 @@ declare global {
       }
       print: {
         pdf(opts: { type: 'sales' | 'purchase'; id: number }): Promise<{ success: boolean; filePath?: string; error?: string }>
+        exportMonthlyPdf(opts: { year: number; month: number }): Promise<{ success: boolean; filePath?: string; error?: string }>
       }
       shell: {
         openExternal(url: string): Promise<void>
       }
       demo: {
         purge(): Promise<void>
+      }
+      notifications: {
+        getAll(): Promise<import('./schema').AppNotification[]>
+        markRead(id: number): Promise<boolean>
+        markAllRead(): Promise<boolean>
       }
     }
   }

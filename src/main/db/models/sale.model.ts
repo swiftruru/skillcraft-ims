@@ -24,8 +24,8 @@ export const SaleModel = {
       params.push(filters.status)
     }
     if (filters?.search) {
-      query += ' AND (so.order_no LIKE ? OR c.name LIKE ?)'
-      params.push(`%${filters.search}%`, `%${filters.search}%`)
+      query += ' AND (so.order_no LIKE ? OR c.name LIKE ? OR so.notes LIKE ?)'
+      params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`)
     }
     query += ' ORDER BY so.created_at DESC'
     return db.prepare(query).all(...params) as SalesOrder[]

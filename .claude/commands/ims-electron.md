@@ -37,3 +37,10 @@ description: 當使用者要求新增或修改 Electron 主程序功能，如視
 7. **視窗狀態持久化**：視窗尺寸與位置以 JSON 存在 `app.getPath('userData')/window-state.json`；`createWindow` 時讀取套用，`mainWindow.on('close')` 時寫入；若存檔不存在使用預設值（1280×800）；maximized 狀態另外處理（先 setBounds 再 maximize()）。
 
 8. **排程每日通知**：SchedulerService 除了同步排程外，另起一個 `'0 9 * * *'` cron job（每天早上 9 點）發送庫存摘要通知；此排程不依賴 autoSyncEnabled 設定，無條件啟動；通知內容包含低庫存數量與待處理訂單數量。
+
+9. **定期自動備份規範**：`SchedulerService` 新增自動備份 cron job：
+   - 排程設定：`backupSchedule`（預設 `'0 2 * * *'` 每天凌晨 2 點），由 `app_settings` 中 `autoBackupEnabled`（`'true'`/`'false'`）控制是否啟動
+   - 備份路徑：`app.getPath('documents')/SkillCraft IMS Backups/ims-backup-YYYY-MM-DD.db`；超過 30 天的備份自動刪除（`fs.readdirSync` 掃目錄後 `fs.unlinkSync`）
+   - IPC：`db:autoBackup` 觸發一次立即備份（手動觸發，回傳 `{ success, filePath, error }`）
+   - Settings 頁面新增「自動備份」開關（shadcn Switch）+ 說明文字「每日凌晨 2 點自動備份，保留 30 天」；開關狀態存入 `app_settings(key='autoBackupEnabled', value='true'/'false')`
+   - 排程啟動/停止：`settings:set autoBackupEnabled` 觸發後，main process 透過 `ipcMain.on` 收到，動態重啟 SchedulerService 的備份 cron（`job.stop()` 後 `schedule(cron, fn)`）

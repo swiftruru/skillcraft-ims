@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -287,6 +288,21 @@ export default function Settings() {
           <CardDescription>{s.dbSectionDesc}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center justify-between py-2 border-b border-border mb-3">
+            <div>
+              <p className="text-sm font-medium">自動備份</p>
+              <p className="text-xs text-muted-foreground">每日凌晨 2 點自動備份，保留 30 天</p>
+            </div>
+            <Switch
+              checked={settings?.autoBackupEnabled ?? false}
+              onCheckedChange={(checked) =>
+                window.electronAPI.settings.set('autoBackupEnabled', String(checked)).then(() =>
+                  queryClient.invalidateQueries({ queryKey: ['settings'] })
+                )
+              }
+            />
+          </div>
+
           <div className="flex flex-wrap gap-3">
             <Button
               variant="outline"

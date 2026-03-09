@@ -202,4 +202,21 @@ export function registerReportsIpc(): void {
       )
       .all(days)
   })
+
+  ipcMain.handle('reports:topCustomers', () => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT c.id as customer_id, c.name,
+                COUNT(so.id) as order_count,
+                COALESCE(SUM(so.total_amount), 0) as total_spent
+         FROM customers c
+         JOIN sales_orders so ON so.customer_id = c.id
+         WHERE so.status IN ('completed', 'returned')
+         GROUP BY c.id
+         ORDER BY total_spent DESC
+         LIMIT 10`
+      )
+      .all()
+  })
 }

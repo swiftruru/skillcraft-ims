@@ -1,3 +1,4 @@
+import { getDb } from '../db'
 import { ipcMain } from 'electron'
 import { ProductModel } from '../db/models/product.model'
 
@@ -40,5 +41,23 @@ export function registerProductsIpc(): void {
 
   ipcMain.handle('products:getAllAdjustments', (_e, filters) => {
     return ProductModel.getAllAdjustments(filters)
+  })
+
+  ipcMain.handle('products:batchDelete', (_e, ids: number[]) => {
+    return ProductModel.batchDelete(ids)
+  })
+
+  ipcMain.handle('products:getPriceHistory', (_e, productId: number) => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT po.order_date, po.order_no, pi.unit_price, pi.quantity
+         FROM purchase_items pi
+         JOIN purchase_orders po ON pi.purchase_order_id = po.id
+         WHERE pi.product_id = ? AND po.status = 'received'
+         ORDER BY po.order_date DESC
+         LIMIT 20`
+      )
+      .all(productId)
   })
 }

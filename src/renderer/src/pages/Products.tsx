@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +33,8 @@ export default function Products() {
   const [exporting, setExporting] = useState(false)
   const [suggestionOpen, setSuggestionOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
 
   const { data: categories } = useQuery<string[]>({
     queryKey: ['products', 'categories'],
@@ -59,7 +62,48 @@ export default function Products() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] })
   })
 
+  const batchDeleteMutation = useMutation({
+    mutationFn: (ids: number[]) => window.electronAPI.products.batchDelete(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      setSelectedIds(new Set())
+    }
+  })
+
+  const allIds = (products ?? []).map((p) => p.id)
+  const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds(new Set())
+    else setSelectedIds(new Set(allIds))
+  }
+  const toggleOne = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   const columns: Column<Product>[] = [
+    {
+      key: '__check__' as keyof Product,
+      label: '',
+      className: 'w-10',
+      render: (_v, row) => (
+        <Checkbox
+          checked={selectedIds.has(row.id as number)}
+          onCheckedChange={() => toggleOne(row.id as number)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+      header: () => (
+        <Checkbox
+          checked={allSelected}
+          onCheckedChange={toggleAll}
+        />
+      )
+    },
     { key: 'sku', label: 'SKU', sortable: true, className: 'font-mono text-xs w-32' },
     { key: 'name', label: p.title, sortable: true, render: (v, row) => (
       <button
@@ -253,6 +297,28 @@ export default function Products() {
         onOpenChange={(open) => !open && setAdjustProduct(null)}
         product={adjustProduct}
       />
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-card border border-border rounded-xl shadow-2xl px-4 py-2.5">
+          <span className="text-sm text-muted-foreground">已選 {selectedIds.size} 項</span>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setBatchDeleteOpen(true)}
+          >
+            批次刪除
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>取消</Button>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onOpenChange={setBatchDeleteOpen}
+        title="批次刪除商品"
+        description={`確定要刪除選取的 ${selectedIds.size} 項商品嗎？有庫存的商品將被略過，此操作不可撤銷。`}
+        onConfirm={() => batchDeleteMutation.mutate(Array.from(selectedIds))}
+      />
+
       <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}

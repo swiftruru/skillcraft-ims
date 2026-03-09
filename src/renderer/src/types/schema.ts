@@ -168,6 +168,7 @@ export interface AppSettings {
   serviceAccountKeyPath: string
   syncIntervalMinutes: number
   autoSyncEnabled: boolean
+  autoBackupEnabled: boolean
   dbPath: string
   appVersion: string
   companyName: string
@@ -274,4 +275,28 @@ export interface SlowMovingItem {
   updated_at: string
   days_idle: number
   stock_value: number
+}
+
+export interface TopCustomerItem {
+  customer_id: number
+  name: string
+  order_count: number
+  total_spent: number
+}
+
+export interface PriceHistoryItem {
+  order_date: string
+  order_no: string
+  unit_price: number
+  quantity: number
+}
+
+export interface AppNotification {
+  id: number
+  type: string
+  title: string
+  body: string
+  link: string | null
+  read: number
+  created_at: string
 }

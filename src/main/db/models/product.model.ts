@@ -68,6 +68,26 @@ export const ProductModel = {
     return result.changes > 0
   },
 
+  batchDelete(ids: number[]): { deleted: number; skipped: number } {
+    const db = getDb()
+    let deleted = 0
+    let skipped = 0
+    const doDelete = db.transaction(() => {
+      for (const id of ids) {
+        const product = db.prepare('SELECT stock_qty FROM products WHERE id = ?').get(id) as { stock_qty: number } | undefined
+        if (!product || product.stock_qty > 0) {
+          skipped++
+          continue
+        }
+        const result = db.prepare('DELETE FROM products WHERE id = ?').run(id)
+        if (result.changes > 0) deleted++
+        else skipped++
+      }
+    })
+    doDelete()
+    return { deleted, skipped }
+  },
+
   getCategories(): string[] {
     const db = getDb()
     return (db.prepare('SELECT DISTINCT category FROM products ORDER BY category').all() as { category: string }[]).map(

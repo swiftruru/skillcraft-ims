@@ -29,7 +29,12 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 
 8. **Toast 通知**：操作成功/失敗使用 toast 通知。import `useToast` from `@/components/ui/use-toast`；success 用 `toast({ title: '...', variant: 'success' })`；error 用 `toast({ title: '...', variant: 'destructive' })`。Toaster 元件已在 Layout 中掛載，不要重複掛載。
 
-9. **鍵盤快捷鍵面板**：`?` 鍵開啟 ShortcutOverlay（target 為 input/textarea/select 時忽略）；`Esc` 關閉；面板列出所有快捷鍵的 label + key badge；不使用 Dialog，改用 fixed overlay + backdrop。
+9. **鍵盤快捷鍵面板**：`?` 鍵開啟 ShortcutOverlay，`Esc` 關閉；target 為 input/textarea/select 時忽略按鍵；
+   - 元件位於 `src/renderer/src/components/layout/ShortcutOverlay.tsx`，在 Layout 掛載（不在每個頁面重複掛載）
+   - 不使用 Dialog，改用 `fixed inset-0 z-50` + `backdrop-blur-sm bg-background/80` backdrop
+   - 快捷鍵列表以 `grid grid-cols-2 gap-2` 排列，每項顯示 label + `<kbd>` badge（`font-mono text-xs border rounded px-1.5`）
+   - 已知快捷鍵：`⌘K` 全域搜尋、`?` 快捷鍵說明、`Esc` 關閉、`N` 新增採購單（在 /purchases 頁）、`N` 新增銷售單（在 /sales 頁）
+   - open state 使用 Zustand store（`ui.store.ts`）的 `shortcutOpen` 欄位
 
 10. **DataTable 分頁**：DataTable 支援 `pageSize` prop（預設 15）；分頁狀態為元件內部 `useState(1)`；排序欄位變更時重置到第 1 頁；分頁列顯示「第 X / Y 頁」與上一頁／下一頁按鈕（`variant="outline" size="sm"`）；資料總筆數 ≤ pageSize 時不顯示分頁列。
 
@@ -50,6 +55,20 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 使用 `useNavigate` 搭配 React Router state `{ openForm: true }` 跳轉目標頁面
     - 目標頁（Purchases、Sales、StockTake）在 `useEffect` 中讀取 `location.state?.openForm`，若為 true 則自動開啟新增表單，讀取後清除 history state
     - 快速操作列樣式：`flex gap-3 flex-wrap`，按鈕 `variant="outline" size="sm" gap-2`
+
+15. **通知中心（Notification Bell）**：Header 右側新增鈴鐺圖示按鈕，點擊展開 popover 通知列表：
+    - IPC：`notifications:getAll()` 回傳 `AppNotification[]`（`{ id, type, title, body, link?, read, created_at }`）；`notifications:markRead(id)` 標為已讀；`notifications:markAllRead()` 全部已讀
+    - 通知由 main process 寫入 SQLite `app_notifications` 資料表，renderer 以 `useQuery(['notifications'], ..., { refetchInterval: 30000 })` 輪詢
+    - 鈴鐺圖示顯示未讀數量 badge（紅色圓點，最多顯示「99+」）；無未讀時隱藏 badge
+    - Popover 內顯示最新 10 筆，每筆有 icon（依 type：low_stock→AlertTriangle 黃、backup→HardDrive 藍）、title、body、時間
+    - 每筆有「跳轉」功能（click 標記已讀並 navigate 到 link）；右上角「全部標為已讀」連結
+
+16. **商品批次操作**：Products 表格支援勾選多筆並批次操作：
+    - 資料行最左側加 Checkbox 欄（`key: '__check__'`）；表頭 Checkbox 可全選/全消
+    - 選取 1 筆以上時底部浮現操作列（`fixed bottom-6 left-1/2 -translate-x-1/2`）：顯示「已選 N 項」+ 操作按鈕
+    - 批次操作：「調整分類」（彈出 Select dialog）、「批次刪除」（ConfirmDialog）
+    - 批次刪除呼叫 `products:batchDelete(ids[])` IPC；返回 `{ deleted: number; skipped: number }`（有庫存的商品 skip）
+    - 操作後 invalidate `['products']`，清空選取集合
 
 11. **側邊欄徽章（Sidebar Badge）**：Sidebar 以 `useQuery(['reports', 'kpis'], ..., { staleTime: 1000 * 60 * 2 })` 取得 KPI 數值，在特定導覽項目右側顯示計數徽章：
     - **商品** → 低庫存數量（`lowStockCount > 0` 時顯示，黃底褐字）

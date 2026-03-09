@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency, formatNumber } from '@/lib/utils'
+import { FileDown } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts'
-import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat, SlowMovingItem } from '@/types/schema'
+import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat, SlowMovingItem, TopCustomerItem } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
@@ -34,6 +35,10 @@ export default function Reports() {
   const r = t.reports
   const [period, setPeriod] = useState('30')
   const [slowDays, setSlowDays] = useState(60)
+  const [pdfExporting, setPdfExporting] = useState(false)
+  const now = new Date()
+  const [pdfYear, setPdfYear] = useState(now.getFullYear())
+  const [pdfMonth, setPdfMonth] = useState(now.getMonth() + 1)
   const trendDays = getDaysForPeriod(period)
 
   const PERIODS = [
@@ -81,13 +86,50 @@ export default function Reports() {
     queryFn: () => window.electronAPI.reports.slowMoving(slowDays),
     staleTime: 1000 * 60 * 5
   })
+  const { data: topCustomers } = useQuery<TopCustomerItem[]>({
+    queryKey: ['reports', 'topCustomers'],
+    queryFn: () => window.electronAPI.reports.topCustomers(),
+    staleTime: 1000 * 60 * 5
+  })
 
   return (
     <div className="p-6 space-y-6">
       {/* Period selector */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-sm font-medium text-muted-foreground">{r.salesTrend}</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <select
+              className="bg-background border border-border rounded px-1.5 py-1 text-xs"
+              value={pdfYear}
+              onChange={(e) => setPdfYear(Number(e.target.value))}
+            >
+              {[now.getFullYear()-1, now.getFullYear()].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <span>年</span>
+            <select
+              className="bg-background border border-border rounded px-1.5 py-1 text-xs"
+              value={pdfMonth}
+              onChange={(e) => setPdfMonth(Number(e.target.value))}
+            >
+              {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <span>月</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1.5"
+            disabled={pdfExporting}
+            onClick={async () => {
+              setPdfExporting(true)
+              await window.electronAPI.print.exportMonthlyPdf({ year: pdfYear, month: pdfMonth })
+              setPdfExporting(false)
+            }}
+          >
+            <FileDown className="w-3 h-3" />
+            {pdfExporting ? '產生中...' : '匯出月報 PDF'}
+          </Button>
           {PERIODS.map((p) => (
             <Button
               key={p.value}
@@ -330,6 +372,57 @@ export default function Reports() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Top Customers */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium">銷售業績排行 Top 10</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {topCustomers && topCustomers.length > 0 ? (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={topCustomers.slice(0, 5)} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={80} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                    formatter={(v: number) => [formatCurrency(v), '累計消費']}
+                  />
+                  <Bar dataKey="total_spent" radius={[0, 4, 4, 0]}>
+                    {topCustomers.slice(0, 5).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-xs text-muted-foreground">
+                      <th className="px-3 py-2 text-left">名次</th>
+                      <th className="px-3 py-2 text-left">客戶名稱</th>
+                      <th className="px-3 py-2 text-right">訂單數</th>
+                      <th className="px-3 py-2 text-right">累計消費</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topCustomers.map((c, i) => (
+                      <tr key={c.customer_id} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="px-3 py-2 text-muted-foreground text-xs w-10">{i + 1}</td>
+                        <td className="px-3 py-2 font-medium">{c.name}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{c.order_count}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-green-400">{formatCurrency(c.total_spent)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">{r.noData}</div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Slow-Moving Inventory */}
       <Card>

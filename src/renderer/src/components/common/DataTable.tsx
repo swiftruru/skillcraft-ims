@@ -9,6 +9,7 @@ export interface Column<T> {
   sortable?: boolean
   className?: string
   render?: (value: unknown, row: T) => React.ReactNode
+  header?: () => React.ReactNode
 }
 
 interface DataTableProps<T> {
@@ -86,7 +87,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   onClick={() => col.sortable && handleSort(String(col.key))}
                 >
                   <div className="flex items-center gap-1">
-                    {col.label}
+                    {col.header ? col.header() : col.label}
                     {col.sortable && (
                       <span className="opacity-50">
                         {sortKey === col.key ? (

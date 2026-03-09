@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PurchaseForm } from '@/components/purchases/PurchaseForm'
 import { PurchaseDetail } from '@/components/purchases/PurchaseDetail'
+import { ReceivePurchaseDialog } from '@/components/purchases/ReceivePurchaseDialog'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import type { PurchaseOrder } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
@@ -208,14 +209,11 @@ export default function Purchases() {
       {detailId !== null && (
         <PurchaseDetail id={detailId} open={detailId !== null} onOpenChange={(open) => !open && setDetailId(null)} />
       )}
-      <ConfirmDialog
+      <ReceivePurchaseDialog
+        orderId={receiveId}
         open={receiveId !== null}
         onOpenChange={(open) => !open && setReceiveId(null)}
-        title={p.receiveTitle}
-        description={p.receiveDesc}
-        onConfirm={() => receiveId && receiveMutation.mutate(receiveId)}
-        confirmLabel={p.receiveTitle}
-        variant="default"
+        onConfirm={(id) => receiveMutation.mutate(id)}
       />
       <ConfirmDialog
         open={cancelId !== null}

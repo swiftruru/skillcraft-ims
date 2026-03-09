@@ -75,7 +75,24 @@ description: 當使用者要求新增或修改進貨、銷售、庫存異動、�
     - 完成後 invalidate `['purchases']`、`['products']`、`['reports']`、`['adjustments']` query cache
     - `PurchaseOrder.status` type 更新為 `'pending' | 'received' | 'cancelled' | 'returned'`
 
-12. **銷售退貨規範**：`sales:return` IPC 只接受 `completed` 狀態的訂單，在同一個 transaction 內完成：
+12. **訂單備注全文搜尋規範**：採購單與銷售單的搜尋 SQL 必須同時比對 `order_no`、供應商/客戶名稱 **以及** `notes` 欄位：
+    ```sql
+    -- 採購單搜尋
+    WHERE (p.order_no LIKE ? OR s.name LIKE ? OR p.notes LIKE ?)
+    -- 銷售單搜尋
+    WHERE (so.order_no LIKE ? OR c.name LIKE ? OR so.notes LIKE ?)
+    ```
+    - `notes` 欄位在 `purchase_orders` 和 `sales_orders` 表皆為 `TEXT NULL`
+    - UI 搜尋框 placeholder 補充「訂單號 / 對象名稱 / 備注」提示文字
+    - 查詢參數統一以 `%${search}%` 模糊匹配，三個佔位符傳同一個值
+
+13. **採購收貨品項比對 Dialog**：`purchases:receive` 前彈出品項確認 Dialog，逐列顯示每個品項以供收貨確認：
+    - 觸發：採購列表中「收貨」按鈕改為先呼叫 `purchases:getById(id)` 展開品項，再開啟 ReceiveDialog
+    - Dialog 顯示：商品名稱、SKU、訂購數量（`quantity`）、實際收貨數量（可編輯 `<Input type="number">`，預設等於訂購數量）
+    - IPC 擴充：`purchases:receive` 接受可選的 `actualQty?: { productId: number; qty: number }[]`；若提供，以 actualQty 更新庫存而非 quantity（允許部分收貨）
+    - 確認後才呼叫 IPC，取消則不執行；Dialog 元件命名 `ReceivePurchaseDialog`，位於 `src/renderer/src/components/purchases/`
+
+14. **銷售退貨規範**：`sales:return` IPC 只接受 `completed` 狀態的訂單，在同一個 transaction 內完成：
     ```
     UPDATE sales_orders SET status='returned' WHERE id=? AND status='completed'
     UPDATE products SET stock_qty = stock_qty + ?, updated_at=datetime('now') WHERE id=?  （每個品項）

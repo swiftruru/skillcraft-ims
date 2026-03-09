@@ -1,6 +1,7 @@
 import { ipcMain, app, dialog } from 'electron'
 import { join } from 'path'
 import { copyFileSync } from 'fs'
+import { SchedulerService } from '../services/scheduler.service'
 
 function getDbPath(): string {
   return join(app.getPath('userData'), 'skillcraft-ims.db')
@@ -46,5 +47,8 @@ export function registerDbIpc(): void {
     } catch (err) {
       return { success: false, error: String(err) }
     }
+  })
+  ipcMain.handle('db:autoBackup', () => {
+    return SchedulerService.getInstance().runAutoBackup()
   })
 }
