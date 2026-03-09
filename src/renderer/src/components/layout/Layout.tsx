@@ -8,6 +8,7 @@ import { CommandPalette } from '../common/CommandPalette'
 import { Toaster } from '../ui/toaster'
 import { ShortcutOverlay } from '../common/ShortcutOverlay'
 import { DemoController } from '../demo/DemoController'
+import { UxTourOverlay } from '../demo/UxTourOverlay'
 import { useLang } from '@/lib/useLang'
 import { purgeDemoData } from '@/lib/purgeDemoData'
 
@@ -92,6 +93,7 @@ export function Layout() {
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ShortcutOverlay open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
       <DemoController />
+      <UxTourOverlay />
       <Toaster />
     </div>
   )

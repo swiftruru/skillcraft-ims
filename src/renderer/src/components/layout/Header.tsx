@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2, Search, Sun, Moon, Play } from 'lucide-react'
+import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2, Search, Sun, Moon, Play, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDate } from '@/lib/utils'
@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/theme.store'
 import { useLangStore } from '@/stores/lang.store'
 import { useLang } from '@/lib/useLang'
 import { useDemoStore } from '@/stores/demo.store'
+import { useUxTourStore } from '@/stores/uxTour.store'
 import { purgeDemoData } from '@/lib/purgeDemoData'
 import { NotificationBell } from './NotificationBell'
 
@@ -16,10 +17,12 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
   const queryClient = useQueryClient()
   const [syncState, setSyncState] = useState<SyncState>('idle')
   const { theme, toggleTheme } = useThemeStore()
-  const { toggleLang } = useLangStore()
+  const { toggleLang, lang } = useLangStore()
+  const isZh = lang === 'zh'
   const t = useLang()
   const [syncMessage, setSyncMessage] = useState('')
   const { startDemo } = useDemoStore()
+  const { open: openUxTour } = useUxTourStore()
 
   const handleStartDemo = async () => {
     await purgeDemoData()
@@ -127,6 +130,17 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
         >
           <Play className="w-3 h-3" />
           Live Demo
+        </Button>
+
+        {/* UX Feature Tour button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={openUxTour}
+          className="h-8 text-xs gap-1.5 border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+        >
+          <Sparkles className="w-3 h-3" />
+          {isZh ? '特色 Demo' : 'UX Tour'}
         </Button>
 
         {/* Language toggle */}
