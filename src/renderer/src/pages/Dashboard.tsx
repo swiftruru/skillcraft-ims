@@ -126,15 +126,15 @@ export default function Dashboard() {
       <div className="flex gap-3 flex-wrap">
         <Button variant="outline" size="sm" className="gap-2"
           onClick={() => navigate('/purchases', { state: { openForm: true } })}>
-          <Plus className="w-4 h-4" />新增採購單
+          <Plus className="w-4 h-4" />{d.addPurchase}
         </Button>
         <Button variant="outline" size="sm" className="gap-2"
           onClick={() => navigate('/sales', { state: { openForm: true } })}>
-          <Plus className="w-4 h-4" />新增銷售單
+          <Plus className="w-4 h-4" />{d.addSales}
         </Button>
         <Button variant="outline" size="sm" className="gap-2"
           onClick={() => navigate('/stock-take', { state: { createNew: true } })}>
-          <ClipboardList className="w-4 h-4" />開始盤點
+          <ClipboardList className="w-4 h-4" />{d.startStockTake}
         </Button>
       </div>
 
@@ -349,7 +349,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4 text-orange-400" />
-                補貨建議
+                {d.restockSuggestion}
                 <Badge variant="warning">{suggestions.length}</Badge>
               </CardTitle>
               <Button
@@ -359,7 +359,7 @@ export default function Dashboard() {
                 onClick={handleCreatePO}
               >
                 <ShoppingCart className="w-3 h-3" />
-                建立採購單（{selectedSuggestions.size} 項）
+                {d.createPurchaseOrder(selectedSuggestions.size)}
               </Button>
             </div>
           </CardHeader>
@@ -367,10 +367,10 @@ export default function Dashboard() {
             <div className="space-y-0">
               <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-4 text-xs text-muted-foreground px-1 pb-2 border-b border-border">
                 <span></span>
-                <span>商品</span>
-                <span className="text-right">現有庫存</span>
-                <span className="text-right">建議補貨</span>
-                <span className="text-right">預估費用</span>
+                <span>{d.product}</span>
+                <span className="text-right">{d.currentStock}</span>
+                <span className="text-right">{d.suggestedQty}</span>
+                <span className="text-right">{d.estimatedCost}</span>
               </div>
               {suggestions.map((item) => {
                 const selected = selectedSuggestions.has(item.product_id)
@@ -391,7 +391,7 @@ export default function Dashboard() {
                       <span className={`text-sm font-semibold ${item.stock_qty === 0 ? 'text-red-400' : 'text-yellow-400'}`}>
                         {item.stock_qty}
                       </span>
-                      <div className="text-xs text-muted-foreground">補貨點 {item.reorder_pt}</div>
+                      <div className="text-xs text-muted-foreground">{d.reorderPoint(item.reorder_pt)}</div>
                     </div>
                     <div className="text-right text-sm font-semibold text-blue-400">
                       +{item.suggested_qty}
@@ -404,9 +404,9 @@ export default function Dashboard() {
               })}
             </div>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
-              <span>點選勾選要採購的項目</span>
+              <span>{d.selectItemsHint}</span>
               <span className="font-semibold text-foreground">
-                預估總費用：{formatCurrency(
+                {d.estimatedTotal}{formatCurrency(
                   (suggestions ?? [])
                     .filter((s) => selectedSuggestions.has(s.product_id))
                     .reduce((sum, s) => sum + s.estimated_cost, 0)

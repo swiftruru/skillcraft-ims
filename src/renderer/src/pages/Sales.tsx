@@ -58,7 +58,7 @@ export default function Sales() {
         queryClient.invalidateQueries({ queryKey: ['products'] })
         queryClient.invalidateQueries({ queryKey: ['reports'] })
       } else {
-        setError(result.error ?? '操作失敗')
+        setError(result.error ?? s.opFailed)
       }
     }
   })
@@ -77,7 +77,7 @@ export default function Sales() {
         queryClient.invalidateQueries({ queryKey: ['reports'] })
         queryClient.invalidateQueries({ queryKey: ['adjustments'] })
       } else {
-        setError(result.error ?? '退貨失敗')
+        setError(result.error ?? s.returnFailed)
       }
     }
   })
@@ -131,7 +131,7 @@ export default function Sales() {
           </Button>
           <Button
             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            title="複製訂單"
+            title={s.cloneOrder}
             onClick={() => handleClone(row.id as number)}
           >
             <Copy className="w-3.5 h-3.5" />
@@ -146,7 +146,7 @@ export default function Sales() {
           {row.status === 'completed' && (
             <Button
               variant="ghost" size="icon" className="h-7 w-7 text-orange-400 hover:text-orange-500"
-              title="退貨"
+              title={s.returnOrder}
               onClick={() => setReturnId(row.id)}
             >
               <Undo2 className="w-3.5 h-3.5" />
@@ -209,10 +209,10 @@ export default function Sales() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder={s.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Input type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title="開始日期" />
-        <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title="結束日期" />
+        <Input type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title={s.dateFrom} />
+        <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title={s.dateTo} />
         {(dateFrom || dateTo) && (
-          <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => { setDateFrom(''); setDateTo('') }}>清除</button>
+          <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => { setDateFrom(''); setDateTo('') }}>{s.clearDates}</button>
         )}
         <Button
           variant="outline" className="gap-2" disabled={exporting}
@@ -264,10 +264,10 @@ export default function Sales() {
       <ConfirmDialog
         open={returnId !== null}
         onOpenChange={(open) => !open && setReturnId(null)}
-        title="確認退貨"
-        description="退貨後庫存將自動回補，此操作不可撤銷。確定要退貨嗎？"
+        title={s.returnTitle}
+        description={s.returnDesc}
         onConfirm={() => returnId && returnMutation.mutate(returnId)}
-        confirmLabel="確認退貨"
+        confirmLabel={s.returnConfirm}
       />
       <ConfirmDialog
         open={deleteId !== null}

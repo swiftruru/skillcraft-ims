@@ -24,6 +24,7 @@ import {
 import { Wand2 } from 'lucide-react'
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@/lib/constants'
 import type { Product } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 const MOCK_DATA = [
   { sku: '', name: 'USB-C 充電器 65W', category: '電子產品', sell_price: 890, buy_price: 450, stock_qty: 50, reorder_pt: 10, unit: '個', description: '支援 PD 快充，適用於筆電及手機' },
@@ -55,6 +56,8 @@ interface ProductFormProps {
 
 export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
   const queryClient = useQueryClient()
+  const t = useLang()
+  const tf = t.forms
   const isEdit = !!product
 
   const {
@@ -132,22 +135,22 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? '編輯商品' : '新增商品'}</DialogTitle>
+          <DialogTitle>{isEdit ? tf.editProduct : tf.addProduct}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="sku">SKU *</Label>
+              <Label htmlFor="sku">{tf.skuLabel}</Label>
               <div className="flex gap-2">
-                <Input id="sku" {...register('sku')} placeholder="ELEC-001" disabled={isEdit} className="flex-1" />
+                <Input id="sku" {...register('sku')} placeholder={tf.skuPlaceholder} disabled={isEdit} className="flex-1" />
                 {!isEdit && (
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     className="h-9 w-9 shrink-0"
-                    title="自動產生 SKU"
+                    title={tf.autoSku}
                     onClick={async () => {
                       const category = watch('category')
                       if (!category) return
@@ -162,15 +165,15 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
               {errors.sku && <p className="text-xs text-destructive">{errors.sku.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="name">商品名稱 *</Label>
-              <Input id="name" {...register('name')} placeholder="USB-C 充電器 65W" />
+              <Label htmlFor="name">{tf.nameLabel}</Label>
+              <Input id="name" {...register('name')} placeholder={tf.namePlaceholder} />
               {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>類別 *</Label>
+              <Label>{tf.categoryLabel}</Label>
               <Select
                 value={watch('category')}
                 onValueChange={(v) => setValue('category', v)}
@@ -186,7 +189,7 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>單位 *</Label>
+              <Label>{tf.unitLabel}</Label>
               <Select value={watch('unit')} onValueChange={(v) => setValue('unit', v)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -202,7 +205,7 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="sell_price">售價 (NT$) *</Label>
+              <Label htmlFor="sell_price">{tf.sellPriceLabel}</Label>
               <Input
                 id="sell_price"
                 type="number"
@@ -213,7 +216,7 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
               {errors.sell_price && <p className="text-xs text-destructive">{errors.sell_price.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="buy_price">進價 (NT$) *</Label>
+              <Label htmlFor="buy_price">{tf.buyPriceLabel}</Label>
               <Input
                 id="buy_price"
                 type="number"
@@ -227,7 +230,7 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="stock_qty">初始庫存</Label>
+              <Label htmlFor="stock_qty">{tf.initialStock}</Label>
               <Input
                 id="stock_qty"
                 type="number"
@@ -235,26 +238,26 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
                 min={0}
                 disabled={isEdit}
               />
-              {isEdit && <p className="text-xs text-muted-foreground">庫存由採購/銷售自動更新</p>}
+              {isEdit && <p className="text-xs text-muted-foreground">{tf.stockAutoUpdated}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="reorder_pt">補貨點</Label>
+              <Label htmlFor="reorder_pt">{tf.reorderPtLabel}</Label>
               <Input
                 id="reorder_pt"
                 type="number"
                 {...register('reorder_pt')}
                 min={0}
               />
-              <p className="text-xs text-muted-foreground">庫存低於此數量時顯示警示</p>
+              <p className="text-xs text-muted-foreground">{tf.reorderPtDesc}</p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="description">說明</Label>
+            <Label htmlFor="description">{tf.descriptionLabel}</Label>
             <Textarea
               id="description"
               {...register('description')}
-              placeholder="商品描述（選填）"
+              placeholder={tf.descriptionPlaceholder}
               rows={2}
             />
           </div>
@@ -262,14 +265,14 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
           <DialogFooter className="gap-2">
             {!isEdit && (
               <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
-                <Wand2 className="w-3.5 h-3.5" />Mock 資料
+                <Wand2 className="w-3.5 h-3.5" />{t.common.mockData}
               </Button>
             )}
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              取消
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={isSubmitting || mutation.isPending}>
-              {isEdit ? '更新' : '新增'}
+              {isEdit ? tf.submitUpdate : tf.submitAdd}
             </Button>
           </DialogFooter>
         </form>

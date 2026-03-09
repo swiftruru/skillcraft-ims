@@ -56,7 +56,7 @@ export default function Reports() {
     { label: r.lastMonth, value: 'last-month' },
     { label: r.thisQuarter, value: 'this-quarter' },
     { label: r.period90, value: '90' },
-    { label: '自訂', value: 'custom' },
+    { label: r.custom, value: 'custom' },
   ]
 
   const { data: trend, isLoading: trendLoading } = useQuery<SalesTrendPoint[]>({
@@ -125,7 +125,7 @@ export default function Reports() {
             >
               {[now.getFullYear()-1, now.getFullYear()].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            <span>年</span>
+            <span>{r.year}</span>
             <select
               className="bg-background border border-border rounded px-1.5 py-1 text-xs"
               value={pdfMonth}
@@ -133,7 +133,7 @@ export default function Reports() {
             >
               {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}</option>)}
             </select>
-            <span>月</span>
+            <span>{r.month}</span>
           </div>
           <Button
             variant="outline"
@@ -147,7 +147,7 @@ export default function Reports() {
             }}
           >
             <FileDown className="w-3 h-3" />
-            {pdfExporting ? '產生中...' : '匯出月報 PDF'}
+            {pdfExporting ? r.exporting : r.exportMonthlyPdf}
           </Button>
           <span data-tour="report-range" className="flex gap-1 flex-wrap">
             {PERIODS.map((p) => (
@@ -166,14 +166,14 @@ export default function Reports() {
       </div>
       {period === 'custom' && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>自訂範圍：</span>
+          <span>{r.customRange}</span>
           <input
             type="date"
             className="bg-background border border-border rounded px-2 py-1 text-xs w-36"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
           />
-          <span>～</span>
+          <span>{r.to}</span>
           <input
             type="date"
             className="bg-background border border-border rounded px-2 py-1 text-xs w-36"
@@ -215,7 +215,7 @@ export default function Reports() {
       {/* Purchase vs Sales */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">採購 vs 銷售（{trendDays}d）</CardTitle>
+          <CardTitle className="text-sm font-medium">{r.purchaseVsSales(trendDays)}</CardTitle>
         </CardHeader>
         <CardContent>
           {purchaseVsSales && purchaseVsSales.length > 0 ? (
@@ -226,10 +226,10 @@ export default function Reports() {
                 <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
                 <Tooltip
                   contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-                  formatter={(v: number, name: string) => [formatCurrency(v), name === 'purchase_amount' ? '採購' : '銷售']}
+                  formatter={(v: number, name: string) => [formatCurrency(v), name === 'purchase_amount' ? r.purchase : r.salesLabel]}
                 />
                 <Legend
-                  formatter={(value) => value === 'purchase_amount' ? '採購' : '銷售'}
+                  formatter={(value) => value === 'purchase_amount' ? r.purchase : r.salesLabel}
                   wrapperStyle={{ fontSize: '12px' }}
                 />
                 <Bar dataKey="purchase_amount" fill="#3b82f6" radius={[2, 2, 0, 0]} />
@@ -305,7 +305,7 @@ export default function Reports() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    {['SKU', t.products.title, t.products.category, t.products.stock, '補貨點', '缺口', '建議補貨'].map(h => (
+                    {['SKU', t.products.title, t.products.category, t.products.stock, r.reorderPoint, r.gap, r.suggestedRestock].map(h => (
                       <th key={h} className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
                     ))}
                   </tr>
@@ -346,7 +346,7 @@ export default function Reports() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    {['SKU', t.products.title, t.products.category, t.products.sellPrice, t.products.buyPrice, '毛利', '毛利率 %'].map((h) => (
+                    {['SKU', t.products.title, t.products.category, t.products.sellPrice, t.products.buyPrice, r.grossProfit, r.grossMarginPct].map((h) => (
                       <th key={h} className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
                     ))}
                   </tr>
@@ -448,7 +448,7 @@ export default function Reports() {
       {/* Top Customers */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">銷售業績排行 Top 10</CardTitle>
+          <CardTitle className="text-sm font-medium">{r.topCustomers}</CardTitle>
         </CardHeader>
         <CardContent>
           {topCustomers && topCustomers.length > 0 ? (
@@ -460,7 +460,7 @@ export default function Reports() {
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={80} />
                   <Tooltip
                     contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-                    formatter={(v: number) => [formatCurrency(v), '累計消費']}
+                    formatter={(v: number) => [formatCurrency(v), r.totalSpend]}
                   />
                   <Bar dataKey="total_spent" radius={[0, 4, 4, 0]}>
                     {topCustomers.slice(0, 5).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
@@ -471,10 +471,10 @@ export default function Reports() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border text-xs text-muted-foreground">
-                      <th className="px-3 py-2 text-left">名次</th>
-                      <th className="px-3 py-2 text-left">客戶名稱</th>
-                      <th className="px-3 py-2 text-right">訂單數</th>
-                      <th className="px-3 py-2 text-right">累計消費</th>
+                      <th className="px-3 py-2 text-left">{r.rank}</th>
+                      <th className="px-3 py-2 text-left">{r.customerName}</th>
+                      <th className="px-3 py-2 text-right">{r.orderCount}</th>
+                      <th className="px-3 py-2 text-right">{r.totalSpend}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -500,7 +500,7 @@ export default function Reports() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">庫存週轉率分析</CardTitle>
+            <CardTitle className="text-sm font-medium">{r.turnoverTitle}</CardTitle>
             <div className="flex gap-1">
               {[7, 30, 90].map((d) => (
                 <Button
@@ -510,30 +510,30 @@ export default function Reports() {
                   className="h-7 px-2 text-xs"
                   onClick={() => setTurnoverDays(d)}
                 >
-                  {d} 天
+                  {r.daysLabel(d)}
                 </Button>
               ))}
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            過去 {turnoverDays} 天銷售速度，預估現有庫存可售天數
+            {r.turnoverDesc(turnoverDays)}
           </p>
         </CardHeader>
         <CardContent>
           {!turnover || turnover.length === 0 ? (
-            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">暫無資料</div>
+            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">{r.noDataFallback}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="text-left px-3 py-2 font-medium">商品名稱</th>
+                    <th className="text-left px-3 py-2 font-medium">{r.productName}</th>
                     <th className="text-left px-3 py-2 font-medium font-mono">SKU</th>
                     <th className="text-left px-3 py-2 font-medium">{t.products.category}</th>
-                    <th className="text-right px-3 py-2 font-medium">庫存</th>
-                    <th className="text-right px-3 py-2 font-medium">已售出</th>
-                    <th className="text-right px-3 py-2 font-medium">週轉率</th>
-                    <th className="text-right px-3 py-2 font-medium">預估售完</th>
+                    <th className="text-right px-3 py-2 font-medium">{t.products.stock}</th>
+                    <th className="text-right px-3 py-2 font-medium">{r.soldQty}</th>
+                    <th className="text-right px-3 py-2 font-medium">{r.turnoverRate}</th>
+                    <th className="text-right px-3 py-2 font-medium">{r.estSellout}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -557,7 +557,7 @@ export default function Reports() {
                           {item.turnover_rate !== null ? item.turnover_rate.toFixed(2) : '—'}
                         </td>
                         <td className={`px-3 py-2 text-right tabular-nums ${dtsColor}`}>
-                          {dts !== null ? `${dts} 天` : '無銷售'}
+                          {dts !== null ? r.daysUnit(dts) : r.noSales}
                         </td>
                       </tr>
                     )
@@ -573,7 +573,7 @@ export default function Reports() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">停滯品分析</CardTitle>
+            <CardTitle className="text-sm font-medium">{r.slowMovingTitle}</CardTitle>
             <div className="flex gap-1">
               {[30, 60, 90].map((d) => (
                 <Button
@@ -583,31 +583,31 @@ export default function Reports() {
                   className="h-7 px-2 text-xs"
                   onClick={() => setSlowDays(d)}
                 >
-                  {d} 天
+                  {r.daysLabel(d)}
                 </Button>
               ))}
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            庫存量 &gt; 0 但超過 {slowDays} 天未有任何異動的商品
+            {r.slowMovingDesc(slowDays)}
           </p>
         </CardHeader>
         <CardContent>
           {!slowMoving || slowMoving.length === 0 ? (
             <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">
-              {slowDays} 天內無停滯品
+              {r.noSlowMoving(slowDays)}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="text-left px-3 py-2 font-medium">商品名稱</th>
+                    <th className="text-left px-3 py-2 font-medium">{r.productName}</th>
                     <th className="text-left px-3 py-2 font-medium font-mono">SKU</th>
                     <th className="text-left px-3 py-2 font-medium">{t.products.category}</th>
-                    <th className="text-right px-3 py-2 font-medium">庫存</th>
-                    <th className="text-right px-3 py-2 font-medium">庫存價值</th>
-                    <th className="text-right px-3 py-2 font-medium">停滯天數</th>
+                    <th className="text-right px-3 py-2 font-medium">{t.products.stock}</th>
+                    <th className="text-right px-3 py-2 font-medium">{r.inventoryValue}</th>
+                    <th className="text-right px-3 py-2 font-medium">{r.idleDays}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -625,7 +625,7 @@ export default function Reports() {
                         <td className="px-3 py-2 text-right">{formatNumber(item.stock_qty)}</td>
                         <td className="px-3 py-2 text-right">{formatCurrency(item.stock_value)}</td>
                         <td className={`px-3 py-2 text-right font-semibold tabular-nums ${idleColor}`}>
-                          {item.days_idle} 天
+                          {r.daysUnit(item.days_idle)}
                         </td>
                       </tr>
                     )
@@ -633,7 +633,7 @@ export default function Reports() {
                 </tbody>
               </table>
               <p className="text-xs text-muted-foreground text-right mt-2 px-3">
-                共 {slowMoving.length} 項停滯品，庫存價值合計 {formatCurrency(slowMoving.reduce((s, i) => s + i.stock_value, 0))}
+                {r.slowMovingSummary(slowMoving.length, formatCurrency(slowMoving.reduce((s, i) => s + i.stock_value, 0)))}
               </p>
             </div>
           )}

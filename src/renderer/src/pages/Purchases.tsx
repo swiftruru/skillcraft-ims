@@ -74,7 +74,7 @@ export default function Purchases() {
         queryClient.invalidateQueries({ queryKey: ['reports'] })
         queryClient.invalidateQueries({ queryKey: ['adjustments'] })
       } else {
-        setError(result.error ?? '退貨失敗')
+        setError(result.error ?? p.returnFailed)
       }
     }
   })
@@ -113,7 +113,7 @@ export default function Purchases() {
               {getStatusLabel(String(v))}
             </span>
             {isOverdue && (
-              <span data-tour="overdue-badge" className="text-xs px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-400">逾期</span>
+              <span data-tour="overdue-badge" className="text-xs px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-400">{p.overdue}</span>
             )}
           </div>
         )
@@ -138,7 +138,7 @@ export default function Purchases() {
           <Button
             data-tour="order-clone"
             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            title="複製訂單"
+            title={p.cloneOrder}
             onClick={() => handleClone(row.id as number)}
           >
             <Copy className="w-3.5 h-3.5" />
@@ -153,7 +153,7 @@ export default function Purchases() {
           {row.status === 'received' && (
             <Button
               variant="ghost" size="icon" className="h-7 w-7 text-orange-400 hover:text-orange-500"
-              title="退貨"
+              title={p.returnOrder}
               onClick={() => setReturnId(row.id)}
             >
               <Undo2 className="w-3.5 h-3.5" />
@@ -215,10 +215,10 @@ export default function Purchases() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder={p.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Input data-tour="date-filter" type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title="開始日期" />
-        <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title="結束日期" />
+        <Input data-tour="date-filter" type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title={p.dateFrom} />
+        <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title={p.dateTo} />
         {(dateFrom || dateTo) && (
-          <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => { setDateFrom(''); setDateTo('') }}>清除</button>
+          <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => { setDateFrom(''); setDateTo('') }}>{p.clearDates}</button>
         )}
         <Button
           variant="outline" className="gap-2" disabled={exporting}
@@ -267,10 +267,10 @@ export default function Purchases() {
       <ConfirmDialog
         open={returnId !== null}
         onOpenChange={(open) => !open && setReturnId(null)}
-        title="確認採購退貨"
-        description="退貨後庫存將自動扣減，並寫入異動記錄，此操作不可撤銷。確定要退貨嗎？"
+        title={p.returnTitle}
+        description={p.returnDesc}
         onConfirm={() => returnId && returnMutation.mutate(returnId)}
-        confirmLabel="確認退貨"
+        confirmLabel={p.returnConfirm}
       />
       <ConfirmDialog
         open={deleteId !== null}

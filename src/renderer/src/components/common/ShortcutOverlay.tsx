@@ -1,3 +1,5 @@
+import { useLang } from '@/lib/useLang'
+
 interface ShortcutOverlayProps {
   open: boolean
   onClose: () => void
@@ -8,19 +10,22 @@ interface ShortcutEntry {
   keys: string[]
 }
 
-const shortcuts: ShortcutEntry[] = [
-  { label: '全域搜尋', keys: ['⌘K', 'Ctrl+K'] },
-  { label: '快捷鍵說明', keys: ['?'] },
-  { label: '關閉對話框', keys: ['Esc'] },
-  { label: '前往總覽', keys: ['G', 'H'] },
-  { label: '前往商品管理', keys: ['G', 'P'] },
-  { label: '前往採購管理', keys: ['G', 'B'] },
-  { label: '前往銷售管理', keys: ['G', 'S'] },
-  { label: '前往報表分析', keys: ['G', 'R'] },
-  { label: '前往系統設定', keys: ['G', ','] }
-]
-
 export function ShortcutOverlay({ open, onClose }: ShortcutOverlayProps) {
+  const t = useLang()
+  const sc = t.shortcuts
+
+  const shortcuts: ShortcutEntry[] = [
+    { label: sc.globalSearch, keys: ['⌘K', 'Ctrl+K'] },
+    { label: sc.showShortcuts, keys: ['?'] },
+    { label: sc.closeDialog, keys: ['Esc'] },
+    { label: sc.goHome, keys: ['G', 'H'] },
+    { label: sc.goProducts, keys: ['G', 'P'] },
+    { label: sc.goPurchases, keys: ['G', 'B'] },
+    { label: sc.goSales, keys: ['G', 'S'] },
+    { label: sc.goReports, keys: ['G', 'R'] },
+    { label: sc.goSettings, keys: ['G', ','] }
+  ]
+
   if (!open) return null
 
   return (
@@ -33,7 +38,7 @@ export function ShortcutOverlay({ open, onClose }: ShortcutOverlayProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold">鍵盤快捷鍵</h2>
+          <h2 className="text-base font-semibold">{sc.title}</h2>
           <button
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground transition-colors text-xs border border-border rounded px-1.5 py-0.5"

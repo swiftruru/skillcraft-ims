@@ -16,6 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select'
 import type { Product, Supplier } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 const schema = z.object({
   supplier_id: z.coerce.number().nullable(),
@@ -32,6 +33,8 @@ type FormValues = z.infer<typeof schema>
 
 export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolean; onOpenChange: (v: boolean) => void; initialData?: Partial<FormValues> }) {
   const queryClient = useQueryClient()
+  const t = useLang()
+  const tf = t.forms
 
   const { data: suppliers } = useQuery<Supplier[]>({
     queryKey: ['suppliers', 'all'],
@@ -111,19 +114,19 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>新增採購單</DialogTitle>
+          <DialogTitle>{tf.newPurchaseOrder}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>供應商</Label>
+              <Label>{tf.supplierLabel}</Label>
               <Select onValueChange={(v) => setValue('supplier_id', v === 'null' ? null : parseInt(v))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="選擇供應商（選填）" />
+                  <SelectValue placeholder={tf.supplierPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="null">無供應商</SelectItem>
+                  <SelectItem value="null">{tf.noSupplier}</SelectItem>
                   {suppliers?.map((s) => (
                     <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                   ))}
@@ -131,7 +134,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="order_date">訂單日期 *</Label>
+              <Label htmlFor="order_date">{tf.orderDateLabel}</Label>
               <Input id="order_date" type="date" {...register('order_date')} />
             </div>
           </div>
@@ -139,7 +142,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
           {/* Items */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>採購明細</Label>
+              <Label>{tf.itemsLabel}</Label>
               <Button
                 type="button"
                 variant="outline"
@@ -148,19 +151,19 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
                 className="gap-1 h-7 text-xs"
               >
                 <Plus className="w-3 h-3" />
-                新增品項
+                {tf.addItem}
               </Button>
             </div>
 
             <div className="space-y-2">
               <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 text-xs text-muted-foreground px-1">
-                <span>商品</span><span>數量</span><span>單價 (NT$)</span><span></span>
+                <span>{tf.productCol}</span><span>{tf.qtyCol}</span><span>{tf.purchasePriceCol}</span><span></span>
               </div>
               {fields.map((field, i) => (
                 <div key={field.id} className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 items-center">
                   <Select onValueChange={(v) => handleProductChange(i, v)}>
                     <SelectTrigger className="h-9">
-                      <SelectValue placeholder="選擇商品" />
+                      <SelectValue placeholder={tf.selectProduct} />
                     </SelectTrigger>
                     <SelectContent>
                       {products?.map((p) => (
@@ -193,16 +196,16 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="notes">備註</Label>
-            <Textarea id="notes" {...register('notes')} rows={2} placeholder="備註（選填）" />
+            <Label htmlFor="notes">{tf.notesLabel}</Label>
+            <Textarea id="notes" {...register('notes')} rows={2} placeholder={tf.notesPlaceholder} />
           </div>
 
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
-              <Wand2 className="w-3.5 h-3.5" />Mock 資料
+              <Wand2 className="w-3.5 h-3.5" />{t.common.mockData}
             </Button>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-            <Button type="submit" disabled={isSubmitting || mutation.isPending}>建立採購單</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t.common.cancel}</Button>
+            <Button type="submit" disabled={isSubmitting || mutation.isPending}>{tf.submitCreate}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -171,7 +171,7 @@ export default function Products() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-blue-400 hover:text-blue-500"
-            title="快速採購"
+            title={p.quickPurchase}
             onClick={() => setQuickPurchaseProduct(row as unknown as Product)}
           >
             <ShoppingCart className="w-3.5 h-3.5" />
@@ -230,10 +230,10 @@ export default function Products() {
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-32 h-9 text-sm">
-            <SelectValue placeholder="全部分類" />
+            <SelectValue placeholder={p.allCategories} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">全部分類</SelectItem>
+            <SelectItem value="__all__">{p.allCategories}</SelectItem>
             {(categories ?? []).map((cat) => (
               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
             ))}
@@ -241,12 +241,12 @@ export default function Products() {
         </Select>
         <Select value={stockFilter} onValueChange={setStockFilter}>
           <SelectTrigger className="w-28 h-9 text-sm">
-            <SelectValue placeholder="全部" />
+            <SelectValue placeholder={p.allStock} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">全部</SelectItem>
-            <SelectItem value="low">低庫存</SelectItem>
-            <SelectItem value="zero">零庫存</SelectItem>
+            <SelectItem value="__all__">{p.allStock}</SelectItem>
+            <SelectItem value="low">{p.lowStock}</SelectItem>
+            <SelectItem value="zero">{p.zeroStock}</SelectItem>
           </SelectContent>
         </Select>
         {hasFilter && (
@@ -254,7 +254,7 @@ export default function Products() {
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             onClick={() => { setCategoryFilter('__all__'); setStockFilter('__all__') }}
           >
-            清除篩選
+            {p.clearFilter}
           </button>
         )}
         <Button variant="outline" className="gap-2" onClick={() => setSuggestionOpen(true)}>
@@ -327,7 +327,7 @@ export default function Products() {
           <span className="text-sm text-muted-foreground">已選 {selectedIds.size} 項</span>
           <Select onValueChange={(cat) => batchUpdateMutation.mutate({ ids: Array.from(selectedIds), category: cat })}>
             <SelectTrigger className="h-8 text-xs w-28">
-              <SelectValue placeholder="調整分類" />
+              <SelectValue placeholder={p.adjustCategory} />
             </SelectTrigger>
             <SelectContent>
               {(categories ?? []).map((cat) => (
@@ -340,17 +340,17 @@ export default function Products() {
             size="sm"
             onClick={() => setBatchDeleteOpen(true)}
           >
-            批次刪除
+            {p.batchDelete}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>取消</Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>{t.common.cancel}</Button>
         </div>
       )}
 
       <ConfirmDialog
         open={batchDeleteOpen}
         onOpenChange={setBatchDeleteOpen}
-        title="批次刪除商品"
-        description={`確定要刪除選取的 ${selectedIds.size} 項商品嗎？有庫存的商品將被略過，此操作不可撤銷。`}
+        title={p.batchDeleteTitle(selectedIds.size)}
+        description={p.batchDeleteDesc(selectedIds.size)}
         onConfirm={() => batchDeleteMutation.mutate(Array.from(selectedIds))}
       />
 

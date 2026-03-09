@@ -88,7 +88,7 @@ export default function InventoryHistory() {
             <button
               onClick={() => { setDateFrom(''); setDateTo('') }}
               className="text-muted-foreground hover:text-foreground"
-              title="清除日期篩選"
+              title={h.clearDateFilter}
             >
               <X className="w-4 h-4" />
             </button>
@@ -149,7 +149,7 @@ export default function InventoryHistory() {
 
       {records && records.length > 0 && (
         <p className="text-xs text-muted-foreground text-right">
-          {records.length} {t.common.noData === 'No data' ? 'records' : '筆記錄'}
+          {h.recordCount(records.length)}
         </p>
       )}
     </div>

@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Product, Customer } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 const schema = z.object({
   customer_id: z.coerce.number().nullable(),
@@ -27,6 +28,8 @@ type FormValues = z.infer<typeof schema>
 
 export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; onOpenChange: (v: boolean) => void; initialData?: Partial<FormValues> }) {
   const queryClient = useQueryClient()
+  const t = useLang()
+  const tf = t.forms
   const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', 'all'], queryFn: () => window.electronAPI.customers.getAll() })
   const { data: products } = useQuery<Product[]>({ queryKey: ['products', 'all'], queryFn: () => window.electronAPI.products.getAll() })
   const today = new Date().toISOString().split('T')[0]
@@ -93,45 +96,45 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>新增銷售單</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{tf.newSalesOrder}</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>客戶</Label>
+              <Label>{tf.customerLabel}</Label>
               <Select onValueChange={(v) => setValue('customer_id', v === 'null' ? null : parseInt(v))}>
-                <SelectTrigger><SelectValue placeholder="選擇客戶（選填）" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={tf.customerPlaceholder} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="null">一般客戶</SelectItem>
+                  <SelectItem value="null">{tf.generalCustomer}</SelectItem>
                   {customers?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="order_date">訂單日期 *</Label>
+              <Label htmlFor="order_date">{tf.orderDateLabel}</Label>
               <Input id="order_date" type="date" {...register('order_date')} />
             </div>
           </div>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>銷售明細</Label>
+              <Label>{tf.salesItemsLabel}</Label>
               <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: 0, quantity: 1, unit_price: 0 })} className="gap-1 h-7 text-xs">
-                <Plus className="w-3 h-3" />新增品項
+                <Plus className="w-3 h-3" />{tf.addItem}
               </Button>
             </div>
             <div className="space-y-2">
               <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 text-xs text-muted-foreground px-1">
-                <span>商品</span><span>數量</span><span>售價 (NT$)</span><span></span>
+                <span>{tf.productCol}</span><span>{tf.qtyCol}</span><span>{tf.sellPriceCol}</span><span></span>
               </div>
               {fields.map((field, i) => (
                 <div key={field.id} className="space-y-1">
                   <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 items-center">
                     <Select onValueChange={(v) => handleProductChange(i, v)}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="選擇商品" /></SelectTrigger>
+                      <SelectTrigger className="h-9"><SelectValue placeholder={tf.selectProduct} /></SelectTrigger>
                       <SelectContent>
                         {products?.map((p) => (
                           <SelectItem key={p.id} value={String(p.id)}>
-                            [{p.sku}] {p.name} (庫存:{p.stock_qty})
+                            [{p.sku}] {p.name} {tf.stockSuffix(p.stock_qty)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -162,17 +165,17 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="notes">備註</Label>
-            <Textarea id="notes" {...register('notes')} rows={2} placeholder="備註（選填）" />
+            <Label htmlFor="notes">{tf.notesLabel}</Label>
+            <Textarea id="notes" {...register('notes')} rows={2} placeholder={tf.notesPlaceholder} />
           </div>
 
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
-              <Wand2 className="w-3.5 h-3.5" />Mock 資料
+              <Wand2 className="w-3.5 h-3.5" />{t.common.mockData}
             </Button>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t.common.cancel}</Button>
             <Button type="submit" disabled={isSubmitting || mutation.isPending || hasStockError}>
-              建立銷售單
+              {tf.submitCreateSale}
             </Button>
           </DialogFooter>
         </form>

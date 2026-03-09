@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Package, Truck, Users, ShoppingCart, FileText, X } from 'lucide-react'
 import type { SearchResult } from '@/types/schema'
+import { useLang } from '@/lib/useLang'
 
 const TYPE_ICONS = {
   product: Package,
@@ -19,14 +20,6 @@ const TYPE_ROUTES: Record<string, string> = {
   sale: '/sales'
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  product: '商品',
-  supplier: '供應商',
-  customer: '客戶',
-  purchase: '採購單',
-  sale: '銷售單'
-}
-
 interface Props {
   open: boolean
   onClose: () => void
@@ -34,6 +27,8 @@ interface Props {
 
 export function CommandPalette({ open, onClose }: Props) {
   const navigate = useNavigate()
+  const t = useLang()
+  const cp = t.commandPalette
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
@@ -108,7 +103,7 @@ export function CommandPalette({ open, onClose }: Props) {
           <input
             ref={inputRef}
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder="搜尋商品、供應商、客戶、訂單..."
+            placeholder={cp.placeholder}
             value={query}
             onChange={(e) => handleChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -145,7 +140,7 @@ export function CommandPalette({ open, onClose }: Props) {
                       )}
                     </div>
                     <span className="text-xs text-muted-foreground shrink-0 bg-muted px-1.5 py-0.5 rounded">
-                      {TYPE_LABELS[result.type]}
+                      {cp.types[result.type as keyof typeof cp.types]}
                     </span>
                   </button>
                 </li>
@@ -157,14 +152,14 @@ export function CommandPalette({ open, onClose }: Props) {
         {/* Empty state */}
         {query.trim().length > 0 && !loading && results.length === 0 && (
           <div className="py-8 text-center text-sm text-muted-foreground">
-            找不到「{query}」相關結果
+            {cp.noResults(query)}
           </div>
         )}
 
         {/* Hint */}
         {query.trim().length === 0 && (
           <div className="px-4 py-3 text-xs text-muted-foreground">
-            輸入關鍵字搜尋 · <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">↑↓</kbd> 移動 · <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">Enter</kbd> 跳轉 · <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">Esc</kbd> 關閉
+            {cp.hint}
           </div>
         )}
       </div>
