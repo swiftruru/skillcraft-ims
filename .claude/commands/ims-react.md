@@ -96,3 +96,25 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - IPC：`products:batchUpdate(ids: number[], data: { category: string })` → `UPDATE products SET category=?, updated_at=datetime('now') WHERE id IN (...)`；回傳 `{ updated: number }`
     - 批次操作列點擊「調整分類」後，出現一個 inline 的 `<Select>` 讓使用者選擇現有分類，選擇後立即執行更新
     - 更新後 `invalidate(['products'])`，清空 `selectedIds`，顯示 toast success
+
+20. **訂單複製（Clone Order）**：採購/銷售頁每筆訂單新增「複製」按鈕（`Copy` icon），點擊後以原始訂單為模板建立新訂單：
+    - `PurchaseForm` / `SaleForm` 新增 `initialData?: Partial<FormValues>` prop
+    - 當 `initialData` 改變且 `open` 為 true 時，`useEffect` 以 `reset(initialData)` 帶入數值；今天日期覆蓋原訂單日期
+    - 頁面中：點擊複製 → `purchases:getById(id)` / `sales:getById(id)` 取得完整訂單（含 items）→ 組成 initialData → 開啟表單
+    - 複製動作為 async，不需新 IPC，複用現有 `getById` + `create`
+
+21. **採購/銷售日期區間篩選**：Purchases/Sales 搜尋欄右側加入「起始日」與「結束日」兩個 `<Input type="date">` 篩選：
+    - 前端 state：`dateFrom` / `dateTo`（預設空字串）；任一設定後在查詢 queryKey 加入 `{ dateFrom, dateTo }`
+    - IPC `purchases:getAll` / `sales:getAll` 新增 `dateFrom?: string; dateTo?: string` 參數，在 SQL `WHERE po.order_date >= ? AND po.order_date <= ?` 條件動態附加
+    - 顯示「清除日期」連結（同商品清除篩選的設計）
+
+22. **採購逾期警示（Overdue Alert）**：Purchases 列表中 `status='pending'` 且建立距今超過 30 天的採購單，在訂單號右側顯示橙色 badge「逾期 N 天」：
+    - 純前端計算：`Math.floor((Date.now() - new Date(order.created_at).getTime()) / 86400000)`
+    - 超過 30 天才顯示，badge 樣式：`text-xs px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400`
+    - Dashboard 的「待處理採購」統計文字旁也顯示逾期筆數（若有）
+
+23. **商品 SKU 自動產生**：ProductForm 的 SKU 欄位右側（新增模式）加入「自動產生」小按鈕（`Zap` icon）：
+    - IPC：`products:nextSku(category: string)` → 查詢該分類所有 SKU，找出最大流水號，回傳 `PREFIX-XXXX` 格式
+    - 分類前綴對應表：電子產品→`ELEC`、電腦周邊→`PERI`、文具→`STAT`、包裝材料→`PKG`、其他→`MISC`；不在表中的分類取前 4 字母大寫
+    - 流水號為 4 位數字（0001 起），取同分類最大值 +1，首次為 0001
+    - 點擊後以 mutation 呼叫 IPC，取回值後直接 `setValue('sku', result)` 填入欄位

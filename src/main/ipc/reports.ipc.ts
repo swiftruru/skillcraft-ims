@@ -86,8 +86,21 @@ export function registerReportsIpc(): void {
     }
   })
 
-  ipcMain.handle('reports:salesTrend', (_e, days = 30) => {
+  ipcMain.handle('reports:salesTrend', (_e, days = 30, dateFrom?: string, dateTo?: string) => {
     const db = getDb()
+    if (dateFrom && dateTo) {
+      return db
+        .prepare(
+          `SELECT order_date as date,
+                  COALESCE(SUM(total_amount), 0) as revenue,
+                  COUNT(*) as orders
+           FROM sales_orders
+           WHERE status = 'completed' AND order_date BETWEEN ? AND ?
+           GROUP BY order_date
+           ORDER BY order_date ASC`
+        )
+        .all(dateFrom, dateTo)
+    }
     return db
       .prepare(
         `SELECT order_date as date,
@@ -116,8 +129,24 @@ export function registerReportsIpc(): void {
       .all()
   })
 
-  ipcMain.handle('reports:topProducts', (_e, days = 30) => {
+  ipcMain.handle('reports:topProducts', (_e, days = 30, dateFrom?: string, dateTo?: string) => {
     const db = getDb()
+    if (dateFrom && dateTo) {
+      return db
+        .prepare(
+          `SELECT p.id as product_id, p.sku, p.name, p.category,
+                  SUM(si.quantity) as total_quantity,
+                  ROUND(SUM(si.quantity * si.unit_price), 2) as total_revenue
+           FROM sale_items si
+           JOIN products p ON si.product_id = p.id
+           JOIN sales_orders so ON si.sales_order_id = so.id
+           WHERE so.status = 'completed' AND so.order_date BETWEEN ? AND ?
+           GROUP BY p.id
+           ORDER BY total_revenue DESC
+           LIMIT 10`
+        )
+        .all(dateFrom, dateTo)
+    }
     return db
       .prepare(
         `SELECT p.id as product_id, p.sku, p.name, p.category,
@@ -227,8 +256,34 @@ export function registerReportsIpc(): void {
       .all(days, days)
   })
 
-  ipcMain.handle('reports:purchaseVsSales', (_e, days: number = 30) => {
+  ipcMain.handle('reports:purchaseVsSales', (_e, days: number = 30, dateFrom?: string, dateTo?: string) => {
     const db = getDb()
+    if (dateFrom && dateTo) {
+      return db
+        .prepare(
+          `SELECT date_series.date,
+                  COALESCE(p.purchase_amount, 0) as purchase_amount,
+                  COALESCE(s.sales_amount, 0) as sales_amount
+           FROM (
+             SELECT order_date as date FROM purchase_orders WHERE order_date BETWEEN ? AND ?
+             UNION
+             SELECT order_date as date FROM sales_orders WHERE order_date BETWEEN ? AND ?
+           ) date_series
+           LEFT JOIN (
+             SELECT order_date, COALESCE(SUM(total_amount), 0) as purchase_amount
+             FROM purchase_orders WHERE status = 'received' AND order_date BETWEEN ? AND ?
+             GROUP BY order_date
+           ) p ON p.order_date = date_series.date
+           LEFT JOIN (
+             SELECT order_date, COALESCE(SUM(total_amount), 0) as sales_amount
+             FROM sales_orders WHERE status = 'completed' AND order_date BETWEEN ? AND ?
+             GROUP BY order_date
+           ) s ON s.order_date = date_series.date
+           GROUP BY date_series.date
+           ORDER BY date_series.date ASC`
+        )
+        .all(dateFrom, dateTo, dateFrom, dateTo, dateFrom, dateTo, dateFrom, dateTo)
+    }
     return db
       .prepare(
         `SELECT date_series.date,

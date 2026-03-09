@@ -40,7 +40,14 @@ export default function Reports() {
   const now = new Date()
   const [pdfYear, setPdfYear] = useState(now.getFullYear())
   const [pdfMonth, setPdfMonth] = useState(now.getMonth() + 1)
-  const trendDays = getDaysForPeriod(period)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const trendDays = period === 'custom' && dateFrom && dateTo
+    ? Math.ceil((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / 86400000) + 1
+    : getDaysForPeriod(period)
+  const customDates = period === 'custom' && dateFrom && dateTo
+    ? { dateFrom, dateTo }
+    : undefined
 
   const PERIODS = [
     { label: r.period7, value: '7' },
@@ -49,19 +56,20 @@ export default function Reports() {
     { label: r.lastMonth, value: 'last-month' },
     { label: r.thisQuarter, value: 'this-quarter' },
     { label: r.period90, value: '90' },
+    { label: '自訂', value: 'custom' },
   ]
 
   const { data: trend, isLoading: trendLoading } = useQuery<SalesTrendPoint[]>({
-    queryKey: ['reports', 'salesTrend', trendDays],
-    queryFn: () => window.electronAPI.reports.salesTrend(trendDays)
+    queryKey: ['reports', 'salesTrend', trendDays, customDates],
+    queryFn: () => window.electronAPI.reports.salesTrend(trendDays, customDates?.dateFrom, customDates?.dateTo)
   })
   const { data: categories } = useQuery<InventoryByCategory[]>({
     queryKey: ['reports', 'inventoryByCategory'],
     queryFn: () => window.electronAPI.reports.inventoryByCategory()
   })
   const { data: topProducts } = useQuery<TopProduct[]>({
-    queryKey: ['reports', 'topProducts', trendDays],
-    queryFn: () => window.electronAPI.reports.topProducts(trendDays)
+    queryKey: ['reports', 'topProducts', trendDays, customDates],
+    queryFn: () => window.electronAPI.reports.topProducts(trendDays, customDates?.dateFrom, customDates?.dateTo)
   })
   const { data: lowStock } = useQuery<LowStockItem[]>({
     queryKey: ['reports', 'lowStock'],
@@ -98,8 +106,8 @@ export default function Reports() {
     staleTime: 1000 * 60 * 5
   })
   const { data: purchaseVsSales } = useQuery<PurchaseVsSalesPoint[]>({
-    queryKey: ['reports', 'purchaseVsSales', trendDays],
-    queryFn: () => window.electronAPI.reports.purchaseVsSales(trendDays),
+    queryKey: ['reports', 'purchaseVsSales', trendDays, customDates],
+    queryFn: () => window.electronAPI.reports.purchaseVsSales(trendDays, customDates?.dateFrom, customDates?.dateTo),
     staleTime: 1000 * 60 * 5
   })
 
@@ -154,6 +162,27 @@ export default function Reports() {
           ))}
         </div>
       </div>
+      {period === 'custom' && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>自訂範圍：</span>
+          <input
+            type="date"
+            className="bg-background border border-border rounded px-2 py-1 text-xs w-36"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+          />
+          <span>～</span>
+          <input
+            type="date"
+            className="bg-background border border-border rounded px-2 py-1 text-xs w-36"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+          />
+          {dateFrom && dateTo && (
+            <span className="text-foreground font-medium">{dateFrom} ~ {dateTo}</span>
+          )}
+        </div>
+      )}
 
       {/* Sales Trend */}
       <Card>

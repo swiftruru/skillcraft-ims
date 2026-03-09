@@ -10,7 +10,7 @@ function generateOrderNo(): string {
 }
 
 export const SaleModel = {
-  findAll(filters?: { status?: string; search?: string }): SalesOrder[] {
+  findAll(filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }): SalesOrder[] {
     const db = getDb()
     let query = `
       SELECT so.*, c.name as customer_name
@@ -26,6 +26,14 @@ export const SaleModel = {
     if (filters?.search) {
       query += ' AND (so.order_no LIKE ? OR c.name LIKE ? OR so.notes LIKE ?)'
       params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`)
+    }
+    if (filters?.dateFrom) {
+      query += ' AND so.order_date >= ?'
+      params.push(filters.dateFrom)
+    }
+    if (filters?.dateTo) {
+      query += ' AND so.order_date <= ?'
+      params.push(filters.dateTo)
     }
     query += ' ORDER BY so.created_at DESC'
     return db.prepare(query).all(...params) as SalesOrder[]

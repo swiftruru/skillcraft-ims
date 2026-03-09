@@ -10,7 +10,7 @@ function generateOrderNo(): string {
 }
 
 export const PurchaseModel = {
-  findAll(filters?: { status?: string; search?: string }): PurchaseOrder[] {
+  findAll(filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }): PurchaseOrder[] {
     const db = getDb()
     let query = `
       SELECT po.*, s.name as supplier_name
@@ -26,6 +26,14 @@ export const PurchaseModel = {
     if (filters?.search) {
       query += ' AND (po.order_no LIKE ? OR s.name LIKE ? OR po.notes LIKE ?)'
       params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`)
+    }
+    if (filters?.dateFrom) {
+      query += ' AND po.order_date >= ?'
+      params.push(filters.dateFrom)
+    }
+    if (filters?.dateTo) {
+      query += ' AND po.order_date <= ?'
+      params.push(filters.dateTo)
     }
     query += ' ORDER BY po.created_at DESC'
     return db.prepare(query).all(...params) as PurchaseOrder[]

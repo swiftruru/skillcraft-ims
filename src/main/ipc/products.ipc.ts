@@ -61,6 +61,22 @@ export function registerProductsIpc(): void {
       .all(productId)
   })
 
+  ipcMain.handle('products:nextSku', (_e, category: string) => {
+    const db = getDb()
+    const prefixMap: Record<string, string> = {
+      '電子產品': 'ELEC',
+      '電腦周邊': 'PERI',
+      '文具': 'STAT',
+      '包裝材料': 'PKG',
+    }
+    const prefix = prefixMap[category] ?? 'MISC'
+    const row = db
+      .prepare(`SELECT COUNT(*) as cnt FROM products WHERE sku LIKE ?`)
+      .get(`${prefix}-%`) as { cnt: number }
+    const next = String(row.cnt + 1).padStart(4, '0')
+    return `${prefix}-${next}`
+  })
+
   ipcMain.handle('products:batchUpdate', (_e, ids: number[], data: { category?: string }) => {
     const db = getDb()
     if (!ids.length) return { updated: 0 }

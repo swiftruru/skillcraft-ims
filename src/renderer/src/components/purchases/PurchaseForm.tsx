@@ -1,4 +1,5 @@
 
+import { useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -29,7 +30,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-export function PurchaseForm({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolean; onOpenChange: (v: boolean) => void; initialData?: Partial<FormValues> }) {
   const queryClient = useQueryClient()
 
   const { data: suppliers } = useQuery<Supplier[]>({
@@ -58,6 +59,20 @@ export function PurchaseForm({ open, onOpenChange }: { open: boolean; onOpenChan
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+
+  // Pre-fill when cloning
+  useEffect(() => {
+    if (open && initialData) {
+      reset({
+        supplier_id: initialData.supplier_id ?? null,
+        order_date: today,
+        notes: initialData.notes ?? '',
+        items: initialData.items?.length ? initialData.items : [{ product_id: 0, quantity: 1, unit_price: 0 }]
+      })
+    } else if (!open) {
+      reset({ supplier_id: null, order_date: today, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] })
+    }
+  }, [open, initialData])
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => window.electronAPI.purchases.create(data),

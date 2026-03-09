@@ -18,6 +18,7 @@ declare global {
         batchDelete(ids: number[]): Promise<{ deleted: number; skipped: number }>
         batchUpdate(ids: number[], data: { category?: string }): Promise<{ updated: number }>
         getPriceHistory(productId: number): Promise<import('./schema').PriceHistoryItem[]>
+        nextSku(category: string): Promise<string>
       }
       suppliers: {
         getAll(search?: string): Promise<import('./schema').Supplier[]>
@@ -36,7 +37,7 @@ declare global {
         getOrders(customerId: number): Promise<import('./schema').SalesOrder[]>
       }
       purchases: {
-        getAll(filters?: { status?: string; search?: string }): Promise<import('./schema').PurchaseOrder[]>
+        getAll(filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }): Promise<import('./schema').PurchaseOrder[]>
         getById(id: number): Promise<import('./schema').PurchaseOrder | null>
         create(data: unknown): Promise<import('./schema').PurchaseOrder>
         receive(id: number): Promise<import('./schema').PurchaseOrder | null>
@@ -45,7 +46,7 @@ declare global {
         delete(id: number): Promise<boolean>
       }
       sales: {
-        getAll(filters?: { status?: string; search?: string }): Promise<import('./schema').SalesOrder[]>
+        getAll(filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }): Promise<import('./schema').SalesOrder[]>
         getById(id: number): Promise<import('./schema').SalesOrder | null>
         create(data: unknown): Promise<import('./schema').SalesOrder>
         complete(id: number): Promise<{ success: boolean; data?: import('./schema').SalesOrder; error?: string }>
@@ -55,16 +56,16 @@ declare global {
       }
       reports: {
         kpis(): Promise<import('./schema').DashboardKPIs>
-        salesTrend(days?: number): Promise<import('./schema').SalesTrendPoint[]>
+        salesTrend(days?: number, dateFrom?: string, dateTo?: string): Promise<import('./schema').SalesTrendPoint[]>
         inventoryByCategory(): Promise<import('./schema').InventoryByCategory[]>
-        topProducts(days?: number): Promise<import('./schema').TopProduct[]>
+        topProducts(days?: number, dateFrom?: string, dateTo?: string): Promise<import('./schema').TopProduct[]>
         lowStock(): Promise<import('./schema').LowStockItem[]>
         marginAnalysis(): Promise<import('./schema').MarginItem[]>
         supplierStats(): Promise<import('./schema').SupplierStat[]>
         customerStats(): Promise<import('./schema').CustomerStat[]>
         slowMoving(days?: number): Promise<import('./schema').SlowMovingItem[]>
         topCustomers(): Promise<import('./schema').TopCustomerItem[]>
-        purchaseVsSales(days?: number): Promise<import('./schema').PurchaseVsSalesPoint[]>
+        purchaseVsSales(days?: number, dateFrom?: string, dateTo?: string): Promise<import('./schema').PurchaseVsSalesPoint[]>
         turnoverAnalysis(days?: number): Promise<import('./schema').TurnoverItem[]>
       }
       sync: {

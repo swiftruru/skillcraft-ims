@@ -64,3 +64,10 @@ description: 當使用者要求新增或修改 Dashboard、KPI 卡片、圖表�
    - 回傳欄位：`id, name, sku, category, stock_qty, buy_price, updated_at, days_idle, stock_value`
    - queryKey：`['reports', 'slowMoving', days]`，`staleTime: 1000 * 60 * 5`
    - UI 在 Reports 頁面以獨立卡片呈現；天數切換 30/60/90 按鈕（`variant="outline" size="sm"`）；顯示商品名稱、SKU、庫存、庫存價值、最後異動天數；天數越長顯示越深的警示色（30天→黃色，60天→橘色，90天→紅色）
+
+16. **報表自訂日期範圍**：Reports 頁面「期間選擇」新增「自訂」選項：
+    - 點選「自訂」後，在按鈕列下方顯示 `dateFrom` / `dateTo` 兩個 `<Input type="date">` 輸入框（inline，寬度 `w-36`）
+    - `period` state 值為 `'custom'`；`trendDays` 當 `period === 'custom'` 時計算為 `Math.ceil((new Date(dateTo) - new Date(dateFrom)) / 86400000) + 1`
+    - IPC `reports:salesTrend`、`reports:purchaseVsSales`、`reports:topProducts` 新增 `dateFrom?: string; dateTo?: string` 可選參數：若提供則 SQL 改為 `WHERE order_date BETWEEN ? AND ?`，否則沿用原 `days` 邏輯
+    - queryKey 加入 `{ dateFrom, dateTo }` 以精確快取
+    - 已設定自訂範圍時，period 按鈕列顯示「自訂: {dateFrom} ~ {dateTo}」文字提示

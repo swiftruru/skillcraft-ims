@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -24,7 +25,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-export function SaleForm({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; onOpenChange: (v: boolean) => void; initialData?: Partial<FormValues> }) {
   const queryClient = useQueryClient()
   const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', 'all'], queryFn: () => window.electronAPI.customers.getAll() })
   const { data: products } = useQuery<Product[]>({ queryKey: ['products', 'all'], queryFn: () => window.electronAPI.products.getAll() })
@@ -36,6 +37,20 @@ export function SaleForm({ open, onOpenChange }: { open: boolean; onOpenChange: 
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+
+  // Pre-fill when cloning
+  useEffect(() => {
+    if (open && initialData) {
+      reset({
+        customer_id: initialData.customer_id ?? null,
+        order_date: today,
+        notes: initialData.notes ?? '',
+        items: initialData.items?.length ? initialData.items : [{ product_id: 0, quantity: 1, unit_price: 0 }]
+      })
+    } else if (!open) {
+      reset({ customer_id: null, order_date: today, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] })
+    }
+  }, [open, initialData])
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => window.electronAPI.sales.create(data),

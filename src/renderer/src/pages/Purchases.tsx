@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2 } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable, type Column } from '@/components/common/DataTable'
@@ -38,10 +38,17 @@ export default function Purchases() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [cloneData, setCloneData] = useState<Record<string, unknown> | null>(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
-    queryKey: ['purchases', 'all', search],
-    queryFn: () => window.electronAPI.purchases.getAll({ search: search || undefined })
+    queryKey: ['purchases', 'all', search, dateFrom, dateTo],
+    queryFn: () => window.electronAPI.purchases.getAll({
+      search: search || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined
+    })
   })
 
   const receiveMutation = useMutation({
@@ -77,6 +84,18 @@ export default function Purchases() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['purchases'] })
   })
 
+  const handleClone = async (id: number) => {
+    const order = await window.electronAPI.purchases.getById(id)
+    if (order) {
+      setCloneData({
+        supplier_id: order.supplier_id,
+        notes: order.notes ?? '',
+        items: (order.items ?? []).map((i) => ({ product_id: i.product_id, quantity: i.quantity, unit_price: i.unit_price }))
+      })
+      setFormOpen(true)
+    }
+  }
+
   const columns: Column<PurchaseOrder>[] = [
     { key: 'order_no', label: p.orderNo, sortable: true, className: 'font-mono text-xs w-36' },
     { key: 'supplier_name', label: p.supplier, sortable: true },
@@ -85,11 +104,20 @@ export default function Purchases() {
       key: 'status',
       label: t.common.status,
       sortable: true,
-      render: (v) => (
-        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(String(v))}`}>
-          {getStatusLabel(String(v))}
-        </span>
-      )
+      render: (v, row) => {
+        const isOverdue = v === 'pending' &&
+          Math.floor((Date.now() - new Date(String(row.created_at)).getTime()) / 86400000) > 30
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(String(v))}`}>
+              {getStatusLabel(String(v))}
+            </span>
+            {isOverdue && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-400">逾期</span>
+            )}
+          </div>
+        )
+      }
     },
     {
       key: 'total_amount',
@@ -106,6 +134,13 @@ export default function Purchases() {
         <div className="flex justify-end gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailId(row.id)}>
             <Eye className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            title="複製訂單"
+            onClick={() => handleClone(row.id as number)}
+          >
+            <Copy className="w-3.5 h-3.5" />
           </Button>
           <Button
             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"
@@ -174,11 +209,16 @@ export default function Purchases() {
           </Button>
         </div>
       )}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder={p.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <Input type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title="開始日期" />
+        <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title="結束日期" />
+        {(dateFrom || dateTo) && (
+          <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => { setDateFrom(''); setDateTo('') }}>清除</button>
+        )}
         <Button
           variant="outline" className="gap-2" disabled={exporting}
           onClick={async () => { setExporting(true); await window.electronAPI.export.purchases(); setExporting(false) }}
@@ -205,7 +245,7 @@ export default function Purchases() {
         )}
       </div>
 
-      <PurchaseForm open={formOpen} onOpenChange={setFormOpen} />
+      <PurchaseForm open={formOpen} onOpenChange={(o) => { setFormOpen(o); if (!o) setCloneData(null) }} initialData={cloneData ?? undefined} />
       {detailId !== null && (
         <PurchaseDetail id={detailId} open={detailId !== null} onOpenChange={(open) => !open && setDetailId(null)} />
       )}

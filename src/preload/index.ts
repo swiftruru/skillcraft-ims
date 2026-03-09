@@ -20,7 +20,8 @@ const electronAPI = {
       ipcRenderer.invoke('products:getAllAdjustments', filters),
     batchDelete: (ids: number[]) => ipcRenderer.invoke('products:batchDelete', ids),
     batchUpdate: (ids: number[], data: { category?: string }) => ipcRenderer.invoke('products:batchUpdate', ids, data),
-    getPriceHistory: (productId: number) => ipcRenderer.invoke('products:getPriceHistory', productId)
+    getPriceHistory: (productId: number) => ipcRenderer.invoke('products:getPriceHistory', productId),
+    nextSku: (category: string) => ipcRenderer.invoke('products:nextSku', category)
   },
 
   // Suppliers
@@ -45,7 +46,7 @@ const electronAPI = {
 
   // Purchases
   purchases: {
-    getAll: (filters?: { status?: string; search?: string }) =>
+    getAll: (filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }) =>
       ipcRenderer.invoke('purchases:getAll', filters),
     getById: (id: number) => ipcRenderer.invoke('purchases:getById', id),
     create: (data: unknown) => ipcRenderer.invoke('purchases:create', data),
@@ -57,7 +58,7 @@ const electronAPI = {
 
   // Sales
   sales: {
-    getAll: (filters?: { status?: string; search?: string }) =>
+    getAll: (filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }) =>
       ipcRenderer.invoke('sales:getAll', filters),
     getById: (id: number) => ipcRenderer.invoke('sales:getById', id),
     create: (data: unknown) => ipcRenderer.invoke('sales:create', data),
@@ -70,16 +71,16 @@ const electronAPI = {
   // Reports
   reports: {
     kpis: () => ipcRenderer.invoke('reports:kpis'),
-    salesTrend: (days?: number) => ipcRenderer.invoke('reports:salesTrend', days),
+    salesTrend: (days?: number, dateFrom?: string, dateTo?: string) => ipcRenderer.invoke('reports:salesTrend', days, dateFrom, dateTo),
     inventoryByCategory: () => ipcRenderer.invoke('reports:inventoryByCategory'),
-    topProducts: (days?: number) => ipcRenderer.invoke('reports:topProducts', days),
+    topProducts: (days?: number, dateFrom?: string, dateTo?: string) => ipcRenderer.invoke('reports:topProducts', days, dateFrom, dateTo),
     lowStock: () => ipcRenderer.invoke('reports:lowStock'),
     marginAnalysis: () => ipcRenderer.invoke('reports:marginAnalysis'),
     supplierStats: () => ipcRenderer.invoke('reports:supplierStats'),
     customerStats: () => ipcRenderer.invoke('reports:customerStats'),
     slowMoving: (days?: number) => ipcRenderer.invoke('reports:slowMoving', days),
     topCustomers: () => ipcRenderer.invoke('reports:topCustomers'),
-    purchaseVsSales: (days?: number) => ipcRenderer.invoke('reports:purchaseVsSales', days),
+    purchaseVsSales: (days?: number, dateFrom?: string, dateTo?: string) => ipcRenderer.invoke('reports:purchaseVsSales', days, dateFrom, dateTo),
     turnoverAnalysis: (days?: number) => ipcRenderer.invoke('reports:turnoverAnalysis', days)
   },
 

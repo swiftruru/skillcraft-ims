@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2 } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable, type Column } from '@/components/common/DataTable'
@@ -37,10 +37,17 @@ export default function Sales() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [cloneData, setCloneData] = useState<Record<string, unknown> | null>(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const { data: orders, isLoading } = useQuery<SalesOrder[]>({
-    queryKey: ['sales', 'all', search],
-    queryFn: () => window.electronAPI.sales.getAll({ search: search || undefined })
+    queryKey: ['sales', 'all', search, dateFrom, dateTo],
+    queryFn: () => window.electronAPI.sales.getAll({
+      search: search || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined
+    })
   })
 
   const completeMutation = useMutation({
@@ -80,6 +87,18 @@ export default function Sales() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sales'] })
   })
 
+  const handleClone = async (id: number) => {
+    const order = await window.electronAPI.sales.getById(id)
+    if (order) {
+      setCloneData({
+        customer_id: order.customer_id,
+        notes: order.notes ?? '',
+        items: (order.items ?? []).map((i) => ({ product_id: i.product_id, quantity: i.quantity, unit_price: i.unit_price }))
+      })
+      setFormOpen(true)
+    }
+  }
+
   const columns: Column<SalesOrder>[] = [
     { key: 'order_no', label: s.orderNo, sortable: true, className: 'font-mono text-xs w-36' },
     { key: 'customer_name', label: s.customer, sortable: true },
@@ -109,6 +128,13 @@ export default function Sales() {
         <div className="flex justify-end gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailId(row.id)}>
             <Eye className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            title="複製訂單"
+            onClick={() => handleClone(row.id as number)}
+          >
+            <Copy className="w-3.5 h-3.5" />
           </Button>
           <Button
             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"
@@ -178,11 +204,16 @@ export default function Sales() {
         </div>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder={s.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <Input type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title="開始日期" />
+        <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title="結束日期" />
+        {(dateFrom || dateTo) && (
+          <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => { setDateFrom(''); setDateTo('') }}>清除</button>
+        )}
         <Button
           variant="outline" className="gap-2" disabled={exporting}
           onClick={async () => { setExporting(true); await window.electronAPI.export.sales(); setExporting(false) }}
@@ -209,7 +240,7 @@ export default function Sales() {
         )}
       </div>
 
-      <SaleForm open={formOpen} onOpenChange={setFormOpen} />
+      <SaleForm open={formOpen} onOpenChange={(o) => { setFormOpen(o); if (!o) setCloneData(null) }} initialData={cloneData ?? undefined} />
       {detailId !== null && (
         <SaleDetail id={detailId} open={detailId !== null} onOpenChange={(open) => !open && setDetailId(null)} />
       )}

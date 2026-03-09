@@ -139,7 +139,26 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="sku">SKU *</Label>
-              <Input id="sku" {...register('sku')} placeholder="ELEC-001" disabled={isEdit} />
+              <div className="flex gap-2">
+                <Input id="sku" {...register('sku')} placeholder="ELEC-001" disabled={isEdit} className="flex-1" />
+                {!isEdit && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    title="自動產生 SKU"
+                    onClick={async () => {
+                      const category = watch('category')
+                      if (!category) return
+                      const sku = await window.electronAPI.products.nextSku(category)
+                      setValue('sku', sku)
+                    }}
+                  >
+                    <Wand2 className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+              </div>
               {errors.sku && <p className="text-xs text-destructive">{errors.sku.message}</p>}
             </div>
             <div className="space-y-1.5">
