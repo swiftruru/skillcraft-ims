@@ -203,6 +203,30 @@ export function registerReportsIpc(): void {
       .all(days)
   })
 
+  ipcMain.handle('reports:turnoverAnalysis', (_e, days: number = 30) => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT p.id as product_id, p.sku, p.name, p.category,
+                p.stock_qty,
+                COALESCE(SUM(si.quantity), 0) as sold_qty,
+                ROUND(COALESCE(SUM(si.quantity), 0) * 1.0 / NULLIF(p.stock_qty, 0), 2) as turnover_rate,
+                CASE
+                  WHEN COALESCE(SUM(si.quantity), 0) = 0 THEN NULL
+                  ELSE ROUND(p.stock_qty * ? * 1.0 / SUM(si.quantity))
+                END as days_to_sell
+         FROM products p
+         LEFT JOIN sale_items si ON si.product_id = p.id
+         LEFT JOIN sales_orders so ON si.sales_order_id = so.id
+           AND so.status = 'completed'
+           AND so.order_date >= date('now', '-' || ? || ' days')
+         WHERE p.stock_qty > 0
+         GROUP BY p.id
+         ORDER BY turnover_rate DESC NULLS LAST`
+      )
+      .all(days, days)
+  })
+
   ipcMain.handle('reports:purchaseVsSales', (_e, days: number = 30) => {
     const db = getDb()
     return db

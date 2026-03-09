@@ -3,6 +3,35 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import type { PurchaseOrder } from '@/types/schema'
+import { CheckCircle2, Circle, XCircle } from 'lucide-react'
+
+interface TimelineStep { label: string; date: string | null; done: boolean; cancelled?: boolean }
+
+function OrderTimeline({ steps }: { steps: TimelineStep[] }) {
+  return (
+    <div className="flex items-start gap-0 pt-3 pb-1">
+      {steps.map((step, i) => (
+        <div key={i} className="flex items-center flex-1 min-w-0">
+          <div className="flex flex-col items-center shrink-0">
+            {step.cancelled
+              ? <XCircle className="w-4 h-4 text-destructive" />
+              : step.done
+                ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                : <Circle className="w-4 h-4 text-muted-foreground/40" />
+            }
+            <span className={`text-xs mt-1 whitespace-nowrap ${step.cancelled ? 'text-destructive' : step.done ? 'text-foreground' : 'text-muted-foreground/50'}`}>
+              {step.label}
+            </span>
+            {step.date && <span className="text-[10px] text-muted-foreground mt-0.5">{step.date}</span>}
+          </div>
+          {i < steps.length - 1 && (
+            <div className={`h-px flex-1 mx-1 mb-5 ${steps[i + 1].done || steps[i + 1].cancelled ? 'bg-green-500/50' : 'bg-border'}`} />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export function PurchaseDetail({
   id,
@@ -82,6 +111,17 @@ export function PurchaseDetail({
         ) : (
           <p className="text-center text-muted-foreground py-8">找不到此採購單</p>
         )}
+        {order && (() => {
+          const isCancelled = order.status === 'cancelled'
+          const isReturned = order.status === 'returned'
+          const isReceived = order.status === 'received' || isReturned
+          const steps: TimelineStep[] = [
+            { label: '建立', date: formatDate(order.created_at), done: true },
+            { label: isCancelled ? '已取消' : '收貨', date: isReceived ? formatDate(order.receive_date ?? '') : isCancelled ? null : null, done: isReceived, cancelled: isCancelled },
+            ...(isReturned ? [{ label: '已退貨', date: null, done: true, cancelled: true }] : [])
+          ]
+          return <div className="border-t border-border pt-3 mt-1"><OrderTimeline steps={steps} /></div>
+        })()}
       </DialogContent>
     </Dialog>
   )

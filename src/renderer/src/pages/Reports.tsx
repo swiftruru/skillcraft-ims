@@ -9,7 +9,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts'
-import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat, SlowMovingItem, TopCustomerItem, PurchaseVsSalesPoint } from '@/types/schema'
+import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat, SlowMovingItem, TopCustomerItem, PurchaseVsSalesPoint, TurnoverItem } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
@@ -35,6 +35,7 @@ export default function Reports() {
   const r = t.reports
   const [period, setPeriod] = useState('30')
   const [slowDays, setSlowDays] = useState(60)
+  const [turnoverDays, setTurnoverDays] = useState(30)
   const [pdfExporting, setPdfExporting] = useState(false)
   const now = new Date()
   const [pdfYear, setPdfYear] = useState(now.getFullYear())
@@ -89,6 +90,11 @@ export default function Reports() {
   const { data: topCustomers } = useQuery<TopCustomerItem[]>({
     queryKey: ['reports', 'topCustomers'],
     queryFn: () => window.electronAPI.reports.topCustomers(),
+    staleTime: 1000 * 60 * 5
+  })
+  const { data: turnover } = useQuery<TurnoverItem[]>({
+    queryKey: ['reports', 'turnoverAnalysis', turnoverDays],
+    queryFn: () => window.electronAPI.reports.turnoverAnalysis(turnoverDays),
     staleTime: 1000 * 60 * 5
   })
   const { data: purchaseVsSales } = useQuery<PurchaseVsSalesPoint[]>({
@@ -455,6 +461,79 @@ export default function Reports() {
             </div>
           ) : (
             <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">{r.noData}</div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Inventory Turnover Analysis */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">庫存週轉率分析</CardTitle>
+            <div className="flex gap-1">
+              {[7, 30, 90].map((d) => (
+                <Button
+                  key={d}
+                  variant={turnoverDays === d ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setTurnoverDays(d)}
+                >
+                  {d} 天
+                </Button>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            過去 {turnoverDays} 天銷售速度，預估現有庫存可售天數
+          </p>
+        </CardHeader>
+        <CardContent>
+          {!turnover || turnover.length === 0 ? (
+            <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">暫無資料</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs text-muted-foreground">
+                    <th className="text-left px-3 py-2 font-medium">商品名稱</th>
+                    <th className="text-left px-3 py-2 font-medium font-mono">SKU</th>
+                    <th className="text-left px-3 py-2 font-medium">{t.products.category}</th>
+                    <th className="text-right px-3 py-2 font-medium">庫存</th>
+                    <th className="text-right px-3 py-2 font-medium">已售出</th>
+                    <th className="text-right px-3 py-2 font-medium">週轉率</th>
+                    <th className="text-right px-3 py-2 font-medium">預估售完</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {turnover.map((item) => {
+                    const dts = item.days_to_sell
+                    const dtsColor = dts === null
+                      ? 'text-muted-foreground'
+                      : dts <= 7
+                        ? 'text-destructive font-semibold'
+                        : dts <= 30
+                          ? 'text-yellow-400 font-semibold'
+                          : 'text-muted-foreground'
+                    return (
+                      <tr key={item.product_id} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium">{item.name}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{item.sku}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{item.category}</td>
+                        <td className="px-3 py-2 text-right">{formatNumber(item.stock_qty)}</td>
+                        <td className="px-3 py-2 text-right">{formatNumber(item.sold_qty)}</td>
+                        <td className="px-3 py-2 text-right text-blue-400">
+                          {item.turnover_rate !== null ? item.turnover_rate.toFixed(2) : '—'}
+                        </td>
+                        <td className={`px-3 py-2 text-right tabular-nums ${dtsColor}`}>
+                          {dts !== null ? `${dts} 天` : '無銷售'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

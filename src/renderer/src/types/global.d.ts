@@ -64,6 +64,7 @@ declare global {
         slowMoving(days?: number): Promise<import('./schema').SlowMovingItem[]>
         topCustomers(): Promise<import('./schema').TopCustomerItem[]>
         purchaseVsSales(days?: number): Promise<import('./schema').PurchaseVsSalesPoint[]>
+        turnoverAnalysis(days?: number): Promise<import('./schema').TurnoverItem[]>
       }
       sync: {
         trigger(direction: 'push' | 'pull' | 'bidirectional'): Promise<{ success: boolean; recordsSynced?: number; error?: string }>

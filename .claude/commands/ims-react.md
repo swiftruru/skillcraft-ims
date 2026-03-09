@@ -35,6 +35,7 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
    - 快捷鍵列表以 `grid grid-cols-2 gap-2` 排列，每項顯示 label + `<kbd>` badge（`font-mono text-xs border rounded px-1.5`）
    - 已知快捷鍵：`⌘K` 全域搜尋、`?` 快捷鍵說明、`Esc` 關閉、`N` 新增採購單（在 /purchases 頁）、`N` 新增銷售單（在 /sales 頁）
    - open state 使用 Zustand store（`ui.store.ts`）的 `shortcutOpen` 欄位
+   - **G+key 路由導覽**：Layout keydown handler 支援兩鍵序列（`G` 後接指定鍵），用 `gMode: boolean` state 記錄等待第二鍵狀態，超過 1500ms 自動重置；對應路由：`G+H` → `/`、`G+P` → `/products`、`G+B` → `/purchases`、`G+S` → `/sales`、`G+R` → `/reports`、`G+,` → `/settings`；target 為 input/textarea/select 時忽略
 
 10. **DataTable 分頁**：DataTable 支援 `pageSize` prop（預設 15）；分頁狀態為元件內部 `useState(1)`；排序欄位變更時重置到第 1 頁；分頁列顯示「第 X / Y 頁」與上一頁／下一頁按鈕（`variant="outline" size="sm"`）；資料總筆數 ≤ pageSize 時不顯示分頁列。
 

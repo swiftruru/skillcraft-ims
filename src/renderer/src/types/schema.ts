@@ -291,6 +291,17 @@ export interface PriceHistoryItem {
   quantity: number
 }
 
+export interface TurnoverItem {
+  product_id: number
+  sku: string
+  name: string
+  category: string
+  stock_qty: number
+  sold_qty: number
+  turnover_rate: number | null
+  days_to_sell: number | null
+}
+
 export interface PurchaseVsSalesPoint {
   date: string
   purchase_amount: number

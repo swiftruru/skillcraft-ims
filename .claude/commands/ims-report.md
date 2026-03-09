@@ -40,6 +40,19 @@ description: 當使用者要求新增或修改 Dashboard、KPI 卡片、圖表�
     - UI：`ProductDetailDialog` 新增「採購價格」tab，以 LineChart 顯示歷史單價趨勢；下方表格列出每筆明細（日期、訂單號、數量、單價）
     - 無採購記錄時顯示空白提示
 
+14. **庫存週轉率分析**：`reports:turnoverAnalysis(days?)` IPC 計算各商品的銷售速度與預估售完天數：
+    - SQL：JOIN `sale_items` + `sales_orders`（status='completed'，指定天數內）+ `products`，計算 `sold_qty`、`turnover_rate = sold_qty / NULLIF(stock_qty, 0)`、`days_to_sell = ROUND(stock_qty * days / NULLIF(sold_qty, 0))`
+    - 回傳欄位：`{ product_id, sku, name, category, stock_qty, sold_qty, turnover_rate, days_to_sell }`，僅回傳 `stock_qty > 0` 的商品，ORDER BY `turnover_rate DESC`
+    - queryKey：`['reports', 'turnoverAnalysis', days]`，`staleTime: 1000 * 60 * 5`；days 預設 30，可選 7/30/90
+    - UI：Reports 頁面新增「庫存週轉率」卡片，顯示表格；`days_to_sell <= 7` 顯示 `text-destructive`（緊急補貨），7–30 顯示 `text-yellow-400`（留意），>30 顯示 `text-muted-foreground`；卡片右上角有 7/30/90 天切換按鈕
+    - type：`TurnoverItem { product_id, sku, name, category, stock_qty, sold_qty, turnover_rate, days_to_sell }`
+
+15. **訂單狀態時間軸**：`PurchaseDetail` 與 `SaleDetail` Dialog 底部新增狀態時間軸，以水平步驟條呈現訂單生命週期：
+    - 採購單步驟：建立（`created_at`）→ 收貨（`receive_date`）或 取消（`cancelled`）
+    - 銷售單步驟：建立（`created_at`）→ 完成（`order_date` + status=completed）或 取消
+    - 已完成步驟以實心圓點 + 綠色線條標示；當前/未完成步驟以空心圓點 + 灰色線條標示；取消狀態以紅色標示
+    - 日期格式使用 `formatDate`；component 不需新 IPC（使用 `getById` 已回傳的資料）
+
 13. **採購 vs 銷售對比圖**：`reports:purchaseVsSales(days?)` IPC 回傳雙軸時序資料：
     - SQL：左聯接採購（`purchase_orders` status='received'）與銷售（`sales_orders` status='completed'），依日期 GROUP BY，回傳 `{ date, purchase_amount, sales_amount }[]`
     - 參數 `days` 預設 30，queryKey 為 `['reports', 'purchaseVsSales', days]`，`staleTime: 1000 * 60 * 5`

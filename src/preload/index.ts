@@ -78,7 +78,8 @@ const electronAPI = {
     customerStats: () => ipcRenderer.invoke('reports:customerStats'),
     slowMoving: (days?: number) => ipcRenderer.invoke('reports:slowMoving', days),
     topCustomers: () => ipcRenderer.invoke('reports:topCustomers'),
-    purchaseVsSales: (days?: number) => ipcRenderer.invoke('reports:purchaseVsSales', days)
+    purchaseVsSales: (days?: number) => ipcRenderer.invoke('reports:purchaseVsSales', days),
+    turnoverAnalysis: (days?: number) => ipcRenderer.invoke('reports:turnoverAnalysis', days)
   },
 
   // Sync
