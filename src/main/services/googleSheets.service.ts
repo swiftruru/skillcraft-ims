@@ -31,7 +31,7 @@ export class GoogleSheetsService {
     })
     const existingSheets = spreadsheet.data.sheets?.map((s) => s.properties?.title) ?? []
 
-    const requiredSheets = ['Products', 'Purchase Orders', 'Sales Orders', 'Reports', '庫存異動', '盤點記錄']
+    const requiredSheets = ['商品', '採購單', '銷售單', '報表', '庫存異動', '盤點記錄']
     const toCreate = requiredSheets.filter((s) => !existingSheets.includes(s))
 
     if (toCreate.length > 0) {
@@ -47,10 +47,10 @@ export class GoogleSheetsService {
 
     // Set headers
     const headers: Record<string, string[][]> = {
-      Products: [['SKU', '商品名稱', '類別', '售價', '進價', '庫存', '補貨點', '單位', '說明', '更新時間']],
-      'Purchase Orders': [['訂單號', '供應商', '狀態', '訂單日期', '收貨日期', '金額', '備註']],
-      'Sales Orders': [['訂單號', '客戶', '狀態', '訂單日期', '金額', '備註']],
-      Reports: [['日期', '庫存總值', '低庫存商品數', '本月營收', '本月毛利']],
+      商品: [['SKU', '商品名稱', '類別', '售價', '進價', '庫存', '補貨點', '單位', '說明', '更新時間']],
+      採購單: [['訂單號', '供應商', '狀態', '訂單日期', '收貨日期', '金額', '備註']],
+      銷售單: [['訂單號', '客戶', '狀態', '訂單日期', '金額', '備註']],
+      報表: [['日期', '庫存總值', '低庫存商品數', '本月營收', '本月毛利']],
       庫存異動: [['時間', 'SKU', '商品名稱', '類別', '異動量', '原因', '備註', '操作者']],
       盤點記錄: [['盤點單號', '狀態', '建立時間', '完成時間', 'SKU', '商品名稱', '系統庫存', '盤點庫存', '差異', '備註']]
     }
@@ -71,14 +71,14 @@ export class GoogleSheetsService {
       p.sku, p.name, p.category, p.sell_price, p.buy_price,
       p.stock_qty, p.reorder_pt, p.unit, p.description ?? '', p.updated_at
     ])
-    await this.clearAndWrite('Products!A2', values)
+    await this.clearAndWrite('商品!A2', values)
   }
 
   async pullProducts(): Promise<Partial<Product>[]> {
     if (!this.sheets) throw new Error('未初始化')
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: 'Products!A2:J'
+      range: '商品!A2:J'
     })
     return (response.data.values ?? [])
       .filter((row) => row[0]) // skip empty rows
@@ -102,7 +102,7 @@ export class GoogleSheetsService {
       o.order_no, o.supplier_name ?? '', o.status,
       o.order_date, o.receive_date ?? '', o.total_amount, o.notes ?? ''
     ])
-    await this.clearAndWrite('Purchase Orders!A2', values)
+    await this.clearAndWrite('採購單!A2', values)
   }
 
   async pushSalesOrders(orders: SalesOrder[]): Promise<void> {
@@ -111,7 +111,7 @@ export class GoogleSheetsService {
       o.order_no, o.customer_name ?? '', o.status,
       o.order_date, o.total_amount, o.notes ?? ''
     ])
-    await this.clearAndWrite('Sales Orders!A2', values)
+    await this.clearAndWrite('銷售單!A2', values)
   }
 
   async pushInventoryAdjustments(adjustments: InventoryAdjustment[]): Promise<void> {
@@ -145,7 +145,7 @@ export class GoogleSheetsService {
     // Append to Reports sheet
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: 'Reports!A2',
+      range: '報表!A2',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
