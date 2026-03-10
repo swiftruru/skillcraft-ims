@@ -16,10 +16,28 @@ if (os.platform() !== 'darwin') {
 }
 
 const APP_NAME = 'SkillCraft IMS'
-const plistPath = path.join(
-  __dirname,
-  '../node_modules/electron/dist/Electron.app/Contents/Info.plist'
-)
+const distDir = path.join(__dirname, '../node_modules/electron/dist')
+const originalApp = path.join(distDir, 'Electron.app')
+const renamedApp = path.join(distDir, `${APP_NAME}.app`)
+const pathTxt = path.join(__dirname, '../node_modules/electron/path.txt')
+
+// Step 1: Rename Electron.app → SkillCraft IMS.app (Dock reads the folder name)
+if (fs.existsSync(originalApp)) {
+  fs.renameSync(originalApp, renamedApp)
+  console.log(`patch-electron-name: renamed Electron.app → "${APP_NAME}.app"`)
+} else if (!fs.existsSync(renamedApp)) {
+  console.log('patch-electron-name: Electron.app not found and renamed app not found, skipping.')
+  process.exit(0)
+}
+
+// Step 2: Update path.txt so the electron module finds the binary at the new location
+if (fs.existsSync(pathTxt)) {
+  const newPath = `${APP_NAME}.app/Contents/MacOS/Electron`
+  fs.writeFileSync(pathTxt, newPath, 'utf-8')
+  console.log(`patch-electron-name: updated path.txt → "${newPath}"`)
+}
+
+const plistPath = path.join(renamedApp, 'Contents/Info.plist')
 
 if (!fs.existsSync(plistPath)) {
   console.log('patch-electron-name: Info.plist not found, skipping.')
