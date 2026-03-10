@@ -71,3 +71,11 @@ if (!content.includes('<key>LSDisplayName</key>')) {
 
 fs.writeFileSync(plistPath, content, 'utf-8')
 console.log(`patch-electron-name: patched Info.plist → "${APP_NAME}"`)
+
+// Step 4: Replace electron.icns with our app icon so About panel and Dock show the correct icon
+const srcIcon = path.join(__dirname, '../resources/icon.icns')
+const destIcon = path.join(renamedApp, 'Contents/Resources/electron.icns')
+if (fs.existsSync(srcIcon)) {
+  fs.copyFileSync(srcIcon, destIcon)
+  console.log('patch-electron-name: replaced electron.icns with app icon')
+}
