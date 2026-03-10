@@ -11,6 +11,20 @@
 > 跨平台桌面進銷存管理系統，以 **Claude Code Skill 規範驅動開發**，整合 Google Sheets 雲端同步，
 > 展示「高等程式語言與軟體設計」課程三個核心方向的完整整合。
 
+## 截圖
+
+| Dashboard | 商品管理 |
+| --- | --- |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Products](docs/screenshots/products.png) |
+
+| Live Demo | UX Tour |
+| --- | --- |
+| ![Live Demo](docs/screenshots/live-demo.png) | ![UX Tour](docs/screenshots/ux-tour.png) |
+
+![Reports](docs/screenshots/reports.png)
+
+---
+
 ## 下載
 
 | 平台 | 下載連結 |
