@@ -12,7 +12,7 @@
     "package": "npm run build && electron-builder --config electron-builder.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
-    "postinstall": "electron-rebuild -f -w better-sqlite3"
+    "postinstall": "electron-rebuild -f -w better-sqlite3 && node scripts/patch-electron-name.js"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",
