@@ -115,7 +115,8 @@ function createWindow(): void {
     applicationName: 'SkillCraft IMS',
     applicationVersion: app.getVersion(),
     version: app.getVersion(),
-    copyright: '進銷存管理系統 — 高等程式語言與軟體設計期末專案'
+    copyright: '進銷存管理系統 — 高等程式語言與軟體設計期末專案',
+    iconPath: join(__dirname, '../../resources/icon.png')
   })
 }
 
