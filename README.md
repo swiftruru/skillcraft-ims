@@ -21,6 +21,10 @@
 | --- | --- |
 | ![Live Demo](docs/screenshots/live-demo.png) | ![UX Tour](docs/screenshots/ux-tour.png) |
 
+| Google Sheets 同步設定 | Demo 資料產生 |
+| --- | --- |
+| ![Settings Sheets](docs/screenshots/settings-sheets.png) | ![Settings Mock Data](docs/screenshots/settings-mockdata.png) |
+
 ![Reports](docs/screenshots/reports.png)
 
 ---
