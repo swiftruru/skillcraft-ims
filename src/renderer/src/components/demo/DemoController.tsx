@@ -58,13 +58,14 @@ export function DemoController() {
   const queryClient = useQueryClient()
   const { lang } = useLangStore()
   const {
-    isActive, currentStep, stepStatus, stepError, demoIds, collapsed,
+    isActive, currentStep, stepStatus, stepError, demoIds, collapsed, formOverlay,
     setStepStatus, advanceStep, setDemoIds, toggleCollapsed, endDemo,
     openFormOverlay, setFormSubmitting, closeFormOverlay, setSpotlight,
   } = useDemoStore()
 
   const isZh = lang === 'zh'
   const t = (obj: { zh: string; en: string }) => obj[lang]
+  const isWaitingSubmit = formOverlay?.waitingForSubmit ?? false
   const runningRef = useRef(false) // prevent concurrent runStep executions
 
   // Persist demoIds to localStorage so the next run can clean up
@@ -383,10 +384,18 @@ export function DemoController() {
               {stepStatus === 'error'   && <AlertCircle  className="w-3.5 h-3.5 text-red-400 shrink-0" />}
             </div>
             <span className="text-xs text-primary font-medium shrink-0">Live Demo</span>
-            {collapsed
-              ? <ChevronUp   className="w-4 h-4 text-muted-foreground shrink-0" />
-              : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-            }
+            {/* Collapse hint — only when form is waiting for submit and panel is open */}
+            {isWaitingSubmit && !collapsed && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-amber-400 animate-pulse shrink-0">
+                <ChevronUp className="w-3.5 h-3.5" />
+                {isZh ? '點此摺疊' : 'Collapse'}
+              </span>
+            )}
+            {(!isWaitingSubmit || collapsed) && (
+              collapsed
+                ? <ChevronUp   className="w-4 h-4 text-muted-foreground shrink-0" />
+                : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+            )}
           </div>
 
           {/* Expanded content */}
