@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
-import { mkdirSync } from 'fs'
+import { mkdirSync, existsSync } from 'fs'
 import initSchemaSql from './migrations/001_init_schema.sql?raw'
 import seedDataSql from './migrations/002_seed_data.sql?raw'
 import inventoryAdjustmentsSql from './migrations/003_inventory_adjustments.sql?raw'
@@ -35,7 +35,33 @@ export async function initDatabase(): Promise<void> {
 
   await runMigrations(db)
 
+  // One-time migration: copy app_settings from the legacy 'skillcraft-ims' userData path
+  // if the current DB has no settings yet (happens when app.name change shifted the path).
+  migrateSettingsFromLegacyPath(db)
+
   console.log(`[DB] Initialized at: ${dbPath}`)
+}
+
+function migrateSettingsFromLegacyPath(database: Database.Database): void {
+  const hasSettings = (database.prepare('SELECT COUNT(*) as n FROM app_settings').get() as { n: number }).n > 0
+  if (hasSettings) return
+
+  const legacyDbPath = join(app.getPath('appData'), 'skillcraft-ims', 'ims.db')
+  if (!existsSync(legacyDbPath)) return
+
+  try {
+    const legacy = new Database(legacyDbPath, { readonly: true })
+    const rows = legacy.prepare('SELECT key, value FROM app_settings').all() as { key: string; value: string }[]
+    legacy.close()
+
+    if (rows.length === 0) return
+
+    const upsert = database.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)')
+    database.transaction(() => { rows.forEach((r) => upsert.run(r.key, r.value)) })()
+    console.log(`[DB] Migrated ${rows.length} settings from legacy path`)
+  } catch (err) {
+    console.warn('[DB] Legacy settings migration skipped:', err)
+  }
 }
 
 async function runMigrations(database: Database.Database): Promise<void> {

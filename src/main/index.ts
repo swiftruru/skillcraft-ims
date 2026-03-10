@@ -9,6 +9,12 @@ import { SchedulerService } from './services/scheduler.service'
 // Set app name before ready so macOS menu bar shows correct name in dev mode
 app.name = 'SkillCraft IMS'
 
+// Pin userData path to a stable location independent of app.name.
+// Without this, changing app.name to include spaces ('SkillCraft IMS') would
+// move the userData directory from 'skillcraft-ims/' to 'SkillCraft IMS/',
+// causing the app to lose access to the user's existing settings and database.
+app.setPath('userData', join(app.getPath('appData'), 'SkillCraft IMS'))
+
 let mainWindow: BrowserWindow | null = null
 
 interface WindowState {
