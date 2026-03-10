@@ -107,7 +107,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     },
     lookHere: {
       zh: '商品管理表格中，將滑鼠移至任一列右側 — 藍色購物車圖示按鈕（「快速採購」）。',
-      en: 'Hover any row in the Products table — look for the blue shopping cart icon button ("快速採購") on the right side.'
+      en: 'Hover any row in the Products table — look for the blue shopping cart icon button ("Quick Purchase") on the right side.'
     }
   },
   {
@@ -127,7 +127,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     },
     lookHere: {
       zh: '點擊商品管理頁的「新增商品」→ 先選類別 → 再點擊 SKU 欄位旁的魔杖（Wand）圖示按鈕。',
-      en: 'Click "新增商品" on the Products page → select a category first → then click the wand (Wand2) icon button next to the SKU field.'
+      en: 'Click "Add Product" on the Products page → select a category first → then click the wand (Wand2) icon button next to the SKU field.'
     }
   },
   {
@@ -179,7 +179,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     targetSelector: '[data-tour="overdue-badge"]',
     description: {
       zh: '超過 30 天仍在「待確認」狀態的採購單，狀態欄會自動顯示橘色「逾期」標籤，無需手動計算建立日期，提醒跟進供應商到貨進度。',
-      en: 'Purchase orders remaining "pending" for 30+ days automatically show an orange "逾期" (Overdue) badge in the status column — no manual date calculation needed. Prompts follow-up on delivery.'
+      en: 'Purchase orders remaining "pending" for 30+ days automatically show an orange "Overdue" badge in the status column — no manual date calculation needed. Prompts follow-up on delivery.'
     },
     uxHighlight: {
       zh: '被遺忘的採購單是中小企業進銷存管理的常見痛點。系統主動計算「等待天數」並標示，讓逾期問題在使用者打開頁面的一秒內浮現，而不是等月底對帳才察覺。這是「主動式（Proactive）」UX 設計的典型應用。',
@@ -187,7 +187,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     },
     lookHere: {
       zh: '採購管理表格的「狀態」欄 — 尋找橘色「逾期」標籤（需有建立超過 30 天的待確認採購單）。',
-      en: 'The "Status" column in the Purchases table — look for the orange "逾期" badge (requires a pending PO created 30+ days ago).'
+      en: 'The "Status" column in the Purchases table — look for the orange "Overdue" badge (requires a pending PO created 30+ days ago).'
     }
   },
   {
@@ -207,7 +207,7 @@ export const UX_TOUR_STEPS: UxTourStep[] = [
     },
     lookHere: {
       zh: '報表分析頁面頂部的期間選擇器 — 點擊「自訂」按鈕後，會顯示開始/結束日期輸入框。',
-      en: 'The period selector at the top of the Reports page — click the "自訂" (Custom) button to reveal start/end date inputs.'
+      en: 'The period selector at the top of the Reports page — click the "Custom" button to reveal start/end date inputs.'
     }
   },
   {
