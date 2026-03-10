@@ -38,5 +38,18 @@ content = content
     `<key>CFBundleName</key>\n\t<string>${APP_NAME}</string>`
   )
 
+// LSDisplayName overrides the Dock tooltip and Finder name
+if (!content.includes('<key>LSDisplayName</key>')) {
+  content = content.replace(
+    '</dict>\n</plist>',
+    `\t<key>LSDisplayName</key>\n\t<string>${APP_NAME}</string>\n</dict>\n</plist>`
+  )
+} else {
+  content = content.replace(
+    /<key>LSDisplayName<\/key>\s*<string>[^<]*<\/string>/,
+    `<key>LSDisplayName</key>\n\t<string>${APP_NAME}</string>`
+  )
+}
+
 fs.writeFileSync(plistPath, content, 'utf-8')
 console.log(`patch-electron-name: patched Info.plist → "${APP_NAME}"`)
