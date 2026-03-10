@@ -6,6 +6,9 @@ import { initDatabase } from './db'
 import { registerAllIpcHandlers } from './ipc'
 import { SchedulerService } from './services/scheduler.service'
 
+// Set app name before ready so macOS menu bar shows correct name in dev mode
+app.name = 'SkillCraft IMS'
+
 let mainWindow: BrowserWindow | null = null
 
 interface WindowState {
