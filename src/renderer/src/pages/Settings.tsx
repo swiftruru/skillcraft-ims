@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud, Database } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud, Database, Shuffle } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,17 @@ type DbOpStatus = { type: 'idle' | 'loading' | 'success' | 'error'; msg?: string
 type MockScale = 'S' | 'M' | 'L'
 type MockScenario = 'normal' | 'warning' | 'empty'
 type MockStatus = { type: 'idle' | 'loading' | 'success' | 'error'; msg?: string; counts?: Record<string, number> }
+
+const MOCK_COMPANIES = [
+  { name: '台灣科技有限公司',   address: '台北市中山區南京東路三段 168 號 8 樓',   phone: '02-2501-8888' },
+  { name: '創新電子股份有限公司', address: '新北市板橋區文化路一段 266 號 5 樓',    phone: '02-2963-5566' },
+  { name: '永豐貿易股份有限公司', address: '台中市西屯區台灣大道二段 688 號 12 樓', phone: '04-2328-7700' },
+  { name: '鑫瑞國際有限公司',   address: '高雄市前鎮區成功二路 88 號 3 樓',       phone: '07-338-9900' },
+  { name: '智誠科技有限公司',   address: '台北市信義區松仁路 58 號 9 樓',         phone: '02-2720-3399' },
+  { name: '宏遠電商股份有限公司', address: '桃園市桃園區中山路 1268 號 2 樓',      phone: '03-333-6688' },
+  { name: '聯捷物流有限公司',   address: '新北市新莊區幸福路 512 號',             phone: '02-2277-4422' },
+  { name: '鼎豐企業股份有限公司', address: '台南市東區東門路一段 260 號',           phone: '06-275-8811' },
+]
 
 const SCALE_CONFIG: Record<MockScale, { products: number; purchases: number; sales: number }> = {
   S: { products: 30, purchases: 40, sales: 80 },
@@ -82,6 +93,13 @@ export default function Settings() {
       companyAddress: data.companyAddress,
       companyPhone: data.companyPhone
     })
+  }
+
+  const fillMockCompany = () => {
+    const pick = MOCK_COMPANIES[Math.floor(Math.random() * MOCK_COMPANIES.length)]
+    companyForm.setValue('companyName', pick.name)
+    companyForm.setValue('companyAddress', pick.address)
+    companyForm.setValue('companyPhone', pick.phone)
   }
 
   // ── Google Sheets form（獨立） ──
@@ -200,6 +218,10 @@ export default function Settings() {
             <div className="flex items-center gap-3 pt-2">
               <Button type="submit" disabled={companyMutation.isPending} size="sm">
                 {companySaveStatus === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : s.saveSettings}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={fillMockCompany} className="gap-1.5 text-muted-foreground">
+                <Shuffle className="w-3.5 h-3.5" />
+                Mock
               </Button>
               {companySaveStatus === 'success' && (
                 <span className="text-xs text-green-400 flex items-center gap-1">
