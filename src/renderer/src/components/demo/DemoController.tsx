@@ -67,6 +67,15 @@ export function DemoController() {
   const t = (obj: { zh: string; en: string }) => obj[lang]
   const isWaitingSubmit = formOverlay?.waitingForSubmit ?? false
   const runningRef = useRef(false) // prevent concurrent runStep executions
+  const prevFormOverlayRef = useRef(formOverlay)
+
+  // Auto-expand panel when form overlay closes (submission complete)
+  useEffect(() => {
+    if (prevFormOverlayRef.current !== null && formOverlay === null && collapsed) {
+      toggleCollapsed()
+    }
+    prevFormOverlayRef.current = formOverlay
+  }, [formOverlay]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist demoIds to localStorage so the next run can clean up
   useEffect(() => {
