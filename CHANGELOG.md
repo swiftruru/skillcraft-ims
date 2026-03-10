@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.4.2] — 2026-03-10
+
+### 問題修復
+
+- 修正 About 面板仍顯示 Electron 預設圖示的問題（移除非正方形 `iconPath`，改由已替換的 bundle icon 提供）
+
+### 其他
+
+- 重構 Changelog 結構：每個版本獨立存放於 `changelog/vX.Y.Z.md`
+- GitHub Release 說明改為只顯示當次版本內容
+- 更新 `.github/workflows/release.yml`，`body_path` 指向對應版本的 changelog 檔案
+
+---
+
 ## [v0.4.1] — 2026-03-10
 
 ### 問題修復
