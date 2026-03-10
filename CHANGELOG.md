@@ -1,5 +1,26 @@
 # Changelog
 
+## [v0.4.1] — 2026-03-10
+
+### 問題修復
+
+#### macOS 開發模式顯示名稱修正
+
+- 修正 macOS 選單列左上角顯示「Electron」而非「SkillCraft IMS」的問題
+- 修正 Dock tooltip 顯示「Electron」的問題（根本原因：Dock 讀取 `.app` 資料夾名稱）
+- 修正 About 面板（關於 SkillCraft IMS）顯示 Electron 預設圖示的問題
+
+### 技術改動
+
+- 新增 `scripts/patch-electron-name.js`：postinstall 腳本，自動 patch `node_modules/electron/dist/` 下的 Electron bundle
+  - 將 `Electron.app` 資料夾改名為 `SkillCraft IMS.app`
+  - 更新 `electron/path.txt` 指向新路徑
+  - 修改 `Info.plist` 的 `CFBundleDisplayName`、`CFBundleName`、`LSDisplayName`
+  - 將 `resources/icon.icns` 複製覆蓋 bundle 內的 `electron.icns`，使 About 面板顯示正確圖示
+- `package.json` postinstall 指令串接 patch 腳本：`electron-rebuild ... && node scripts/patch-electron-name.js`
+
+---
+
 ## [v0.4.0] — 2026-03-10
 
 ### 新功能
