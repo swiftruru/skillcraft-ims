@@ -21,7 +21,9 @@ const electronAPI = {
     batchDelete: (ids: number[]) => ipcRenderer.invoke('products:batchDelete', ids),
     batchUpdate: (ids: number[], data: { category?: string }) => ipcRenderer.invoke('products:batchUpdate', ids, data),
     getPriceHistory: (productId: number) => ipcRenderer.invoke('products:getPriceHistory', productId),
-    nextSku: (category: string) => ipcRenderer.invoke('products:nextSku', category)
+    nextSku: (category: string) => ipcRenderer.invoke('products:nextSku', category),
+    getImage: (id: number) => ipcRenderer.invoke('products:getImage', id),
+    setImage: (id: number, base64: string | null) => ipcRenderer.invoke('products:setImage', id, base64)
   },
 
   // Suppliers

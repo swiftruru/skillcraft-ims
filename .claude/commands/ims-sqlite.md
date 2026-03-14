@@ -20,3 +20,8 @@ description: 當使用者要求新增或修改資料庫操作、Model 函式、M
 5. **Migration 規則**：新增資料表或欄位必須建立新的 migration 檔案（如 `003_xxx.sql`），不修改已有的 migration 檔，schema 變更以 `ALTER TABLE` 或新增資料表實現。
 
 6. **金額欄位型別**：`sell_price`、`buy_price`、`total_amount` 等金額欄位統一使用 `REAL`（SQLite）/ `number`（TypeScript），顯示時由 UI 層格式化為 `NT$ X,XXX`。
+
+7. **商品圖片欄位**：`products` 表透過 migration `011_product_images.sql` 新增 `image_data TEXT NULL` 欄位，儲存前端壓縮後的 base64 字串（格式 `data:image/jpeg;base64,...`）：
+   - `products:getAll` 與 `products:getById` **不回傳** `image_data`（避免大量資料傳輸），Product type 不含此欄位
+   - 圖片透過獨立 IPC 操作：`products:setImage(id: number, base64: string | null)` 寫入/清除；`products:getImage(id: number)` 回傳 `string | null`
+   - `products:setImage` 直接 `UPDATE products SET image_data=?, updated_at=datetime('now') WHERE id=?`

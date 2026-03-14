@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -121,12 +121,15 @@ export default function Products() {
     },
     { key: 'sku', label: 'SKU', sortable: true, className: 'font-mono text-xs w-32' },
     { key: 'name', label: p.title, sortable: true, render: (v, row) => (
-      <button
-        className="text-left hover:text-primary hover:underline transition-colors"
-        onClick={() => setDetailProduct(row as unknown as Product)}
-      >
-        {String(v)}
-      </button>
+      <div className="flex items-center gap-2">
+        <ProductThumbnail productId={(row as unknown as Product).id} />
+        <button
+          className="text-left hover:text-primary hover:underline transition-colors"
+          onClick={() => setDetailProduct(row as unknown as Product)}
+        >
+          {String(v)}
+        </button>
+      </div>
     )},
     { key: 'category', label: p.category, sortable: true, render: (v) => (
       <Badge variant="secondary" className="text-xs">{String(v)}</Badge>
@@ -367,6 +370,21 @@ export default function Products() {
         description={p.deleteDesc}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
       />
+    </div>
+  )
+}
+
+function ProductThumbnail({ productId }: { productId: number }) {
+  const { data: image } = useQuery<string | null>({
+    queryKey: ['products', 'image', productId],
+    queryFn: () => window.electronAPI.products.getImage(productId),
+    staleTime: 1000 * 60 * 5
+  })
+  return image ? (
+    <img src={image} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+  ) : (
+    <div className="w-8 h-8 rounded bg-muted/40 flex items-center justify-center shrink-0">
+      <Package className="w-4 h-4 text-muted-foreground/30" />
     </div>
   )
 }

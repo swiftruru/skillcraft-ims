@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Wand2 } from 'lucide-react'
+import { Wand2, Package, X } from 'lucide-react'
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@/lib/constants'
 import type { Product } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
@@ -59,6 +59,48 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
   const t = useLang()
   const tf = t.forms
   const isEdit = !!product
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [imgPreview, setImgPreview] = useState<string | null>(null)
+  const [imgSaving, setImgSaving] = useState(false)
+
+  const { data: savedImage } = useQuery<string | null>({
+    queryKey: ['products', 'image', product?.id],
+    queryFn: () => window.electronAPI.products.getImage(product!.id),
+    enabled: isEdit && !!product?.id,
+    staleTime: 1000 * 60 * 5
+  })
+
+  useEffect(() => {
+    setImgPreview(savedImage ?? null)
+  }, [savedImage])
+
+  const compressAndUpload = async (file: File) => {
+    if (!product?.id) return
+    setImgSaving(true)
+    const img = new Image()
+    img.src = URL.createObjectURL(file)
+    setImgPreview(img.src)
+    img.onload = async () => {
+      const MAX = 400
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width * scale
+      canvas.height = img.height * scale
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+      const base64 = canvas.toDataURL('image/jpeg', 0.8)
+      setImgPreview(base64)
+      await window.electronAPI.products.setImage(product.id, base64)
+      queryClient.invalidateQueries({ queryKey: ['products', 'image', product.id] })
+      setImgSaving(false)
+    }
+  }
+
+  const clearImage = async () => {
+    if (!product?.id) return
+    setImgPreview(null)
+    await window.electronAPI.products.setImage(product.id, null)
+    queryClient.invalidateQueries({ queryKey: ['products', 'image', product.id] })
+  }
 
   const {
     register,
@@ -139,6 +181,45 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {isEdit && (
+            <div className="flex items-center gap-4">
+              <div
+                className="relative group w-20 h-20 shrink-0 rounded-lg border border-border bg-muted/30 flex items-center justify-center cursor-pointer overflow-hidden"
+                onClick={() => !imgSaving && fileInputRef.current?.click()}
+              >
+                {imgPreview ? (
+                  <img src={imgPreview} alt="product" className="w-full h-full object-cover" />
+                ) : (
+                  <Package className="w-8 h-8 text-muted-foreground/40" />
+                )}
+                {imgPreview && !imgSaving && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); clearImage() }}
+                    className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-background/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+                {imgSaving && (
+                  <div className="absolute inset-0 bg-background/60 flex items-center justify-center text-xs text-muted-foreground">儲存中...</div>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                <p className="font-medium text-foreground/70">商品圖片</p>
+                <p>點擊左側區塊上傳圖片</p>
+                <p>自動壓縮至 400×400</p>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) compressAndUpload(f); e.target.value = '' }}
+              />
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="sku">{tf.skuLabel}</Label>

@@ -118,3 +118,11 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 分類前綴對應表：電子產品→`ELEC`、電腦周邊→`PERI`、文具→`STAT`、包裝材料→`PKG`、其他→`MISC`；不在表中的分類取前 4 字母大寫
     - 流水號為 4 位數字（0001 起），取同分類最大值 +1，首次為 0001
     - 點擊後以 mutation 呼叫 IPC，取回值後直接 `setValue('sku', result)` 填入欄位
+
+24. **商品圖片上傳與縮圖**：Products 表格與 ProductForm 支援每個商品附加一張圖片：
+    - **ProductForm**（編輯模式）：表單頂部或 SKU 欄旁顯示圖片區塊（80×80px `object-cover rounded-lg border`），無圖時顯示 `Package` icon 佔位符；點擊區塊觸發隱藏的 `<input type="file" accept="image/*">`
+    - **圖片壓縮**：選擇後以 Canvas API 縮放至最大 400×400，再以 `toDataURL('image/jpeg', 0.8)` 轉 base64，呼叫 `products:setImage(id, base64)` 儲存；顯示新圖片前用 `URL.createObjectURL` 做本地預覽
+    - **清除圖片**：圖片區塊 hover 時右上角顯示 ✕ 按鈕，點擊後呼叫 `products:setImage(id, null)` 清除
+    - **新增模式不支援圖片**：`ProductForm` 新增模式隱藏圖片欄位，提示「儲存後可在編輯模式上傳圖片」
+    - **Products 表格縮圖**：商品名稱欄左側加 32×32px 縮圖（`object-cover rounded`）；以 `useQuery(['products', 'image', id])` 懶載入，`enabled` 為 `true`；無圖時顯示灰色 `Package` icon 佔位；縮圖不影響列高（`shrink-0`）
+    - **i18n**：不新增 i18n key，直接用固定中文文字「點擊上傳圖片」、「已選擇，儲存中...」

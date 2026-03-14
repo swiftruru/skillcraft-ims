@@ -77,6 +77,18 @@ export function registerProductsIpc(): void {
     return `${prefix}-${next}`
   })
 
+  ipcMain.handle('products:getImage', (_e, id: number) => {
+    const db = getDb()
+    const row = db.prepare('SELECT image_data FROM products WHERE id = ?').get(id) as { image_data: string | null } | undefined
+    return row?.image_data ?? null
+  })
+
+  ipcMain.handle('products:setImage', (_e, id: number, base64: string | null) => {
+    const db = getDb()
+    db.prepare(`UPDATE products SET image_data = ?, updated_at = datetime('now') WHERE id = ?`).run(base64, id)
+    return { success: true }
+  })
+
   ipcMain.handle('products:batchUpdate', (_e, ids: number[], data: { category?: string }) => {
     const db = getDb()
     if (!ids.length) return { updated: 0 }
