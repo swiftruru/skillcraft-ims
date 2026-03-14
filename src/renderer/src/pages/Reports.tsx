@@ -9,7 +9,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts'
-import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat, SlowMovingItem, TopCustomerItem, PurchaseVsSalesPoint, TurnoverItem } from '@/types/schema'
+import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, MarginItem, SupplierStat, CustomerStat, SlowMovingItem, TopCustomerItem, PurchaseVsSalesPoint, TurnoverItem, AbcItem, MonthlyPLPoint } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
@@ -108,6 +108,16 @@ export default function Reports() {
   const { data: purchaseVsSales } = useQuery<PurchaseVsSalesPoint[]>({
     queryKey: ['reports', 'purchaseVsSales', trendDays, customDates],
     queryFn: () => window.electronAPI.reports.purchaseVsSales(trendDays, customDates?.dateFrom, customDates?.dateTo),
+    staleTime: 1000 * 60 * 5
+  })
+  const { data: abcData } = useQuery<AbcItem[]>({
+    queryKey: ['reports', 'abcAnalysis'],
+    queryFn: () => window.electronAPI.reports.abcAnalysis(),
+    staleTime: 1000 * 60 * 5
+  })
+  const { data: monthlyPL } = useQuery<MonthlyPLPoint[]>({
+    queryKey: ['reports', 'monthlyPL'],
+    queryFn: () => window.electronAPI.reports.monthlyPL(),
     staleTime: 1000 * 60 * 5
   })
 
@@ -635,6 +645,94 @@ export default function Reports() {
               <p className="text-xs text-muted-foreground text-right mt-2 px-3">
                 {r.slowMovingSummary(slowMoving.length, formatCurrency(slowMoving.reduce((s, i) => s + i.stock_value, 0)))}
               </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Monthly P&L */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">近 12 個月損益</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!monthlyPL ? (
+            <LoadingSpinner />
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={monthlyPL} barSize={16} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${Math.round(v / 1000)}K`} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                  formatter={(value: number, name: string) => [formatCurrency(value), name === 'revenue' ? '營收' : name === 'cost' ? '成本' : '毛利']}
+                />
+                <Legend formatter={(v) => v === 'revenue' ? '營收' : v === 'cost' ? '成本' : '毛利'} wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="revenue" fill="#3b82f6" opacity={0.7} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="cost" fill="#ef4444" opacity={0.7} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="gross_profit" fill="#10b981" opacity={0.85} radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ABC Analysis */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">商品 ABC 分析</CardTitle>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> A 類：貢獻 70% 營收</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" /> B 類：貢獻 20%</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-muted-foreground/50 inline-block" /> C 類：其餘 10%</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!abcData ? (
+            <LoadingSpinner />
+          ) : abcData.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">尚無銷售資料</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="px-3 py-2 font-medium">商品</th>
+                    <th className="px-3 py-2 font-medium">SKU</th>
+                    <th className="px-3 py-2 font-medium">類別</th>
+                    <th className="px-3 py-2 text-right font-medium">銷售額</th>
+                    <th className="px-3 py-2 text-right font-medium">佔比</th>
+                    <th className="px-3 py-2 text-right font-medium">累計</th>
+                    <th className="px-3 py-2 text-center font-medium">等級</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {abcData.map((item) => {
+                    const cls = item.abc_class
+                    const badge = cls === 'A'
+                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                      : cls === 'B'
+                        ? 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400'
+                        : 'bg-muted text-muted-foreground'
+                    return (
+                      <tr key={item.product_id} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium">{item.name}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{item.sku}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{item.category}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.revenue)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{item.revenue_pct}%</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{item.cumulative_pct}%</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${badge}`}>{cls}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>

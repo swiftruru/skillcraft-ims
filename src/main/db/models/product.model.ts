@@ -37,8 +37,8 @@ export const ProductModel = {
     const db = getDb()
     const result = db
       .prepare(
-        `INSERT INTO products (sku, name, category, sell_price, buy_price, stock_qty, reorder_pt, unit, description)
-         VALUES (@sku, @name, @category, @sell_price, @buy_price, @stock_qty, @reorder_pt, @unit, @description)`
+        `INSERT INTO products (sku, name, category, sell_price, buy_price, avg_cost, stock_qty, reorder_pt, unit, description)
+         VALUES (@sku, @name, @category, @sell_price, @buy_price, @buy_price, @stock_qty, @reorder_pt, @unit, @description)`
       )
       .run(data)
     return this.findById(result.lastInsertRowid as number)!

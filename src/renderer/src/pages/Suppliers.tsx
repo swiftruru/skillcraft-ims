@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Edit2, Trash2, Wand2, Eye } from 'lucide-react'
 import { useForm } from 'react-hook-form'
@@ -34,6 +34,12 @@ export default function Suppliers() {
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null)
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+
+  useEffect(() => {
+    const handler = () => { setEditSupplier(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '' }); setFormOpen(true) }
+    window.addEventListener('ims:new-item', handler)
+    return () => window.removeEventListener('ims:new-item', handler)
+  }, [])
 
   const { data: suppliers, isLoading } = useQuery<Supplier[]>({
     queryKey: ['suppliers', 'all', search],

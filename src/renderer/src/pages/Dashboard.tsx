@@ -14,7 +14,11 @@ import {
   CheckSquare,
   Square,
   Plus,
-  ClipboardList
+  ClipboardList,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Brain,
+  RefreshCw
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -34,7 +38,7 @@ import {
   Bar,
   Cell
 } from 'recharts'
-import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion } from '@/types/schema'
+import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion, AiForecastResult } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 const CATEGORY_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
@@ -46,6 +50,8 @@ export default function Dashboard() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set())
+  const [aiForecast, setAiForecast] = useState<AiForecastResult | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   const { data: kpis, isLoading: kpisLoading } = useQuery<DashboardKPIs>({
     queryKey: ['reports', 'kpis'],
@@ -87,6 +93,17 @@ export default function Dashboard() {
       toast({ title: '採購單已建立', variant: 'success' })
     },
     onError: () => toast({ title: '建立失敗', variant: 'destructive' })
+  })
+
+  const aiForecastMutation = useMutation({
+    mutationFn: () => window.electronAPI.ai.forecast(),
+    onSuccess: (data) => {
+      setAiForecast(data)
+      setAiError(null)
+    },
+    onError: (err: Error) => {
+      setAiError(err.message ?? 'AI 預測失敗，請重試。')
+    }
   })
 
   const toggleSuggestion = (id: number) => {
@@ -168,6 +185,24 @@ export default function Dashboard() {
           icon={<AlertTriangle className="w-4 h-4" />}
           color={kpis?.lowStockCount ? 'text-yellow-400' : 'text-muted-foreground'}
           alert={!!kpis?.lowStockCount}
+        />
+      </div>
+
+      {/* 應收/應付 KPI */}
+      <div className="grid grid-cols-2 gap-4">
+        <KpiCard
+          title={d.unpaidReceivables}
+          value={formatCurrency(kpis?.unpaidSalesTotal ?? 0)}
+          subtitle={d.unpaidReceivablesHint}
+          icon={<ArrowDownLeft className="w-4 h-4" />}
+          color={(kpis?.unpaidSalesTotal ?? 0) > 0 ? 'text-emerald-400' : 'text-muted-foreground'}
+        />
+        <KpiCard
+          title={d.unpaidPayables}
+          value={formatCurrency(kpis?.unpaidPurchasesTotal ?? 0)}
+          subtitle={d.unpaidPayablesHint}
+          icon={<ArrowUpRight className="w-4 h-4" />}
+          color={(kpis?.unpaidPurchasesTotal ?? 0) > 0 ? 'text-rose-400' : 'text-muted-foreground'}
         />
       </div>
 
@@ -416,6 +451,80 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* AI Demand Forecast */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Brain className="w-4 h-4 text-violet-400" />
+              AI 需求預測
+            </CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1.5"
+              disabled={aiForecastMutation.isPending}
+              onClick={() => aiForecastMutation.mutate()}
+            >
+              <RefreshCw className={`w-3 h-3 ${aiForecastMutation.isPending ? 'animate-spin' : ''}`} />
+              {aiForecastMutation.isPending ? '分析中...' : '生成預測'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {aiError && (
+            <div className="text-sm text-red-400 py-2">{aiError}</div>
+          )}
+          {!aiForecast && !aiError && !aiForecastMutation.isPending && (
+            <div className="flex items-center justify-center h-20 text-sm text-muted-foreground">
+              點擊「生成預測」，Claude AI 將分析近 30 天銷售資料並提供補貨建議
+            </div>
+          )}
+          {aiForecastMutation.isPending && (
+            <div className="flex items-center justify-center h-20 text-sm text-muted-foreground gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              正在分析庫存與銷售資料...
+            </div>
+          )}
+          {aiForecast && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground leading-relaxed">{aiForecast.summary}</p>
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 text-xs text-muted-foreground bg-muted/30 px-3 py-2">
+                  <span>商品</span>
+                  <span className="text-right">現有庫存</span>
+                  <span className="text-right">預計售完</span>
+                  <span className="text-right">建議補貨</span>
+                </div>
+                <div className="divide-y divide-border/50 max-h-64 overflow-y-auto">
+                  {aiForecast.items
+                    .filter((item) => item.suggested_reorder_qty > 0)
+                    .slice(0, 10)
+                    .map((item) => (
+                      <div key={item.product_id} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-3 py-2 items-center">
+                        <div>
+                          <div className="text-sm font-medium">{item.name}</div>
+                          <div className="text-xs text-muted-foreground">{item.reasoning}</div>
+                        </div>
+                        <div className="text-right text-sm tabular-nums">{item.stock_qty}</div>
+                        <div className={`text-right text-sm tabular-nums ${item.days_remaining !== null && item.days_remaining <= 7 ? 'text-red-400 font-semibold' : 'text-muted-foreground'}`}>
+                          {item.days_remaining !== null ? `${item.days_remaining} 天` : '—'}
+                        </div>
+                        <div className="text-right text-sm font-semibold text-violet-400 tabular-nums">
+                          +{item.suggested_reorder_qty}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground text-right">
+                生成時間：{new Date(aiForecast.generatedAt).toLocaleString('zh-TW')}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

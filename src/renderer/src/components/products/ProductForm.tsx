@@ -85,20 +85,35 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
       return
     }
     setImgSaving(true)
-    const img = new Image()
-    img.src = URL.createObjectURL(file)
-    setImgPreview(img.src)
-    img.onload = async () => {
-      const MAX = 400
-      const scale = Math.min(1, MAX / Math.max(img.width, img.height))
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width * scale
-      canvas.height = img.height * scale
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-      const base64 = canvas.toDataURL('image/jpeg', 0.8)
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target!.result as string)
+        reader.onerror = () => reject(new Error('檔案讀取失敗'))
+        reader.readAsDataURL(file)
+      })
+      setImgPreview(dataUrl)
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+          const MAX = 400
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+          const canvas = document.createElement('canvas')
+          canvas.width = img.width * scale
+          canvas.height = img.height * scale
+          canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+          resolve(canvas.toDataURL('image/jpeg', 0.8))
+        }
+        img.onerror = () => reject(new Error('圖片處理失敗'))
+        img.src = dataUrl
+      })
       setImgPreview(base64)
       await window.electronAPI.products.setImage(product.id, base64)
       queryClient.invalidateQueries({ queryKey: ['products', 'image', product.id] })
+    } catch (e) {
+      setImgError(e instanceof Error ? e.message : '上傳失敗，請重試')
+      setImgPreview(null)
+    } finally {
       setImgSaving(false)
     }
   }

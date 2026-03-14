@@ -106,14 +106,22 @@ export const PurchaseModel = {
     const updateOrder = db.prepare(
       `UPDATE purchase_orders SET status = 'received', receive_date = date('now') WHERE id = ?`
     )
-    const updateStock = db.prepare(
-      `UPDATE products SET stock_qty = stock_qty + ?, updated_at = datetime('now') WHERE id = ?`
+    const getProduct = db.prepare(`SELECT stock_qty, avg_cost FROM products WHERE id = ?`)
+    const updateStockAndAvgCost = db.prepare(
+      `UPDATE products SET stock_qty = stock_qty + ?, avg_cost = ?, updated_at = datetime('now') WHERE id = ?`
     )
 
     db.transaction(() => {
       updateOrder.run(id)
       for (const item of order.items ?? []) {
-        updateStock.run(item.quantity, item.product_id)
+        const product = getProduct.get(item.product_id) as { stock_qty: number; avg_cost: number } | undefined
+        const currentQty = product?.stock_qty ?? 0
+        const currentAvgCost = product?.avg_cost ?? 0
+        const newQty = currentQty + item.quantity
+        const newAvgCost = newQty > 0
+          ? (currentQty * currentAvgCost + item.quantity * item.unit_price) / newQty
+          : item.unit_price
+        updateStockAndAvgCost.run(item.quantity, newAvgCost, item.product_id)
       }
     })()
 

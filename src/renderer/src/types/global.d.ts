@@ -17,8 +17,11 @@ declare global {
         getAllAdjustments(filters?: { search?: string; reason?: string; dateFrom?: string; dateTo?: string; limit?: number }): Promise<import('./schema').InventoryAdjustment[]>
         batchDelete(ids: number[]): Promise<{ deleted: number; skipped: number }>
         batchUpdate(ids: number[], data: { category?: string }): Promise<{ updated: number }>
+        batchUpdatePrice(ids: number[], mode: 'set' | 'increase' | 'decrease', target: 'sell_price' | 'buy_price' | 'both', amount: number, amountType: 'fixed' | 'percent'): Promise<{ updated: number }>
         getPriceHistory(productId: number): Promise<import('./schema').PriceHistoryItem[]>
         nextSku(category: string): Promise<string>
+        getImage(id: number): Promise<string | null>
+        setImage(id: number, base64: string | null): Promise<{ success: boolean }>
       }
       suppliers: {
         getAll(search?: string): Promise<import('./schema').Supplier[]>
@@ -44,6 +47,8 @@ declare global {
         cancel(id: number): Promise<boolean>
         return(id: number): Promise<{ success: boolean; data?: import('./schema').PurchaseOrder; error?: string }>
         delete(id: number): Promise<boolean>
+        markPaid(id: number): Promise<import('./schema').PurchaseOrder | null>
+        setPaymentDue(id: number, dueDate: string): Promise<import('./schema').PurchaseOrder | null>
       }
       sales: {
         getAll(filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }): Promise<import('./schema').SalesOrder[]>
@@ -53,6 +58,8 @@ declare global {
         cancel(id: number): Promise<boolean>
         return(id: number): Promise<{ success: boolean; data?: import('./schema').SalesOrder; error?: string }>
         delete(id: number): Promise<boolean>
+        markPaid(id: number): Promise<import('./schema').SalesOrder | null>
+        setPaymentDue(id: number, dueDate: string): Promise<import('./schema').SalesOrder | null>
       }
       reports: {
         kpis(): Promise<import('./schema').DashboardKPIs>
@@ -67,6 +74,8 @@ declare global {
         topCustomers(): Promise<import('./schema').TopCustomerItem[]>
         purchaseVsSales(days?: number, dateFrom?: string, dateTo?: string): Promise<import('./schema').PurchaseVsSalesPoint[]>
         turnoverAnalysis(days?: number): Promise<import('./schema').TurnoverItem[]>
+        abcAnalysis(): Promise<import('./schema').AbcItem[]>
+        monthlyPL(): Promise<import('./schema').MonthlyPLPoint[]>
       }
       sync: {
         trigger(direction: 'push' | 'pull' | 'bidirectional'): Promise<{ success: boolean; recordsSynced?: number; error?: string }>
@@ -128,6 +137,9 @@ declare global {
           counts: { suppliers: number; customers: number; products: number; purchaseOrders: number; salesOrders: number; adjustments: number }
           error?: string
         }>
+      }
+      ai: {
+        forecast(): Promise<import('./schema').AiForecastResult>
       }
       notifications: {
         getAll(): Promise<import('./schema').AppNotification[]>

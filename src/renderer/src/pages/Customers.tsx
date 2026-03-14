@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Edit2, Trash2, Wand2, Eye } from 'lucide-react'
 import { useForm } from 'react-hook-form'
@@ -34,6 +34,12 @@ export default function Customers() {
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+
+  useEffect(() => {
+    const handler = () => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '' }); setFormOpen(true) }
+    window.addEventListener('ims:new-item', handler)
+    return () => window.removeEventListener('ims:new-item', handler)
+  }, [])
 
   const { data: customers, isLoading } = useQuery<Customer[]>({
     queryKey: ['customers', 'all', search],

@@ -77,4 +77,14 @@ export function registerSalesIpc(): void {
     }
   })
   ipcMain.handle('sales:delete', (_e, id: number) => SaleModel.delete(id))
+  ipcMain.handle('sales:markPaid', (_e, id: number) => {
+    const order = SaleModel.findById(id)
+    if (!order || order.status !== 'completed') throw new Error('只有已完成的銷售單可標記付款')
+    getDb().prepare(`UPDATE sales_orders SET payment_status='paid' WHERE id=?`).run(id)
+    return SaleModel.findById(id)
+  })
+  ipcMain.handle('sales:setPaymentDue', (_e, id: number, dueDate: string) => {
+    getDb().prepare(`UPDATE sales_orders SET payment_due_date=? WHERE id=?`).run(dueDate, id)
+    return SaleModel.findById(id)
+  })
 }

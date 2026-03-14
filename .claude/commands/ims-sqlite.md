@@ -25,3 +25,15 @@ description: 當使用者要求新增或修改資料庫操作、Model 函式、M
    - `products:getAll` 與 `products:getById` **不回傳** `image_data`（避免大量資料傳輸），Product type 不含此欄位
    - 圖片透過獨立 IPC 操作：`products:setImage(id: number, base64: string | null)` 寫入/清除；`products:getImage(id: number)` 回傳 `string | null`
    - `products:setImage` 直接 `UPDATE products SET image_data=?, updated_at=datetime('now') WHERE id=?`
+
+8. **AVCO 移動加權平均成本**：`products` 表透過 migration `012_avco_cost.sql` 新增 `avg_cost REAL DEFAULT 0` 欄位：
+   - 新增商品時 `avg_cost` 初始化為 `buy_price`（INSERT 時帶入）
+   - 採購收貨（`purchases:receive`）時在 transaction 內計算：`new_avg = (current_qty × current_avg + received_qty × unit_price) / new_qty`
+   - `reports:kpis` 庫存總值、毛利計算改用 `COALESCE(NULLIF(avg_cost, 0), buy_price)` 取代純 `buy_price`
+
+9. **帳期管理欄位**：`purchase_orders` 與 `sales_orders` 透過 migration `013_payment_terms.sql` 新增兩個欄位：
+   - `payment_due_date DATE NULL`：付款截止日，由使用者建立訂單或後續設定
+   - `payment_status TEXT DEFAULT 'unpaid'`：付款狀態，限制為 `'unpaid' | 'paid' | 'overdue'`
+   - `purchases:markPaid(id)` / `sales:markPaid(id)` IPC：更新 `payment_status = 'paid'`，僅限 `received` / `completed` 狀態的訂單
+   - `reports:kpis` 新增 `unpaidPurchases`（應付）與 `unpaidSales`（應收）兩個 KPI：SQL 使用 `SUM(total_amount) WHERE payment_status = 'unpaid' AND status IN ('received'/'completed')`
+   - 逾期判斷：`payment_due_date < date('now') AND payment_status = 'unpaid'`，UI 顯示紅色 `逾期` Badge，不自動更新 DB 欄位

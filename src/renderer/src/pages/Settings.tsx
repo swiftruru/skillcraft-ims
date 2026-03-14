@@ -318,6 +318,9 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* AI Settings */}
+      <AiSettingsCard settings={settings} onSaved={() => queryClient.invalidateQueries({ queryKey: ['settings'] })} />
+
       {/* DB Info */}
       <Card>
         <CardHeader>
@@ -488,5 +491,69 @@ export default function Settings() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function AiSettingsCard({ settings, onSaved }: { settings: AppSettings | undefined; onSaved: () => void }) {
+  const [apiKey, setApiKey] = useState('')
+  const [saveStatus, setSaveStatus] = useState<Status>('idle')
+
+  useEffect(() => {
+    if (settings?.claudeApiKey !== undefined) {
+      setApiKey(settings.claudeApiKey)
+    }
+  }, [settings?.claudeApiKey])
+
+  const handleSave = async () => {
+    setSaveStatus('loading')
+    try {
+      await window.electronAPI.settings.set('claudeApiKey', apiKey.trim())
+      onSaved()
+      setSaveStatus('success')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">AI 需求預測</CardTitle>
+        <CardDescription>
+          設定 Claude API Key 以啟用 AI 銷售預測與補貨建議功能。API Key 僅儲存在本機。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label>Claude API Key</Label>
+          <Input
+            type="password"
+            placeholder="sk-ant-..."
+            className="font-mono text-sm"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            從 console.anthropic.com 取得 API Key。使用的模型為 claude-haiku-4-5（低成本）。
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button size="sm" onClick={handleSave} disabled={saveStatus === 'loading'}>
+            {saveStatus === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : '儲存'}
+          </Button>
+          {saveStatus === 'success' && (
+            <span className="text-xs text-green-400 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> 已儲存
+            </span>
+          )}
+          {saveStatus === 'error' && (
+            <span className="text-xs text-red-400 flex items-center gap-1">
+              <XCircle className="w-3 h-3" /> 儲存失敗
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

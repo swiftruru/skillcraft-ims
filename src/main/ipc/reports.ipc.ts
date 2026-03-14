@@ -6,7 +6,7 @@ export function registerReportsIpc(): void {
     const db = getDb()
 
     const inventoryValue = (
-      db.prepare('SELECT COALESCE(SUM(stock_qty * buy_price), 0) as val FROM products').get() as { val: number }
+      db.prepare('SELECT COALESCE(SUM(stock_qty * COALESCE(NULLIF(avg_cost, 0), buy_price)), 0) as val FROM products').get() as { val: number }
     ).val
 
     const monthlyRevenue = (
@@ -30,7 +30,7 @@ export function registerReportsIpc(): void {
     const monthlyGrossProfit = (
       db
         .prepare(
-          `SELECT COALESCE(SUM((si.unit_price - p.buy_price) * si.quantity), 0) as val
+          `SELECT COALESCE(SUM((si.unit_price - COALESCE(NULLIF(p.avg_cost, 0), p.buy_price)) * si.quantity), 0) as val
            FROM sale_items si
            JOIN products p ON si.product_id = p.id
            JOIN sales_orders so ON si.sales_order_id = so.id
@@ -42,7 +42,7 @@ export function registerReportsIpc(): void {
     const prevMonthGrossProfit = (
       db
         .prepare(
-          `SELECT COALESCE(SUM((si.unit_price - p.buy_price) * si.quantity), 0) as val
+          `SELECT COALESCE(SUM((si.unit_price - COALESCE(NULLIF(p.avg_cost, 0), p.buy_price)) * si.quantity), 0) as val
            FROM sale_items si
            JOIN products p ON si.product_id = p.id
            JOIN sales_orders so ON si.sales_order_id = so.id
@@ -73,6 +73,18 @@ export function registerReportsIpc(): void {
         .get() as { cnt: number }
     ).cnt
 
+    const unpaidSalesTotal = (
+      db
+        .prepare(`SELECT COALESCE(SUM(total_amount), 0) as val FROM sales_orders WHERE status = 'completed' AND payment_status = 'unpaid'`)
+        .get() as { val: number }
+    ).val
+
+    const unpaidPurchasesTotal = (
+      db
+        .prepare(`SELECT COALESCE(SUM(total_amount), 0) as val FROM purchase_orders WHERE status = 'received' AND payment_status = 'unpaid'`)
+        .get() as { val: number }
+    ).val
+
     return {
       totalInventoryValue: inventoryValue,
       monthlyRevenue,
@@ -82,7 +94,9 @@ export function registerReportsIpc(): void {
       lowStockCount,
       totalProducts,
       pendingSalesOrders,
-      pendingPurchasesCount
+      pendingPurchasesCount,
+      unpaidSalesTotal,
+      unpaidPurchasesTotal
     }
   })
 
@@ -178,9 +192,9 @@ export function registerReportsIpc(): void {
     const db = getDb()
     return db
       .prepare(
-        `SELECT id, sku, name, category, sell_price, buy_price, stock_qty,
-                ROUND(sell_price - buy_price, 2) as margin,
-                ROUND((sell_price - buy_price) * 100.0 / NULLIF(sell_price, 0), 1) as margin_pct
+        `SELECT id, sku, name, category, sell_price, buy_price, avg_cost, stock_qty,
+                ROUND(sell_price - COALESCE(NULLIF(avg_cost, 0), buy_price), 2) as margin,
+                ROUND((sell_price - COALESCE(NULLIF(avg_cost, 0), buy_price)) * 100.0 / NULLIF(sell_price, 0), 1) as margin_pct
          FROM products
          ORDER BY margin_pct DESC`
       )
@@ -308,6 +322,73 @@ export function registerReportsIpc(): void {
          ORDER BY date_series.date ASC`
       )
       .all(days, days, days, days)
+  })
+
+  ipcMain.handle('reports:abcAnalysis', () => {
+    const db = getDb()
+    return db
+      .prepare(
+        `WITH product_revenue AS (
+           SELECT p.id as product_id, p.sku, p.name, p.category,
+                  COALESCE(SUM(si.unit_price * si.quantity), 0) as revenue
+           FROM products p
+           LEFT JOIN sale_items si ON si.product_id = p.id
+           LEFT JOIN sales_orders so ON si.sales_order_id = so.id AND so.status = 'completed'
+           GROUP BY p.id
+           HAVING revenue > 0
+         ),
+         totals AS (SELECT SUM(revenue) as total FROM product_revenue),
+         ranked AS (
+           SELECT pr.*,
+                  SUM(pr.revenue) OVER (ORDER BY pr.revenue DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as cumulative
+           FROM product_revenue pr
+         )
+         SELECT r.product_id, r.sku, r.name, r.category, r.revenue,
+                ROUND(r.revenue * 100.0 / t.total, 1) as revenue_pct,
+                ROUND(r.cumulative * 100.0 / t.total, 1) as cumulative_pct,
+                CASE
+                  WHEN r.cumulative <= t.total * 0.7 THEN 'A'
+                  WHEN r.cumulative <= t.total * 0.9 THEN 'B'
+                  ELSE 'C'
+                END as abc_class
+         FROM ranked r, totals t
+         ORDER BY r.revenue DESC`
+      )
+      .all()
+  })
+
+  ipcMain.handle('reports:monthlyPL', () => {
+    const db = getDb()
+    return db
+      .prepare(
+        `WITH RECURSIVE months(m) AS (
+           SELECT strftime('%Y-%m', date('now', '-11 months'))
+           UNION ALL
+           SELECT strftime('%Y-%m', date(m || '-01', '+1 month'))
+           FROM months WHERE m < strftime('%Y-%m', 'now')
+         )
+         SELECT
+           m.m as month,
+           COALESCE(s.revenue, 0) as revenue,
+           COALESCE(c.cost, 0) as cost,
+           ROUND(COALESCE(s.revenue, 0) - COALESCE(c.cost, 0), 2) as gross_profit
+         FROM months m
+         LEFT JOIN (
+           SELECT strftime('%Y-%m', order_date) as mo, SUM(total_amount) as revenue
+           FROM sales_orders WHERE status = 'completed'
+           GROUP BY mo
+         ) s ON s.mo = m.m
+         LEFT JOIN (
+           SELECT strftime('%Y-%m', so.order_date) as mo,
+                  SUM(si.quantity * COALESCE(NULLIF(p.avg_cost, 0), p.buy_price)) as cost
+           FROM sale_items si
+           JOIN products p ON si.product_id = p.id
+           JOIN sales_orders so ON si.sales_order_id = so.id AND so.status = 'completed'
+           GROUP BY mo
+         ) c ON c.mo = m.m
+         ORDER BY m.m ASC`
+      )
+      .all()
   })
 
   ipcMain.handle('reports:topCustomers', () => {

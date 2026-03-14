@@ -102,9 +102,10 @@ export function ProductDetailDialog({ open, onOpenChange, product }: Props) {
 
   if (!product) return null
 
-  const stockValue = product.stock_qty * product.buy_price
+  const effectiveCost = product.avg_cost > 0 ? product.avg_cost : product.buy_price
+  const stockValue = product.stock_qty * effectiveCost
   const margin = product.sell_price > 0
-    ? Math.round(((product.sell_price - product.buy_price) / product.sell_price) * 100)
+    ? Math.round(((product.sell_price - effectiveCost) / product.sell_price) * 100)
     : 0
   const isLowStock = product.stock_qty <= product.reorder_pt
 
@@ -142,12 +143,12 @@ export function ProductDetailDialog({ open, onOpenChange, product }: Props) {
           <StatCard
             label="庫存價值"
             value={formatCurrency(stockValue)}
-            sub={`進價 ${formatCurrency(product.buy_price)}`}
+            sub={`均成本 ${formatCurrency(effectiveCost)}`}
           />
           <StatCard
             label="毛利率"
             value={`${margin}%`}
-            sub={`售價 ${formatCurrency(product.sell_price)}`}
+            sub={`售 ${formatCurrency(product.sell_price)} / 均 ${formatCurrency(effectiveCost)}`}
           />
           <StatCard
             label="總調整次數"

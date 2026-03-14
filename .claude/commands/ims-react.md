@@ -126,3 +126,14 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - **新增模式不支援圖片**：`ProductForm` 新增模式隱藏圖片欄位，提示「儲存後可在編輯模式上傳圖片」
     - **Products 表格縮圖**：商品名稱欄左側加 32×32px 縮圖（`object-cover rounded`）；以 `useQuery(['products', 'image', id])` 懶載入，`enabled` 為 `true`；無圖時顯示灰色 `Package` icon 佔位；縮圖不影響列高（`shrink-0`）
     - **i18n**：不新增 i18n key，直接用固定中文文字「點擊上傳圖片」、「已選擇，儲存中...」
+
+
+25. **批次價格調整（BatchPriceDialog）**：Products 頁面多選商品後，批次工具列出現「調整價格」按鈕（`DollarSign` icon），開啟 `BatchPriceDialog`：
+    - 元件位於 `src/renderer/src/components/products/BatchPriceDialog.tsx`
+    - 表單欄位（react-hook-form + zod）：
+      - `mode`: `'fixed'`（±N 元）或 `'percent'`（±N%），Radio Group 切換
+      - `target`: `'sell'`、`'buy'` 或 `'both'`，Radio Group 切換
+      - `amount`: number（正數為加價，負數為降價）
+    - 預覽表格：列出選中商品目前售價/進價 → 調整後預覽值；調整後 < 0 顯示 `text-destructive`
+    - 確認後呼叫 `products:batchUpdatePrice(updates[])` IPC，成功後 toast 提示「已調整 N 項商品價格」，invalidate `['products']` 和 `['reports']`，清空選取集合，關閉 Dialog
+    - IPC `products:batchUpdatePrice` 在單一 transaction 內逐筆 UPDATE，signature：`{ id, sell_price?, buy_price? }[]`

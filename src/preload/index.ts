@@ -20,6 +20,8 @@ const electronAPI = {
       ipcRenderer.invoke('products:getAllAdjustments', filters),
     batchDelete: (ids: number[]) => ipcRenderer.invoke('products:batchDelete', ids),
     batchUpdate: (ids: number[], data: { category?: string }) => ipcRenderer.invoke('products:batchUpdate', ids, data),
+    batchUpdatePrice: (ids: number[], mode: 'set' | 'increase' | 'decrease', target: 'sell_price' | 'buy_price' | 'both', amount: number, amountType: 'fixed' | 'percent') =>
+      ipcRenderer.invoke('products:batchUpdatePrice', ids, mode, target, amount, amountType),
     getPriceHistory: (productId: number) => ipcRenderer.invoke('products:getPriceHistory', productId),
     nextSku: (category: string) => ipcRenderer.invoke('products:nextSku', category),
     getImage: (id: number) => ipcRenderer.invoke('products:getImage', id),
@@ -55,7 +57,9 @@ const electronAPI = {
     receive: (id: number) => ipcRenderer.invoke('purchases:receive', id),
     cancel: (id: number) => ipcRenderer.invoke('purchases:cancel', id),
     return: (id: number) => ipcRenderer.invoke('purchases:return', id),
-    delete: (id: number) => ipcRenderer.invoke('purchases:delete', id)
+    delete: (id: number) => ipcRenderer.invoke('purchases:delete', id),
+    markPaid: (id: number) => ipcRenderer.invoke('purchases:markPaid', id),
+    setPaymentDue: (id: number, dueDate: string) => ipcRenderer.invoke('purchases:setPaymentDue', id, dueDate)
   },
 
   // Sales
@@ -67,7 +71,9 @@ const electronAPI = {
     complete: (id: number) => ipcRenderer.invoke('sales:complete', id),
     cancel: (id: number) => ipcRenderer.invoke('sales:cancel', id),
     return: (id: number) => ipcRenderer.invoke('sales:return', id),
-    delete: (id: number) => ipcRenderer.invoke('sales:delete', id)
+    delete: (id: number) => ipcRenderer.invoke('sales:delete', id),
+    markPaid: (id: number) => ipcRenderer.invoke('sales:markPaid', id),
+    setPaymentDue: (id: number, dueDate: string) => ipcRenderer.invoke('sales:setPaymentDue', id, dueDate)
   },
 
   // Reports
@@ -83,7 +89,9 @@ const electronAPI = {
     slowMoving: (days?: number) => ipcRenderer.invoke('reports:slowMoving', days),
     topCustomers: () => ipcRenderer.invoke('reports:topCustomers'),
     purchaseVsSales: (days?: number, dateFrom?: string, dateTo?: string) => ipcRenderer.invoke('reports:purchaseVsSales', days, dateFrom, dateTo),
-    turnoverAnalysis: (days?: number) => ipcRenderer.invoke('reports:turnoverAnalysis', days)
+    turnoverAnalysis: (days?: number) => ipcRenderer.invoke('reports:turnoverAnalysis', days),
+    abcAnalysis: () => ipcRenderer.invoke('reports:abcAnalysis'),
+    monthlyPL: () => ipcRenderer.invoke('reports:monthlyPL')
   },
 
   // Sync
@@ -175,6 +183,11 @@ const electronAPI = {
   mockData: {
     generate: (options: { scale: 'S' | 'M' | 'L'; scenario: 'normal' | 'warning' | 'empty' }) =>
       ipcRenderer.invoke('mockdata:generate', options)
+  },
+
+  // AI
+  ai: {
+    forecast: () => ipcRenderer.invoke('ai:forecast')
   },
 
   // Notifications

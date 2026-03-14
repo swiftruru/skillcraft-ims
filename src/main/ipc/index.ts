@@ -16,6 +16,7 @@ import { registerPrintIpc } from './print.ipc'
 import { registerDemoIpc } from './demo.ipc'
 import { registerNotificationsIpc } from './notifications.ipc'
 import { registerMockDataIpc } from './mockdata.ipc'
+import { registerAiIpc } from './ai.ipc'
 
 export function registerAllIpcHandlers(): void {
   registerProductsIpc()
@@ -36,4 +37,5 @@ export function registerAllIpcHandlers(): void {
   registerDemoIpc()
   registerNotificationsIpc()
   registerMockDataIpc()
+  registerAiIpc()
 }

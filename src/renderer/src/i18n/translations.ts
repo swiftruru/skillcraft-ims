@@ -107,7 +107,11 @@ export const translations = {
       estimatedCost: '預估費用',
       reorderPoint: (n: number) => `補貨點 ${n}`,
       selectItemsHint: '點選勾選要採購的項目',
-      estimatedTotal: '預估總費用：'
+      estimatedTotal: '預估總費用：',
+      unpaidReceivables: '應收帳款',
+      unpaidPayables: '應付帳款',
+      unpaidReceivablesHint: '已完成但未收款',
+      unpaidPayablesHint: '已收貨但未付款'
     },
     products: {
       title: '商品名稱',
@@ -134,7 +138,12 @@ export const translations = {
       batchDeleteTitle: (_n: number) => `批次刪除商品`,
       batchDeleteDesc: (n: number) => `確定要刪除選取的 ${n} 項商品嗎？有庫存的商品將被略過，此操作不可撤銷。`,
       adjustCategory: '調整分類',
-      quickPurchase: '快速採購'
+      quickPurchase: '快速採購',
+      adjustPrice: '調整價格',
+      priceAdjustMode: '調整方式',
+      priceAdjustTarget: '調整欄位',
+      priceAdjustType: '金額類型',
+      priceAdjustAmount: '數值'
     },
     purchases: {
       orderNo: '訂單號',
@@ -160,7 +169,14 @@ export const translations = {
       clearDates: '清除',
       returnTitle: '確認採購退貨',
       returnDesc: '退貨後庫存將自動扣減，並寫入異動記錄，此操作不可撤銷。確定要退貨嗎？',
-      returnConfirm: '確認退貨'
+      returnConfirm: '確認退貨',
+      paymentStatus: '付款狀態',
+      markPaid: '標記已付款',
+      markPaidTitle: '確認標記為已付款',
+      markPaidDesc: '標記此採購單為已付款？',
+      paid: '已付款',
+      unpaid: '未付款',
+      paymentDue: '付款截止日'
     },
     sales: {
       customer: '客戶',
@@ -185,7 +201,15 @@ export const translations = {
       clearDates: '清除',
       returnTitle: '確認退貨',
       returnDesc: '退貨後庫存將自動回補，此操作不可撤銷。確定要退貨嗎？',
-      returnConfirm: '確認退貨'
+      returnConfirm: '確認退貨',
+      paymentStatus: '付款狀態',
+      markPaid: '標記已付款',
+      markPaidTitle: '確認標記為已付款',
+      markPaidDesc: '標記此銷售單為已付款？',
+      paid: '已付款',
+      unpaid: '未付款',
+      overdue: '逾期',
+      paymentDue: '付款截止日'
     },
     suppliers: {
       name: '名稱',
@@ -462,7 +486,8 @@ export const translations = {
       goPurchases: '前往採購管理',
       goSales: '前往銷售管理',
       goReports: '前往報表分析',
-      goSettings: '前往系統設定'
+      goSettings: '前往系統設定',
+      newItem: '新增（目前頁面）'
     }
   },
 
@@ -574,7 +599,11 @@ export const translations = {
       estimatedCost: 'Est. Cost',
       reorderPoint: (n: number) => `Reorder: ${n}`,
       selectItemsHint: 'Select items to purchase',
-      estimatedTotal: 'Estimated Total:'
+      estimatedTotal: 'Estimated Total:',
+      unpaidReceivables: 'Receivables',
+      unpaidPayables: 'Payables',
+      unpaidReceivablesHint: 'Completed but unpaid',
+      unpaidPayablesHint: 'Received but unpaid'
     },
     products: {
       title: 'Name',
@@ -601,7 +630,12 @@ export const translations = {
       batchDeleteTitle: (_n: number) => `Delete Products`,
       batchDeleteDesc: (n: number) => `Delete ${n} selected products? Products with stock will be skipped. This cannot be undone.`,
       adjustCategory: 'Adjust Category',
-      quickPurchase: 'Quick Purchase'
+      quickPurchase: 'Quick Purchase',
+      adjustPrice: 'Adjust Price',
+      priceAdjustMode: 'Mode',
+      priceAdjustTarget: 'Field',
+      priceAdjustType: 'Amount Type',
+      priceAdjustAmount: 'Value'
     },
     purchases: {
       orderNo: 'Order No.',
@@ -627,7 +661,14 @@ export const translations = {
       clearDates: 'Clear',
       returnTitle: 'Confirm Purchase Return',
       returnDesc: 'Stock will be deducted and an adjustment record created. This cannot be undone.',
-      returnConfirm: 'Confirm Return'
+      returnConfirm: 'Confirm Return',
+      paymentStatus: 'Payment Status',
+      markPaid: 'Mark as Paid',
+      markPaidTitle: 'Confirm Mark as Paid',
+      markPaidDesc: 'Mark this purchase order as paid?',
+      paid: 'Paid',
+      unpaid: 'Unpaid',
+      paymentDue: 'Payment Due'
     },
     sales: {
       customer: 'Customer',
@@ -652,7 +693,15 @@ export const translations = {
       clearDates: 'Clear',
       returnTitle: 'Confirm Return',
       returnDesc: 'Stock will be restored after return. This cannot be undone.',
-      returnConfirm: 'Confirm Return'
+      returnConfirm: 'Confirm Return',
+      paymentStatus: 'Payment Status',
+      markPaid: 'Mark as Paid',
+      markPaidTitle: 'Confirm Mark as Paid',
+      markPaidDesc: 'Mark this sales order as paid?',
+      paid: 'Paid',
+      unpaid: 'Unpaid',
+      overdue: 'Overdue',
+      paymentDue: 'Payment Due'
     },
     suppliers: {
       name: 'Name',
@@ -929,7 +978,8 @@ export const translations = {
       goPurchases: 'Go to Purchases',
       goSales: 'Go to Sales',
       goReports: 'Go to Reports',
-      goSettings: 'Go to Settings'
+      goSettings: 'Go to Settings',
+      newItem: 'New (current page)'
     }
   }
 }

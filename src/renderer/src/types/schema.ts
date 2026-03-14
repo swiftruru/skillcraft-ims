@@ -8,6 +8,7 @@ export interface Product {
   category: string
   sell_price: number
   buy_price: number
+  avg_cost: number
   stock_qty: number
   reorder_pt: number
   unit: string
@@ -55,6 +56,8 @@ export interface PurchaseOrder {
   receive_date: string | null
   total_amount: number
   notes: string | null
+  payment_due_date: string | null
+  payment_status: 'unpaid' | 'paid'
   created_at: string
   items?: PurchaseItem[]
 }
@@ -87,6 +90,8 @@ export interface SalesOrder {
   order_date: string
   total_amount: number
   notes: string | null
+  payment_due_date: string | null
+  payment_status: 'unpaid' | 'paid'
   created_at: string
   items?: SaleItem[]
 }
@@ -129,6 +134,8 @@ export interface DashboardKPIs {
   totalProducts: number
   pendingSalesOrders: number
   pendingPurchasesCount: number
+  unpaidSalesTotal: number
+  unpaidPurchasesTotal: number
 }
 
 export interface SalesTrendPoint {
@@ -174,6 +181,23 @@ export interface AppSettings {
   companyName: string
   companyAddress: string
   companyPhone: string
+  claudeApiKey: string
+}
+
+export interface AiForecastResult {
+  summary: string
+  items: {
+    product_id: number
+    sku: string
+    name: string
+    category: string
+    avg_daily_sales: number
+    stock_qty: number
+    days_remaining: number | null
+    suggested_reorder_qty: number
+    reasoning: string
+  }[]
+  generatedAt: string
 }
 
 export interface InventoryAdjustment {
@@ -216,6 +240,7 @@ export interface MarginItem {
   category: string
   sell_price: number
   buy_price: number
+  avg_cost: number
   stock_qty: number
   margin: number
   margin_pct: number | null
@@ -306,6 +331,24 @@ export interface PurchaseVsSalesPoint {
   date: string
   purchase_amount: number
   sales_amount: number
+}
+
+export interface AbcItem {
+  product_id: number
+  sku: string
+  name: string
+  category: string
+  revenue: number
+  revenue_pct: number
+  cumulative_pct: number
+  abc_class: 'A' | 'B' | 'C'
+}
+
+export interface MonthlyPLPoint {
+  month: string
+  revenue: number
+  cost: number
+  gross_profit: number
 }
 
 export interface AppNotification {

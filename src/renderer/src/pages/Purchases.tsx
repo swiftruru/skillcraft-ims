@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable, type Column } from '@/components/common/DataTable'
@@ -31,6 +31,13 @@ export default function Purchases() {
       navigate(location.pathname, { replace: true, state: null })
     }
   }, [])
+
+  useEffect(() => {
+    const handler = () => setFormOpen(true)
+    window.addEventListener('ims:new-item', handler)
+    return () => window.removeEventListener('ims:new-item', handler)
+  }, [])
+
   const [detailId, setDetailId] = useState<number | null>(null)
   const [receiveId, setReceiveId] = useState<number | null>(null)
   const [cancelId, setCancelId] = useState<number | null>(null)
@@ -41,6 +48,7 @@ export default function Purchases() {
   const [cloneData, setCloneData] = useState<Record<string, unknown> | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [markPaidId, setMarkPaidId] = useState<number | null>(null)
 
   const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
     queryKey: ['purchases', 'all', search, dateFrom, dateTo],
@@ -84,6 +92,14 @@ export default function Purchases() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['purchases'] })
   })
 
+  const markPaidMutation = useMutation({
+    mutationFn: (id: number) => window.electronAPI.purchases.markPaid(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+    }
+  })
+
   const handleClone = async (id: number) => {
     const order = await window.electronAPI.purchases.getById(id)
     if (order) {
@@ -120,6 +136,21 @@ export default function Purchases() {
       }
     },
     {
+      key: 'payment_status',
+      label: p.paymentStatus,
+      render: (_v, row) => {
+        if (row.status !== 'received') return null
+        const isOverdue = row.payment_status === 'unpaid' && row.payment_due_date && row.payment_due_date < new Date().toISOString().slice(0, 10)
+        if (row.payment_status === 'paid') {
+          return <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-400">{p.paid}</span>
+        }
+        if (isOverdue) {
+          return <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">{p.overdue}</span>
+        }
+        return <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{p.unpaid}</span>
+      }
+    },
+    {
       key: 'total_amount',
       label: t.common.amount,
       sortable: true,
@@ -150,6 +181,15 @@ export default function Purchases() {
           >
             <Printer className="w-3.5 h-3.5" />
           </Button>
+          {row.status === 'received' && row.payment_status !== 'paid' && (
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7 text-green-400 hover:text-green-500"
+              title={p.markPaid}
+              onClick={() => setMarkPaidId(row.id as number)}
+            >
+              <BadgeCheck className="w-3.5 h-3.5" />
+            </Button>
+          )}
           {row.status === 'received' && (
             <Button
               variant="ghost" size="icon" className="h-7 w-7 text-orange-400 hover:text-orange-500"
@@ -278,6 +318,15 @@ export default function Purchases() {
         title={p.deleteTitle}
         description={p.deleteDesc}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+      />
+      <ConfirmDialog
+        open={markPaidId !== null}
+        onOpenChange={(open) => !open && setMarkPaidId(null)}
+        title={p.markPaidTitle}
+        description={p.markPaidDesc}
+        onConfirm={() => markPaidId && markPaidMutation.mutate(markPaidId)}
+        confirmLabel={p.markPaid}
+        variant="default"
       />
     </div>
   )

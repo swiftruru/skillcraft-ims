@@ -13,6 +13,8 @@ import demoAdjustmentsSql from './migrations/008_demo_adjustments.sql?raw'
 import appNotificationsSql from './migrations/009_app_notifications.sql?raw'
 import fixReturnedStatusSql from './migrations/010_fix_returned_status.sql?raw'
 import productImagesSql from './migrations/011_product_images.sql?raw'
+import avcoCostSql from './migrations/012_avco_cost.sql?raw'
+import paymentTermsSql from './migrations/013_payment_terms.sql?raw'
 
 let db: Database.Database | null = null
 
@@ -86,7 +88,9 @@ async function runMigrations(database: Database.Database): Promise<void> {
     { name: '008_demo_adjustments', sql: demoAdjustmentsSql },
     { name: '009_app_notifications', sql: appNotificationsSql },
     { name: '010_fix_returned_status', sql: fixReturnedStatusSql },
-    { name: '011_product_images', sql: productImagesSql }
+    { name: '011_product_images', sql: productImagesSql },
+    { name: '012_avco_cost', sql: avcoCostSql },
+    { name: '013_payment_terms', sql: paymentTermsSql }
   ]
 
   for (const migration of migrations) {

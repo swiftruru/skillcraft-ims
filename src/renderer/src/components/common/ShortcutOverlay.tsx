@@ -19,6 +19,7 @@ export function ShortcutOverlay({ open, onClose }: ShortcutOverlayProps) {
     { label: sc.globalSearch, keys: [`${modKey}K`] },
     { label: sc.showShortcuts, keys: ['?'] },
     { label: sc.closeDialog, keys: ['Esc'] },
+    { label: sc.newItem, keys: ['N'] },
     { label: sc.goHome, keys: ['G', 'H'] },
     { label: sc.goProducts, keys: ['G', 'P'] },
     { label: sc.goPurchases, keys: ['G', 'B'] },

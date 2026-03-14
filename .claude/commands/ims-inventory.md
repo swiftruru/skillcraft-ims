@@ -92,6 +92,27 @@ description: 當使用者要求新增或修改進貨、銷售、庫存異動、�
     - IPC 擴充：`purchases:receive` 接受可選的 `actualQty?: { productId: number; qty: number }[]`；若提供，以 actualQty 更新庫存而非 quantity（允許部分收貨）
     - 確認後才呼叫 IPC，取消則不執行；Dialog 元件命名 `ReceivePurchaseDialog`，位於 `src/renderer/src/components/purchases/`
 
+15. **帳期管理規範**：`purchase_orders` 與 `sales_orders` 透過 migration `013_payment_terms.sql` 新增 `payment_due_date DATE NULL` 與 `payment_status TEXT DEFAULT 'unpaid'`：
+    - 付款狀態值：`'unpaid'`（未付）、`'paid'`（已付）、`'overdue'`（逾期，前端判斷，不存 DB）
+    - `purchases:markPaid(id)` / `sales:markPaid(id)` IPC：`UPDATE SET payment_status='paid'`，僅限已收貨/已完成訂單，否則 throw Error
+    - `PurchaseOrder` / `SalesOrder` type 補充 `payment_due_date: string | null` 與 `payment_status: 'unpaid' | 'paid'`
+    - UI 顯示規則：
+      - `payment_status === 'paid'` → 綠色「已付款」Badge
+      - `payment_due_date < today && payment_status === 'unpaid'` → 紅色「逾期」Badge（前端計算）
+      - 其他未付 → 灰色「未付款」Badge
+    - 採購/銷售表單（`PurchaseForm` / `SaleForm`）新增可選「付款截止日」`<Input type="date">`
+    - 完成 markPaid 後 invalidate `['purchases']` / `['sales']` 和 `['reports']`
+
+16. **批次商品價格調整規範**：`products:batchUpdatePrice` IPC 接受陣列參數一次更新多筆商品價格：
+    - 簽名：`products:batchUpdatePrice(updates: { id: number; sell_price?: number; buy_price?: number }[])`
+    - 在單一 transaction 內逐筆 `UPDATE products SET sell_price=?, buy_price=?, updated_at=datetime('now') WHERE id=?`
+    - UI：`Products` 頁面多選後工具列出現「調整價格」按鈕（`DollarSign` icon），開啟 `BatchPriceDialog`
+    - `BatchPriceDialog` 規格：
+      - 模式切換：「固定金額調整」（±N 元）或「百分比調整」（±N%）
+      - 對象切換：「售價」、「進價」或「兩者」
+      - 預覽表格：顯示選中商品的目前價格 → 調整後價格（負值變更用紅色標示）
+      - 確認後呼叫 IPC，成功後 invalidate `['products']` 和 `['reports']` query cache
+
 14. **銷售退貨規範**：`sales:return` IPC 只接受 `completed` 狀態的訂單，在同一個 transaction 內完成：
     ```
     UPDATE sales_orders SET status='returned' WHERE id=? AND status='completed'

@@ -24,7 +24,8 @@ export function registerSettingsIpc(): void {
       appVersion: app.getVersion(),
       companyName: settings['companyName'] ?? '',
       companyAddress: settings['companyAddress'] ?? '',
-      companyPhone: settings['companyPhone'] ?? ''
+      companyPhone: settings['companyPhone'] ?? '',
+      claudeApiKey: settings['claudeApiKey'] ?? ''
     }
   })
 

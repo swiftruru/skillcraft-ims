@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -15,6 +15,7 @@ import { ProductDetailDialog } from '@/components/products/ProductDetailDialog'
 import { PurchaseSuggestionDialog } from '@/components/inventory/PurchaseSuggestionDialog'
 import { ImportCsvDialog } from '@/components/products/ImportCsvDialog'
 import { QuickPurchaseDialog } from '@/components/purchases/QuickPurchaseDialog'
+import { BatchPriceDialog } from '@/components/products/BatchPriceDialog'
 import { formatCurrency, formatNumber } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
 import type { Product } from '@/types/schema'
@@ -38,7 +39,14 @@ export default function Products() {
   const [importOpen, setImportOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+  const [batchPriceOpen, setBatchPriceOpen] = useState(false)
   const [quickPurchaseProduct, setQuickPurchaseProduct] = useState<Product | null>(null)
+
+  useEffect(() => {
+    const handler = () => { setEditProduct(null); setFormOpen(true) }
+    window.addEventListener('ims:new-item', handler)
+    return () => window.removeEventListener('ims:new-item', handler)
+  }, [])
 
   const { data: categories } = useQuery<string[]>({
     queryKey: ['products', 'categories'],
@@ -339,6 +347,13 @@ export default function Products() {
             </SelectContent>
           </Select>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBatchPriceOpen(true)}
+          >
+            {p.adjustPrice}
+          </Button>
+          <Button
             variant="destructive"
             size="sm"
             onClick={() => setBatchDeleteOpen(true)}
@@ -357,6 +372,13 @@ export default function Products() {
         onConfirm={() => batchDeleteMutation.mutate(Array.from(selectedIds))}
       />
 
+      <BatchPriceDialog
+        open={batchPriceOpen}
+        onOpenChange={setBatchPriceOpen}
+        selectedIds={Array.from(selectedIds)}
+        products={products ?? []}
+        onSuccess={() => setSelectedIds(new Set())}
+      />
       <QuickPurchaseDialog
         product={quickPurchaseProduct}
         open={quickPurchaseProduct !== null}

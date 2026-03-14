@@ -71,6 +71,13 @@ export function Layout() {
         gMode.current = true
         if (gTimer.current) clearTimeout(gTimer.current)
         gTimer.current = setTimeout(() => { gMode.current = false }, 1500)
+        return
+      }
+
+      if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('ims:new-item'))
+        return
       }
     }
     window.addEventListener('keydown', handler)

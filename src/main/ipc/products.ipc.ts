@@ -102,4 +102,33 @@ export function registerProductsIpc(): void {
     }
     return { updated }
   })
+
+  ipcMain.handle(
+    'products:batchUpdatePrice',
+    (_e, ids: number[], mode: 'set' | 'increase' | 'decrease', target: 'sell_price' | 'buy_price' | 'both', amount: number, amountType: 'fixed' | 'percent') => {
+      const db = getDb()
+      if (!ids.length || amount <= 0) return { updated: 0 }
+      const placeholders = ids.map(() => '?').join(', ')
+
+      const buildExpr = (col: string) => {
+        if (mode === 'set') return amountType === 'fixed' ? `${amount}` : `${col} * ${amount} / 100.0`
+        const delta = amountType === 'fixed' ? `${amount}` : `${col} * ${amount} / 100.0`
+        const sign = mode === 'increase' ? '+' : '-'
+        return `MAX(0, ${col} ${sign} ${delta})`
+      }
+
+      const cols: ('sell_price' | 'buy_price')[] = target === 'both' ? ['sell_price', 'buy_price'] : [target]
+      let totalUpdated = 0
+      db.transaction(() => {
+        for (const col of cols) {
+          const expr = buildExpr(col)
+          const result = db
+            .prepare(`UPDATE products SET ${col} = ROUND(${expr}, 2), updated_at = datetime('now') WHERE id IN (${placeholders})`)
+            .run(...ids)
+          totalUpdated = result.changes
+        }
+      })()
+      return { updated: totalUpdated }
+    }
+  )
 }
