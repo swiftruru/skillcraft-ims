@@ -66,6 +66,13 @@ export function ProductDetailDialog({ open, onOpenChange, product }: Props) {
     enabled: open && product !== null
   })
 
+  const { data: productImage } = useQuery<string | null>({
+    queryKey: ['products', 'image', product?.id],
+    queryFn: () => window.electronAPI.products.getImage(product!.id),
+    enabled: open && product !== null,
+    staleTime: 1000 * 60 * 5
+  })
+
   const { data: priceHistory, isLoading: priceLoading } = useQuery<PriceHistoryItem[]>({
     queryKey: ['products', 'priceHistory', product?.id],
     queryFn: () => window.electronAPI.products.getPriceHistory(product!.id),
@@ -105,13 +112,24 @@ export function ProductDetailDialog({ open, onOpenChange, product }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {product.name}
-            {isLowStock && (
-              <Badge variant="destructive" className="text-xs">低庫存</Badge>
+          <div className="flex items-start gap-3">
+            {productImage && (
+              <img
+                src={productImage}
+                alt={product.name}
+                className="w-14 h-14 rounded-lg object-cover border border-border shrink-0"
+              />
             )}
-          </DialogTitle>
-          <p className="text-xs text-muted-foreground font-mono">{product.sku} · {product.category}</p>
+            <div className="min-w-0">
+              <DialogTitle className="flex items-center gap-2">
+                {product.name}
+                {isLowStock && (
+                  <Badge variant="destructive" className="text-xs">低庫存</Badge>
+                )}
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground font-mono">{product.sku} · {product.category}</p>
+            </div>
+          </div>
         </DialogHeader>
 
         {/* KPI Cards */}
