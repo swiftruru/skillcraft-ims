@@ -13,6 +13,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import type { Supplier, SupplierCreate } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
+import { formatCurrency } from '@/lib/utils'
 import { SupplierDetailDialog } from '@/components/suppliers/SupplierDetailDialog'
 
 const schema = z.object({
@@ -21,7 +22,8 @@ const schema = z.object({
   phone: z.string().optional(),
   email: z.string().email('Email 格式不正確').optional().or(z.literal('')),
   address: z.string().optional(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  credit_limit: z.coerce.number().min(0).optional()
 })
 type FormValues = z.infer<typeof schema>
 
@@ -36,7 +38,7 @@ export default function Suppliers() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
   useEffect(() => {
-    const handler = () => { setEditSupplier(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '' }); setFormOpen(true) }
+    const handler = () => { setEditSupplier(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0 }); setFormOpen(true) }
     window.addEventListener('ims:new-item', handler)
     return () => window.removeEventListener('ims:new-item', handler)
   }, [])
@@ -75,14 +77,14 @@ export default function Suppliers() {
   }
 
   const onSubmit = (data: FormValues) => {
-    const payload = { name: data.name, contact: data.contact ?? null, phone: data.phone ?? null, email: data.email ?? null, address: data.address ?? null, notes: data.notes ?? null }
+    const payload = { name: data.name, contact: data.contact ?? null, phone: data.phone ?? null, email: data.email ?? null, address: data.address ?? null, notes: data.notes ?? null, credit_limit: data.credit_limit ?? 0 }
     if (editSupplier) updateMutation.mutate({ id: editSupplier.id, data: payload })
     else createMutation.mutate(payload)
   }
 
   const openEdit = (sup: Supplier) => {
     setEditSupplier(sup)
-    reset({ name: sup.name, contact: sup.contact ?? '', phone: sup.phone ?? '', email: sup.email ?? '', address: sup.address ?? '', notes: sup.notes ?? '' })
+    reset({ name: sup.name, contact: sup.contact ?? '', phone: sup.phone ?? '', email: sup.email ?? '', address: sup.address ?? '', notes: sup.notes ?? '', credit_limit: sup.credit_limit ?? 0 })
     setFormOpen(true)
   }
 
@@ -96,6 +98,7 @@ export default function Suppliers() {
     { key: 'phone', label: s.phone },
     { key: 'email', label: s.email },
     { key: 'address', label: s.address },
+    { key: 'credit_limit', label: '信用額度', render: (v) => (Number(v) > 0 ? formatCurrency(Number(v)) : <span className="text-muted-foreground">—</span>) },
     { key: 'id', label: '', className: 'w-28 text-right', render: (_v, row) => (
       <div className="flex justify-end gap-1">
         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setDetailSupplier(row as unknown as Supplier)}><Eye className="w-3.5 h-3.5" /></Button>
@@ -112,7 +115,7 @@ export default function Suppliers() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder={s.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Button onClick={() => { setEditSupplier(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '' }); setFormOpen(true) }} className="gap-2">
+        <Button onClick={() => { setEditSupplier(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0 }); setFormOpen(true) }} className="gap-2">
           <Plus className="w-4 h-4" />{s.addSupplier}
         </Button>
       </div>
@@ -137,6 +140,10 @@ export default function Suppliers() {
               <div className="space-y-1.5"><Label>{s.phone}</Label><Input {...register('phone')} /></div>
               <div className="space-y-1.5"><Label>{s.email}</Label><Input type="email" {...register('email')} />{errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}</div>
               <div className="space-y-1.5"><Label>{s.address}</Label><Input {...register('address')} /></div>
+              <div className="space-y-1.5">
+                <Label>信用額度</Label>
+                <Input type="number" min={0} step={1000} placeholder="0 表示不限制" {...register('credit_limit')} />
+              </div>
             </div>
             <DialogFooter className="gap-2">
               {!editSupplier && (

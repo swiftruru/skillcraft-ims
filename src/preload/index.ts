@@ -35,7 +35,8 @@ const electronAPI = {
     create: (data: unknown) => ipcRenderer.invoke('suppliers:create', data),
     update: (id: number, data: unknown) => ipcRenderer.invoke('suppliers:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('suppliers:delete', id),
-    getOrders: (supplierId: number) => ipcRenderer.invoke('suppliers:getOrders', supplierId)
+    getOrders: (supplierId: number) => ipcRenderer.invoke('suppliers:getOrders', supplierId),
+    getOutstanding: (supplierId: number) => ipcRenderer.invoke('suppliers:getOutstanding', supplierId)
   },
 
   // Customers
@@ -45,7 +46,8 @@ const electronAPI = {
     create: (data: unknown) => ipcRenderer.invoke('customers:create', data),
     update: (id: number, data: unknown) => ipcRenderer.invoke('customers:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('customers:delete', id),
-    getOrders: (customerId: number) => ipcRenderer.invoke('customers:getOrders', customerId)
+    getOrders: (customerId: number) => ipcRenderer.invoke('customers:getOrders', customerId),
+    getOutstanding: (customerId: number) => ipcRenderer.invoke('customers:getOutstanding', customerId)
   },
 
   // Purchases

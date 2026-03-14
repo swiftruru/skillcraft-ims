@@ -4,7 +4,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Wand2 } from 'lucide-react'
+import { Plus, Trash2, Wand2, AlertTriangle } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '@/components/ui/dialog'
@@ -86,8 +86,21 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
     }
   })
 
+  const supplierId = watch('supplier_id')
   const items = watch('items')
   const total = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0), 0)
+
+  const selectedSupplier = suppliers?.find((s) => s.id === Number(supplierId))
+  const { data: outstandingData } = useQuery<{ outstanding: number }>({
+    queryKey: ['suppliers', 'outstanding', supplierId],
+    queryFn: () => window.electronAPI.suppliers.getOutstanding(Number(supplierId)),
+    enabled: !!supplierId && (selectedSupplier?.credit_limit ?? 0) > 0
+  })
+  const creditLimit = selectedSupplier?.credit_limit ?? 0
+  const outstanding = outstandingData?.outstanding ?? 0
+  const projectedTotal = outstanding + total
+  const creditExceeded = creditLimit > 0 && projectedTotal > creditLimit
+  const creditNearLimit = creditLimit > 0 && !creditExceeded && projectedTotal >= creditLimit * 0.8
 
   const fillMock = () => {
     const firstProduct = products?.[0]
@@ -195,6 +208,19 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
             </div>
           </div>
 
+          {creditExceeded && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>已超過信用額度（上限 NT${creditLimit.toLocaleString('zh-TW')}，目前已用 NT${outstanding.toLocaleString('zh-TW')}），無法建立訂單。</span>
+            </div>
+          )}
+          {creditNearLimit && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-400">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>接近信用上限：已用 NT${outstanding.toLocaleString('zh-TW')} + 本單 NT${total.toLocaleString('zh-TW')} = NT${projectedTotal.toLocaleString('zh-TW')}（上限 NT${creditLimit.toLocaleString('zh-TW')}）</span>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="notes">{tf.notesLabel}</Label>
             <Textarea id="notes" {...register('notes')} rows={2} placeholder={tf.notesPlaceholder} />
@@ -205,7 +231,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
               <Wand2 className="w-3.5 h-3.5" />{t.common.mockData}
             </Button>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t.common.cancel}</Button>
-            <Button type="submit" disabled={isSubmitting || mutation.isPending}>{tf.submitCreate}</Button>
+            <Button type="submit" disabled={isSubmitting || mutation.isPending || creditExceeded}>{tf.submitCreate}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

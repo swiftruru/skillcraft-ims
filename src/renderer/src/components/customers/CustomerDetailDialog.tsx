@@ -4,6 +4,22 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import type { Customer, SalesOrder } from '@/types/schema'
 
+function CreditBar({ used, limit }: { used: number; limit: number }) {
+  const pct = Math.min((used / limit) * 100, 100)
+  const color = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-green-500'
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>已用 {formatCurrency(used)}</span>
+        <span>上限 {formatCurrency(limit)}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
 interface Props {
   customer: Customer | null
   open: boolean
@@ -16,6 +32,12 @@ export function CustomerDetailDialog({ customer, open, onOpenChange }: Props) {
     queryFn: () => window.electronAPI.customers.getOrders(customer!.id),
     enabled: open && customer !== null,
     staleTime: 1000 * 60
+  })
+
+  const { data: outstandingData } = useQuery<{ outstanding: number }>({
+    queryKey: ['customers', 'outstanding', customer?.id],
+    queryFn: () => window.electronAPI.customers.getOutstanding(customer!.id),
+    enabled: open && customer !== null && (customer?.credit_limit ?? 0) > 0
   })
 
   const completedOrders = (orders ?? []).filter((o) => o.status === 'completed' || o.status === 'returned')
@@ -45,7 +67,7 @@ export function CustomerDetailDialog({ customer, open, onOpenChange }: Props) {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 py-3 border-b border-border">
+        <div className={`grid gap-4 py-3 border-b border-border ${(customer?.credit_limit ?? 0) > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <div className="text-center">
             <div className="text-xl font-bold">{(orders ?? []).length}</div>
             <div className="text-xs text-muted-foreground">訂單總數</div>
@@ -58,6 +80,12 @@ export function CustomerDetailDialog({ customer, open, onOpenChange }: Props) {
             <div className="text-xl font-bold text-blue-400">{formatCurrency(totalSpent)}</div>
             <div className="text-xs text-muted-foreground">累計消費</div>
           </div>
+          {(customer?.credit_limit ?? 0) > 0 && (
+            <div className="text-center col-span-1">
+              <div className="text-xs text-muted-foreground mb-1">信用額度使用</div>
+              <CreditBar used={outstandingData?.outstanding ?? 0} limit={customer!.credit_limit} />
+            </div>
+          )}
         </div>
 
         {/* Order list */}

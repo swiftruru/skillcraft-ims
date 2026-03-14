@@ -30,6 +30,7 @@ declare global {
         update(id: number, data: unknown): Promise<import('./schema').Supplier | null>
         delete(id: number): Promise<boolean>
         getOrders(supplierId: number): Promise<import('./schema').PurchaseOrder[]>
+        getOutstanding(supplierId: number): Promise<{ outstanding: number }>
       }
       customers: {
         getAll(search?: string): Promise<import('./schema').Customer[]>
@@ -38,6 +39,7 @@ declare global {
         update(id: number, data: unknown): Promise<import('./schema').Customer | null>
         delete(id: number): Promise<boolean>
         getOrders(customerId: number): Promise<import('./schema').SalesOrder[]>
+        getOutstanding(customerId: number): Promise<{ outstanding: number }>
       }
       purchases: {
         getAll(filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }): Promise<import('./schema').PurchaseOrder[]>

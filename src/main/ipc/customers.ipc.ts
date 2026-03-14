@@ -8,6 +8,15 @@ export function registerCustomersIpc(): void {
   ipcMain.handle('customers:create', (_e, data) => CustomerModel.create(data))
   ipcMain.handle('customers:update', (_e, id: number, data) => CustomerModel.update(id, data))
   ipcMain.handle('customers:delete', (_e, id: number) => CustomerModel.delete(id))
+  ipcMain.handle('customers:getOutstanding', (_e, customerId: number) => {
+    const db = getDb()
+    const row = db.prepare(
+      `SELECT COALESCE(SUM(total_amount), 0) as outstanding
+       FROM sales_orders
+       WHERE customer_id = ? AND payment_status = 'unpaid' AND status IN ('completed', 'partial_return')`
+    ).get(customerId) as { outstanding: number }
+    return { outstanding: row.outstanding }
+  })
   ipcMain.handle('customers:getOrders', (_e, customerId: number) => {
     const db = getDb()
     return db.prepare(

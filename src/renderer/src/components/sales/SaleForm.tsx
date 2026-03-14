@@ -60,8 +60,21 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['sales'] }); reset(); onOpenChange(false) }
   })
 
+  const customerId = watch('customer_id')
   const items = watch('items')
   const total = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0), 0)
+
+  const selectedCustomer = customers?.find((c) => c.id === Number(customerId))
+  const { data: outstandingData } = useQuery<{ outstanding: number }>({
+    queryKey: ['customers', 'outstanding', customerId],
+    queryFn: () => window.electronAPI.customers.getOutstanding(Number(customerId)),
+    enabled: !!customerId && (selectedCustomer?.credit_limit ?? 0) > 0
+  })
+  const creditLimit = selectedCustomer?.credit_limit ?? 0
+  const outstanding = outstandingData?.outstanding ?? 0
+  const projectedTotal = outstanding + total
+  const creditExceeded = creditLimit > 0 && projectedTotal > creditLimit
+  const creditNearLimit = creditLimit > 0 && !creditExceeded && projectedTotal >= creditLimit * 0.8
 
   // 逐行計算庫存不足警告
   const stockWarnings = items.map((item) => {
@@ -164,6 +177,19 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
             </div>
           </div>
 
+          {creditExceeded && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>已超過信用額度（上限 NT${creditLimit.toLocaleString('zh-TW')}，目前已用 NT${outstanding.toLocaleString('zh-TW')}），無法建立訂單。</span>
+            </div>
+          )}
+          {creditNearLimit && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-400">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>接近信用上限：已用 NT${outstanding.toLocaleString('zh-TW')} + 本單 NT${total.toLocaleString('zh-TW')} = NT${projectedTotal.toLocaleString('zh-TW')}（上限 NT${creditLimit.toLocaleString('zh-TW')}）</span>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="notes">{tf.notesLabel}</Label>
             <Textarea id="notes" {...register('notes')} rows={2} placeholder={tf.notesPlaceholder} />
@@ -174,7 +200,7 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
               <Wand2 className="w-3.5 h-3.5" />{t.common.mockData}
             </Button>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t.common.cancel}</Button>
-            <Button type="submit" disabled={isSubmitting || mutation.isPending || hasStockError}>
+            <Button type="submit" disabled={isSubmitting || mutation.isPending || hasStockError || creditExceeded}>
               {tf.submitCreateSale}
             </Button>
           </DialogFooter>

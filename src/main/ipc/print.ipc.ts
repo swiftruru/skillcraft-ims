@@ -11,6 +11,8 @@ interface OrderRow {
   supplier_name?: string
   customer_name?: string
   status: string
+  payment_status?: string
+  payment_due_date?: string | null
 }
 
 interface ItemRow {
@@ -37,7 +39,8 @@ function getStatusLabel(status: string): string {
     received: '已收貨',
     cancelled: '已取消',
     pending: '待處理',
-    returned: '已退貨'
+    returned: '已退貨',
+    partial_return: '部分退貨'
   }
   return map[status] ?? status
 }
@@ -48,7 +51,8 @@ function getStatusColor(status: string): string {
     received: 'background:#dbeafe;color:#1d4ed8',
     cancelled: 'background:#fee2e2;color:#b91c1c',
     pending: 'background:#fef9c3;color:#a16207',
-    returned: 'background:#ffedd5;color:#c2410c'
+    returned: 'background:#ffedd5;color:#c2410c',
+    partial_return: 'background:#fef3c7;color:#b45309'
   }
   return map[status] ?? 'background:#f3f4f6;color:#374151'
 }
@@ -130,6 +134,16 @@ function buildHtml(
       <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">品項數量</div>
       <div style="font-size:13px">${items.length} 項</div>
     </div>
+    ${type === 'sales' && order.payment_status ? `
+    <div>
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">付款狀態</div>
+      <div style="font-size:13px;font-weight:600;color:${order.payment_status === 'paid' ? '#15803d' : '#dc2626'}">${order.payment_status === 'paid' ? '已付款' : '未付款'}</div>
+    </div>
+    ${order.payment_due_date ? `
+    <div>
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">付款期限</div>
+      <div style="font-size:13px;font-weight:600;color:${order.payment_due_date < new Date().toISOString().slice(0,10) && order.payment_status !== 'paid' ? '#dc2626' : '#1e293b'}">${order.payment_due_date}</div>
+    </div>` : ''}` : ''}
   </div>
 
   <!-- Table -->

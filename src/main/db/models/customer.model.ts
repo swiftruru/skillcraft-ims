@@ -20,10 +20,10 @@ export const CustomerModel = {
     const db = getDb()
     const result = db
       .prepare(
-        `INSERT INTO customers (name, contact, phone, email, address, notes)
-         VALUES (@name, @contact, @phone, @email, @address, @notes)`
+        `INSERT INTO customers (name, contact, phone, email, address, notes, credit_limit)
+         VALUES (@name, @contact, @phone, @email, @address, @notes, @credit_limit)`
       )
-      .run(data)
+      .run({ ...data, credit_limit: data.credit_limit ?? 0 })
     return this.findById(result.lastInsertRowid as number)!
   },
 
@@ -33,7 +33,7 @@ export const CustomerModel = {
     if (!existing) return null
     const updated = { ...existing, ...data }
     db.prepare(
-      `UPDATE customers SET name=@name, contact=@contact, phone=@phone, email=@email, address=@address, notes=@notes WHERE id=@id`
+      `UPDATE customers SET name=@name, contact=@contact, phone=@phone, email=@email, address=@address, notes=@notes, credit_limit=@credit_limit WHERE id=@id`
     ).run({ ...updated, id })
     return this.findById(id)
   },

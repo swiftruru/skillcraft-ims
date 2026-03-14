@@ -28,6 +28,7 @@ export interface Supplier {
   email: string | null
   address: string | null
   notes: string | null
+  credit_limit: number
   created_at: string
 }
 
@@ -41,6 +42,7 @@ export interface Customer {
   email: string | null
   address: string | null
   notes: string | null
+  credit_limit: number
   created_at: string
 }
 

@@ -13,6 +13,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import type { Customer, CustomerCreate } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
+import { formatCurrency } from '@/lib/utils'
 import { CustomerDetailDialog } from '@/components/customers/CustomerDetailDialog'
 
 const schema = z.object({
@@ -21,7 +22,8 @@ const schema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   address: z.string().optional(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  credit_limit: z.coerce.number().min(0).optional()
 })
 type FormValues = z.infer<typeof schema>
 
@@ -36,7 +38,7 @@ export default function Customers() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
   useEffect(() => {
-    const handler = () => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '' }); setFormOpen(true) }
+    const handler = () => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0 }); setFormOpen(true) }
     window.addEventListener('ims:new-item', handler)
     return () => window.removeEventListener('ims:new-item', handler)
   }, [])
@@ -73,14 +75,14 @@ export default function Customers() {
   }
 
   const onSubmit = (data: FormValues) => {
-    const payload = { name: data.name, contact: data.contact ?? null, phone: data.phone ?? null, email: data.email ?? null, address: data.address ?? null, notes: data.notes ?? null }
+    const payload = { name: data.name, contact: data.contact ?? null, phone: data.phone ?? null, email: data.email ?? null, address: data.address ?? null, notes: data.notes ?? null, credit_limit: data.credit_limit ?? 0 }
     if (editCustomer) updateMutation.mutate({ id: editCustomer.id, data: payload })
     else createMutation.mutate(payload)
   }
 
   const openEdit = (cust: Customer) => {
     setEditCustomer(cust)
-    reset({ name: cust.name, contact: cust.contact ?? '', phone: cust.phone ?? '', email: cust.email ?? '', address: cust.address ?? '', notes: cust.notes ?? '' })
+    reset({ name: cust.name, contact: cust.contact ?? '', phone: cust.phone ?? '', email: cust.email ?? '', address: cust.address ?? '', notes: cust.notes ?? '', credit_limit: cust.credit_limit ?? 0 })
     setFormOpen(true)
   }
 
@@ -94,6 +96,7 @@ export default function Customers() {
     { key: 'phone', label: c.phone },
     { key: 'email', label: c.email },
     { key: 'address', label: c.address },
+    { key: 'credit_limit', label: '信用額度', render: (v) => (Number(v) > 0 ? formatCurrency(Number(v)) : <span className="text-muted-foreground">—</span>) },
     { key: 'id', label: '', className: 'w-28 text-right', render: (_v, row) => (
       <div className="flex justify-end gap-1">
         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setDetailCustomer(row as unknown as Customer)}><Eye className="w-3.5 h-3.5" /></Button>
@@ -110,7 +113,7 @@ export default function Customers() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder={c.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Button onClick={() => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '' }); setFormOpen(true) }} className="gap-2">
+        <Button onClick={() => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0 }); setFormOpen(true) }} className="gap-2">
           <Plus className="w-4 h-4" />{c.addCustomer}
         </Button>
       </div>
@@ -129,6 +132,10 @@ export default function Customers() {
               <div className="space-y-1.5"><Label>{c.phone}</Label><Input {...register('phone')} /></div>
               <div className="space-y-1.5"><Label>{c.email}</Label><Input type="email" {...register('email')} /></div>
               <div className="space-y-1.5"><Label>{c.address}</Label><Input {...register('address')} /></div>
+              <div className="space-y-1.5">
+                <Label>信用額度</Label>
+                <Input type="number" min={0} step={1000} placeholder="0 表示不限制" {...register('credit_limit')} />
+              </div>
             </div>
             <DialogFooter className="gap-2">
               {!editCustomer && (

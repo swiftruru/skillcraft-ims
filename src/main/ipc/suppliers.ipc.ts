@@ -8,6 +8,15 @@ export function registerSuppliersIpc(): void {
   ipcMain.handle('suppliers:create', (_e, data) => SupplierModel.create(data))
   ipcMain.handle('suppliers:update', (_e, id: number, data) => SupplierModel.update(id, data))
   ipcMain.handle('suppliers:delete', (_e, id: number) => SupplierModel.delete(id))
+  ipcMain.handle('suppliers:getOutstanding', (_e, supplierId: number) => {
+    const db = getDb()
+    const row = db.prepare(
+      `SELECT COALESCE(SUM(total_amount), 0) as outstanding
+       FROM purchase_orders
+       WHERE supplier_id = ? AND payment_status = 'unpaid' AND status = 'received'`
+    ).get(supplierId) as { outstanding: number }
+    return { outstanding: row.outstanding }
+  })
   ipcMain.handle('suppliers:getOrders', (_e, supplierId: number) => {
     const db = getDb()
     return db.prepare(
