@@ -81,6 +81,7 @@ export type PurchaseOrderCreate = {
   order_date: string
   notes: string | null
   items: PurchaseItemInput[]
+  payment_due_date?: string | null
 }
 
 export interface SalesOrder {
@@ -118,6 +119,7 @@ export type SalesOrderCreate = {
   order_date: string
   notes: string | null
   items: SaleItemInput[]
+  payment_due_date?: string | null
 }
 
 export interface InventoryAdjustment {

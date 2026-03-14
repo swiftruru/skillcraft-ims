@@ -23,6 +23,7 @@ export const translations = {
       reports: '報表分析',
       stockTake: '庫存盤點',
       inventoryHistory: '異動歷史',
+      receivables: '帳款管理',
       settings: '設定',
       about: '關於'
     },
@@ -462,7 +463,29 @@ export const translations = {
       salesItemsLabel: '銷售明細',
       sellPriceCol: '售價 (NT$)',
       stockSuffix: (n: number) => `(庫存:${n})`,
-      submitCreateSale: '建立銷售單'
+      submitCreateSale: '建立銷售單',
+      paymentTermsLabel: '帳期天數',
+      paymentTermsPlaceholder: '0 表示不設定'
+    },
+    receivables: {
+      title: '帳款管理',
+      salesTab: '應收帳款',
+      purchasesTab: '應付帳款',
+      orderNo: '訂單號',
+      customer: '客戶',
+      supplier: '供應商',
+      orderDate: '訂單日期',
+      paymentDue: '付款期限',
+      amount: '金額',
+      overdue: '逾期',
+      dueToday: '今日到期',
+      markPaid: '標記已付款',
+      markPaidTitle: '確認標記為已付款',
+      markPaidDesc: '確認將此訂單標記為已付款？此操作不可撤銷。',
+      emptyMessage: '目前無未付款帳款',
+      summary: (count: number, total: number) => `共 ${count} 筆，合計 NT$ ${total.toLocaleString('zh-TW')}`,
+      overdueCount: (n: number) => `${n} 筆逾期`,
+      total: (n: number) => `共 ${n} 筆`
     },
     commandPalette: {
       placeholder: '搜尋商品、供應商、客戶、訂單...',
@@ -515,6 +538,7 @@ export const translations = {
       reports: 'Reports',
       stockTake: 'Stock Take',
       inventoryHistory: 'History',
+      receivables: 'Receivables',
       settings: 'Settings',
       about: 'About'
     },
@@ -954,7 +978,29 @@ export const translations = {
       salesItemsLabel: 'Order Items',
       sellPriceCol: 'Sell Price (NT$)',
       stockSuffix: (n: number) => `(Stock:${n})`,
-      submitCreateSale: 'Create Sales Order'
+      submitCreateSale: 'Create Sales Order',
+      paymentTermsLabel: 'Payment Terms (days)',
+      paymentTermsPlaceholder: '0 = no due date'
+    },
+    receivables: {
+      title: 'Receivables & Payables',
+      salesTab: 'Receivables',
+      purchasesTab: 'Payables',
+      orderNo: 'Order No.',
+      customer: 'Customer',
+      supplier: 'Supplier',
+      orderDate: 'Order Date',
+      paymentDue: 'Payment Due',
+      amount: 'Amount',
+      overdue: 'Overdue',
+      dueToday: 'Due Today',
+      markPaid: 'Mark as Paid',
+      markPaidTitle: 'Confirm Mark as Paid',
+      markPaidDesc: 'Are you sure you want to mark this order as paid? This action cannot be undone.',
+      emptyMessage: 'No outstanding payments',
+      summary: (count: number, total: number) => `${count} orders, total NT$ ${total.toLocaleString()}`,
+      overdueCount: (n: number) => `${n} overdue`,
+      total: (n: number) => `${n} orders`
     },
     commandPalette: {
       placeholder: 'Search products, suppliers, customers, orders...',

@@ -21,6 +21,7 @@ import { useLang } from '@/lib/useLang'
 const schema = z.object({
   supplier_id: z.coerce.number().nullable(),
   order_date: z.string().min(1, '訂單日期必填'),
+  payment_terms: z.coerce.number().int().min(0).optional(),
   notes: z.string().optional(),
   items: z.array(z.object({
     product_id: z.coerce.number().min(1, '請選擇商品'),
@@ -56,6 +57,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
     defaultValues: {
       supplier_id: null,
       order_date: today,
+      payment_terms: 0,
       notes: '',
       items: [{ product_id: 0, quantity: 1, unit_price: 0 }]
     }
@@ -69,16 +71,22 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
       reset({
         supplier_id: initialData.supplier_id ?? null,
         order_date: today,
+        payment_terms: 0,
         notes: initialData.notes ?? '',
         items: initialData.items?.length ? initialData.items : [{ product_id: 0, quantity: 1, unit_price: 0 }]
       })
     } else if (!open) {
-      reset({ supplier_id: null, order_date: today, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] })
+      reset({ supplier_id: null, order_date: today, payment_terms: 0, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] })
     }
   }, [open, initialData])
 
   const mutation = useMutation({
-    mutationFn: (data: FormValues) => window.electronAPI.purchases.create(data),
+    mutationFn: (data: FormValues) => {
+      const payment_due_date = data.payment_terms && data.payment_terms > 0
+        ? new Date(new Date(data.order_date).getTime() + data.payment_terms * 86400000).toISOString().slice(0, 10)
+        : null
+      return window.electronAPI.purchases.create({ ...data, payment_due_date })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases'] })
       reset()
@@ -107,6 +115,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
     reset({
       supplier_id: suppliers?.[0]?.id ?? null,
       order_date: today,
+      payment_terms: 30,
       notes: '測試採購單，請確認品項後送出',
       items: firstProduct
         ? [{ product_id: firstProduct.id, quantity: 10, unit_price: firstProduct.buy_price }]
@@ -131,8 +140,8 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
         </DialogHeader>
 
         <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1.5 col-span-1">
               <Label>{tf.supplierLabel}</Label>
               <Select onValueChange={(v) => setValue('supplier_id', v === 'null' ? null : parseInt(v))}>
                 <SelectTrigger>
@@ -149,6 +158,10 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
             <div className="space-y-1.5">
               <Label htmlFor="order_date">{tf.orderDateLabel}</Label>
               <Input id="order_date" type="date" {...register('order_date')} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="payment_terms">{tf.paymentTermsLabel}</Label>
+              <Input id="payment_terms" type="number" min={0} step={15} placeholder={tf.paymentTermsPlaceholder} {...register('payment_terms')} />
             </div>
           </div>
 

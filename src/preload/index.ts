@@ -95,7 +95,8 @@ const electronAPI = {
     purchaseVsSales: (days?: number, dateFrom?: string, dateTo?: string) => ipcRenderer.invoke('reports:purchaseVsSales', days, dateFrom, dateTo),
     turnoverAnalysis: (days?: number) => ipcRenderer.invoke('reports:turnoverAnalysis', days),
     abcAnalysis: () => ipcRenderer.invoke('reports:abcAnalysis'),
-    monthlyPL: () => ipcRenderer.invoke('reports:monthlyPL')
+    monthlyPL: () => ipcRenderer.invoke('reports:monthlyPL'),
+    getUnpaidOrders: () => ipcRenderer.invoke('reports:getUnpaidOrders')
   },
 
   // Sync

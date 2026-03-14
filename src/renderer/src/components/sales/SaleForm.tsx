@@ -16,6 +16,7 @@ import { useLang } from '@/lib/useLang'
 const schema = z.object({
   customer_id: z.coerce.number().nullable(),
   order_date: z.string().min(1),
+  payment_terms: z.coerce.number().int().min(0).optional(),
   notes: z.string().optional(),
   items: z.array(z.object({
     product_id: z.coerce.number().min(1, '請選擇商品'),
@@ -36,7 +37,7 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
 
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { customer_id: null, order_date: today, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] }
+    defaultValues: { customer_id: null, order_date: today, payment_terms: 0, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] }
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
@@ -47,16 +48,22 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
       reset({
         customer_id: initialData.customer_id ?? null,
         order_date: today,
+        payment_terms: 0,
         notes: initialData.notes ?? '',
         items: initialData.items?.length ? initialData.items : [{ product_id: 0, quantity: 1, unit_price: 0 }]
       })
     } else if (!open) {
-      reset({ customer_id: null, order_date: today, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] })
+      reset({ customer_id: null, order_date: today, payment_terms: 0, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] })
     }
   }, [open, initialData])
 
   const mutation = useMutation({
-    mutationFn: (data: FormValues) => window.electronAPI.sales.create(data),
+    mutationFn: (data: FormValues) => {
+      const payment_due_date = data.payment_terms && data.payment_terms > 0
+        ? new Date(new Date(data.order_date).getTime() + data.payment_terms * 86400000).toISOString().slice(0, 10)
+        : null
+      return window.electronAPI.sales.create({ ...data, payment_due_date })
+    },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['sales'] }); reset(); onOpenChange(false) }
   })
 
@@ -92,6 +99,7 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
     reset({
       customer_id: customers?.[0]?.id ?? null,
       order_date: today,
+      payment_terms: 30,
       notes: '測試銷售單，請確認品項後送出',
       items: firstProduct
         ? [{ product_id: firstProduct.id, quantity: 2, unit_price: firstProduct.sell_price }]
@@ -111,8 +119,8 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{tf.newSalesOrder}</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1.5 col-span-1">
               <Label>{tf.customerLabel}</Label>
               <Select onValueChange={(v) => setValue('customer_id', v === 'null' ? null : parseInt(v))}>
                 <SelectTrigger><SelectValue placeholder={tf.customerPlaceholder} /></SelectTrigger>
@@ -125,6 +133,10 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
             <div className="space-y-1.5">
               <Label htmlFor="order_date">{tf.orderDateLabel}</Label>
               <Input id="order_date" type="date" {...register('order_date')} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="payment_terms">{tf.paymentTermsLabel}</Label>
+              <Input id="payment_terms" type="number" min={0} step={15} placeholder={tf.paymentTermsPlaceholder} {...register('payment_terms')} />
             </div>
           </div>
 

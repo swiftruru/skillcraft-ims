@@ -85,6 +85,16 @@ export function registerReportsIpc(): void {
         .get() as { val: number }
     ).val
 
+    const overdueCount = (
+      db.prepare(`
+        SELECT COUNT(*) as cnt FROM (
+          SELECT id FROM sales_orders WHERE status IN ('completed','partial_return') AND payment_status='unpaid' AND payment_due_date IS NOT NULL AND payment_due_date < date('now')
+          UNION ALL
+          SELECT id FROM purchase_orders WHERE status='received' AND payment_status='unpaid' AND payment_due_date IS NOT NULL AND payment_due_date < date('now')
+        )
+      `).get() as { cnt: number }
+    ).cnt
+
     return {
       totalInventoryValue: inventoryValue,
       monthlyRevenue,
@@ -96,7 +106,8 @@ export function registerReportsIpc(): void {
       pendingSalesOrders,
       pendingPurchasesCount,
       unpaidSalesTotal,
-      unpaidPurchasesTotal
+      unpaidPurchasesTotal,
+      overdueCount
     }
   })
 
@@ -406,5 +417,31 @@ export function registerReportsIpc(): void {
          LIMIT 10`
       )
       .all()
+  })
+
+  ipcMain.handle('reports:getUnpaidOrders', () => {
+    const db = getDb()
+    const today = new Date().toISOString().slice(0, 10)
+    const sales = db.prepare(`
+      SELECT so.id, so.order_no,
+             COALESCE(c.name, '散客') as party_name,
+             so.order_date, so.payment_due_date, so.total_amount, so.payment_status,
+             CASE WHEN so.payment_due_date IS NOT NULL AND so.payment_due_date < ? THEN 1 ELSE 0 END as overdue
+      FROM sales_orders so
+      LEFT JOIN customers c ON so.customer_id = c.id
+      WHERE so.status IN ('completed', 'partial_return') AND so.payment_status = 'unpaid'
+      ORDER BY so.payment_due_date ASC, so.order_date DESC
+    `).all(today)
+    const purchases = db.prepare(`
+      SELECT po.id, po.order_no,
+             COALESCE(s.name, '無供應商') as party_name,
+             po.order_date, po.payment_due_date, po.total_amount, po.payment_status,
+             CASE WHEN po.payment_due_date IS NOT NULL AND po.payment_due_date < ? THEN 1 ELSE 0 END as overdue
+      FROM purchase_orders po
+      LEFT JOIN suppliers s ON po.supplier_id = s.id
+      WHERE po.status = 'received' AND po.payment_status = 'unpaid'
+      ORDER BY po.payment_due_date ASC, po.order_date DESC
+    `).all(today)
+    return { sales, purchases }
   })
 }

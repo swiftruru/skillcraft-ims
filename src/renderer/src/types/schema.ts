@@ -139,6 +139,18 @@ export interface DashboardKPIs {
   pendingPurchasesCount: number
   unpaidSalesTotal: number
   unpaidPurchasesTotal: number
+  overdueCount: number
+}
+
+export interface UnpaidOrder {
+  id: number
+  order_no: string
+  party_name: string
+  order_date: string
+  payment_due_date: string | null
+  total_amount: number
+  payment_status: string
+  overdue: number
 }
 
 export interface SalesTrendPoint {

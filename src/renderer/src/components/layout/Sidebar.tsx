@@ -12,7 +12,8 @@ import {
   History,
   Settings,
   Warehouse,
-  Info
+  Info,
+  Wallet
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLang } from '@/lib/useLang'
@@ -34,6 +35,7 @@ export function Sidebar() {
     { to: '/sales', icon: TrendingUp, label: t.nav.sales, badge: kpis?.pendingSalesOrders, badgeStyle: 'bg-primary/15 text-primary' },
     { to: '/suppliers', icon: Truck, label: t.nav.suppliers },
     { to: '/customers', icon: Users, label: t.nav.customers },
+    { to: '/receivables', icon: Wallet, label: t.nav.receivables, badge: kpis?.overdueCount, badgeStyle: 'bg-red-500/20 text-red-500' },
     { to: '/reports', icon: BarChart3, label: t.nav.reports },
     { to: '/stock-take', icon: ClipboardList, label: t.nav.stockTake },
     { to: '/inventory-history', icon: History, label: t.nav.inventoryHistory }

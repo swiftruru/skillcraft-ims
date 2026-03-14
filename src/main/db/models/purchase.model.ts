@@ -71,8 +71,8 @@ export const PurchaseModel = {
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0)
 
     const insertOrder = db.prepare(
-      `INSERT INTO purchase_orders (order_no, supplier_id, order_date, total_amount, notes)
-       VALUES (@order_no, @supplier_id, @order_date, @total_amount, @notes)`
+      `INSERT INTO purchase_orders (order_no, supplier_id, order_date, total_amount, notes, payment_due_date)
+       VALUES (@order_no, @supplier_id, @order_date, @total_amount, @notes, @payment_due_date)`
     )
     const insertItem = db.prepare(
       `INSERT INTO purchase_items (purchase_order_id, product_id, quantity, unit_price)
@@ -85,7 +85,8 @@ export const PurchaseModel = {
         supplier_id: data.supplier_id,
         order_date: data.order_date,
         total_amount: totalAmount,
-        notes: data.notes
+        notes: data.notes,
+        payment_due_date: data.payment_due_date ?? null
       })
       const orderId = result.lastInsertRowid as number
       for (const item of data.items) {

@@ -58,3 +58,30 @@ WHERE payment_status = 'unpaid'
 - Dashboard 的應收/應付 KPI 卡片已顯示未付款總額
 - 逾期的 Badge 在前端計算：`payment_due_date < today && payment_status === 'unpaid'` → 紅色「逾期」
 - 通知中心（bell icon）已有 `app_notifications` 顯示邏輯，通知寫入後自動出現
+
+## 建立訂單時設定帳期天數
+
+### 表單欄位
+
+- `payment_terms`：`z.coerce.number().int().min(0).optional()`，預設 `0`
+- Label：「帳期天數」，Placeholder：「0 表示不設定期限」
+- 放置位置：`order_date` 欄旁邊（grid cols-3 或獨立行）
+
+### 計算邏輯（前端送出前）
+
+```typescript
+const paymentDueDate = data.payment_terms && data.payment_terms > 0
+  ? new Date(new Date(data.order_date).getTime() + data.payment_terms * 86400000)
+      .toISOString().slice(0, 10)
+  : null
+```
+
+### Model 支援
+
+- `SaleModel.create()` 接受 `payment_due_date?: string | null`，寫入 `INSERT` SQL
+- `PurchaseModel.create()` 同上
+- `SalesOrderCreate` / `PurchaseOrderCreate` 型別加入 `payment_due_date?: string | null`
+
+### 不需要新 Migration
+
+`payment_due_date` 欄位已由 Migration 013 建立。

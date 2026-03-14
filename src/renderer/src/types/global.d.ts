@@ -79,6 +79,7 @@ declare global {
         turnoverAnalysis(days?: number): Promise<import('./schema').TurnoverItem[]>
         abcAnalysis(): Promise<import('./schema').AbcItem[]>
         monthlyPL(): Promise<import('./schema').MonthlyPLPoint[]>
+        getUnpaidOrders(): Promise<{ sales: import('./schema').UnpaidOrder[]; purchases: import('./schema').UnpaidOrder[] }>
       }
       sync: {
         trigger(direction: 'push' | 'pull' | 'bidirectional'): Promise<{ success: boolean; recordsSynced?: number; error?: string }>
