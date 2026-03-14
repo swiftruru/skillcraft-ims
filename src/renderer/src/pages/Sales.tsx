@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable, type Column } from '@/components/common/DataTable'
@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { SaleForm } from '@/components/sales/SaleForm'
 import { SaleDetail } from '@/components/sales/SaleDetail'
+import { PartialReturnDialog } from '@/components/sales/PartialReturnDialog'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import type { SalesOrder } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
@@ -48,6 +49,7 @@ export default function Sales() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [markPaidId, setMarkPaidId] = useState<number | null>(null)
+  const [partialReturnOrder, setPartialReturnOrder] = useState<SalesOrder | null>(null)
 
   const { data: orders, isLoading } = useQuery<SalesOrder[]>({
     queryKey: ['sales', 'all', search, dateFrom, dateTo],
@@ -133,7 +135,7 @@ export default function Sales() {
       key: 'payment_status',
       label: s.paymentStatus,
       render: (_v, row) => {
-        if (row.status !== 'completed') return null
+        if (row.status !== 'completed' && row.status !== 'partial_return') return null
         const isOverdue = row.payment_status === 'unpaid' && row.payment_due_date && row.payment_due_date < new Date().toISOString().slice(0, 10)
         if (row.payment_status === 'paid') {
           return <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-400">{s.paid}</span>
@@ -174,13 +176,25 @@ export default function Sales() {
           >
             <Printer className="w-3.5 h-3.5" />
           </Button>
-          {row.status === 'completed' && row.payment_status !== 'paid' && (
+          {(row.status === 'completed' || row.status === 'partial_return') && row.payment_status !== 'paid' && (
             <Button
               variant="ghost" size="icon" className="h-7 w-7 text-green-400 hover:text-green-500"
               title={s.markPaid}
               onClick={() => setMarkPaidId(row.id as number)}
             >
               <BadgeCheck className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          {(row.status === 'completed' || row.status === 'partial_return') && (
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7 text-amber-400 hover:text-amber-500"
+              title="部分退貨"
+              onClick={async () => {
+                const order = await window.electronAPI.sales.getById(row.id as number)
+                if (order) setPartialReturnOrder(order as SalesOrder)
+              }}
+            >
+              <SplitSquareVertical className="w-3.5 h-3.5" />
             </Button>
           )}
           {row.status === 'completed' && (
@@ -324,6 +338,12 @@ export default function Sales() {
         onConfirm={() => markPaidId && markPaidMutation.mutate(markPaidId)}
         confirmLabel={s.markPaid}
         variant="default"
+      />
+      <PartialReturnDialog
+        open={partialReturnOrder !== null}
+        onOpenChange={(open) => !open && setPartialReturnOrder(null)}
+        order={partialReturnOrder}
+        onSuccess={() => setPartialReturnOrder(null)}
       />
     </div>
   )

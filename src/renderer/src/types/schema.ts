@@ -86,7 +86,7 @@ export interface SalesOrder {
   order_no: string
   customer_id: number | null
   customer_name?: string
-  status: 'pending' | 'completed' | 'cancelled' | 'returned'
+  status: 'pending' | 'completed' | 'cancelled' | 'returned' | 'partial_return'
   order_date: string
   total_amount: number
   notes: string | null
@@ -105,6 +105,7 @@ export interface SaleItem {
   quantity: number
   unit_price: number
   subtotal?: number
+  return_qty: number
 }
 
 export type SaleItemInput = { product_id: number; quantity: number; unit_price: number }

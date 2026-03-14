@@ -167,6 +167,61 @@ export const SaleModel = {
     return this.findById(id)
   },
 
+  partialReturn(id: number, items: { itemId: number; returnQty: number }[]): SalesOrder | null {
+    const db = getDb()
+    const order = this.findById(id)
+    if (!order || (order.status !== 'completed' && order.status !== 'partial_return')) {
+      throw new Error('只有已完成或部分退貨的銷售單可以進行退貨')
+    }
+    if (!items || items.length === 0) throw new Error('請至少選擇一個退貨品項')
+
+    const itemMap = new Map((order.items ?? []).map(i => [i.id, i]))
+
+    // Validate all items before executing
+    for (const { itemId, returnQty } of items) {
+      if (returnQty <= 0) continue
+      const item = itemMap.get(itemId)
+      if (!item) throw new Error(`找不到品項 ID ${itemId}`)
+      const alreadyReturned = item.return_qty ?? 0
+      if (returnQty > item.quantity - alreadyReturned) {
+        throw new Error(`${item.product_name ?? itemId} 退貨數量超過可退數量`)
+      }
+    }
+
+    const updateItemQty = db.prepare(
+      `UPDATE sale_items SET return_qty = return_qty + ? WHERE id = ?`
+    )
+    const restoreStock = db.prepare(
+      `UPDATE products SET stock_qty = stock_qty + ?, updated_at = datetime('now') WHERE id = ?`
+    )
+    const insertAdj = db.prepare(
+      `INSERT INTO inventory_adjustments (product_id, delta, reason, note, adjusted_at)
+       VALUES (?, ?, '退貨入庫', ?, datetime('now'))`
+    )
+    const updateOrderStatus = db.prepare(
+      `UPDATE sales_orders SET status = ? WHERE id = ?`
+    )
+
+    db.transaction(() => {
+      for (const { itemId, returnQty } of items) {
+        if (returnQty <= 0) continue
+        const item = itemMap.get(itemId)!
+        updateItemQty.run(returnQty, itemId)
+        restoreStock.run(returnQty, item.product_id)
+        insertAdj.run(item.product_id, returnQty, `部分退貨 ${order.order_no}`)
+      }
+
+      // Re-fetch items to check if fully returned
+      const updatedItems = db.prepare(
+        `SELECT quantity, return_qty FROM sale_items WHERE sales_order_id = ?`
+      ).all(id) as { quantity: number; return_qty: number }[]
+      const fullyReturned = updatedItems.every(i => (i.return_qty ?? 0) >= i.quantity)
+      updateOrderStatus.run(fullyReturned ? 'returned' : 'partial_return', id)
+    })()
+
+    return this.findById(id)
+  },
+
   delete(id: number): boolean {
     const db = getDb()
     const order = this.findById(id)

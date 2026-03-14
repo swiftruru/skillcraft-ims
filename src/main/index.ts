@@ -53,6 +53,85 @@ function saveWindowState(win: BrowserWindow): void {
   }
 }
 
+function checkPaymentDueNotifications(): void {
+  try {
+    const { getDb } = require('./db') as typeof import('./db')
+    const { insertNotification } = require('./ipc/notifications.ipc') as typeof import('./ipc/notifications.ipc')
+    const db = getDb()
+    const today = new Date().toISOString().slice(0, 10)
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+
+    type DueRow = { order_no: string; payment_due_date: string; total_amount: number }
+
+    const purchaseDue = db.prepare(
+      `SELECT order_no, payment_due_date, total_amount
+       FROM purchase_orders
+       WHERE payment_status = 'unpaid' AND payment_due_date IS NOT NULL
+         AND payment_due_date <= ? AND status = 'received'`
+    ).all(tomorrow) as DueRow[]
+
+    const salesDue = db.prepare(
+      `SELECT order_no, payment_due_date, total_amount
+       FROM sales_orders
+       WHERE payment_status = 'unpaid' AND payment_due_date IS NOT NULL
+         AND payment_due_date <= ? AND status = 'completed'`
+    ).all(tomorrow) as DueRow[]
+
+    const allDue = [
+      ...purchaseDue.map(r => ({ ...r, kind: 'purchase' as const })),
+      ...salesDue.map(r => ({ ...r, kind: 'sales' as const }))
+    ]
+
+    if (allDue.length === 0) return
+
+    const overdue = allDue.filter(r => r.payment_due_date < today)
+    const dueToday = allDue.filter(r => r.payment_due_date === today)
+    const dueTomorrow = allDue.filter(r => r.payment_due_date === tomorrow)
+
+    // OS notifications
+    if (Notification.isSupported()) {
+      if (overdue.length > 0) {
+        const preview = overdue.slice(0, 3).map(r => r.order_no).join('、')
+        const extra = overdue.length > 3 ? `…等共 ${overdue.length} 筆` : ''
+        new Notification({ title: '⚠️ 帳款逾期提醒', body: preview + extra, silent: false }).show()
+      }
+      if (dueToday.length > 0) {
+        new Notification({
+          title: '🔔 帳款今日到期',
+          body: `${dueToday.length} 筆帳款今日到期，請盡快處理`,
+          silent: false
+        }).show()
+      }
+      if (dueTomorrow.length > 0) {
+        new Notification({
+          title: '📅 帳款明日到期',
+          body: `${dueTomorrow.length} 筆帳款明日到期`,
+          silent: true
+        }).show()
+      }
+    }
+
+    // In-app notifications (max 10, overdue first)
+    const toInsert = [...overdue, ...dueToday, ...dueTomorrow].slice(0, 10)
+    for (const r of toInsert) {
+      // De-dup: skip if same order_no already notified today
+      const existing = db.prepare(
+        `SELECT id FROM app_notifications WHERE body LIKE ? AND created_at >= date('now')`
+      ).get(`%${r.order_no}%`)
+      if (existing) continue
+
+      const isOverdue = r.payment_due_date < today
+      const isToday = r.payment_due_date === today
+      const label = isOverdue ? '逾期' : isToday ? '今日到期' : '明日到期'
+      const type = isOverdue ? 'payment_overdue' : isToday ? 'payment_due_today' : 'payment_due_soon'
+      const link = r.kind === 'purchase' ? '/purchases' : '/sales'
+      insertNotification(type, `💳 帳款${label}`, `${r.order_no} 帳款${label}，金額 $${r.total_amount.toLocaleString()}`, link)
+    }
+  } catch {
+    // Silent fail
+  }
+}
+
 function checkLowStockNotification(): void {
   if (!Notification.isSupported()) return
   try {
@@ -104,6 +183,7 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     mainWindow!.show()
     checkLowStockNotification()
+    checkPaymentDueNotifications()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

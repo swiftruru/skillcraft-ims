@@ -76,6 +76,14 @@ export function registerSalesIpc(): void {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
+  ipcMain.handle('sales:partialReturn', (_e, id: number, items: { itemId: number; returnQty: number }[]) => {
+    try {
+      const result = SaleModel.partialReturn(id, items)
+      return { success: true, data: result }
+    } catch (err: unknown) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
   ipcMain.handle('sales:delete', (_e, id: number) => SaleModel.delete(id))
   ipcMain.handle('sales:markPaid', (_e, id: number) => {
     const order = SaleModel.findById(id)

@@ -43,7 +43,8 @@ export function getStatusLabel(status: string): string {
     received: '已收貨',
     completed: '已完成',
     cancelled: '已取消',
-    returned: '已退貨'
+    returned: '已退貨',
+    partial_return: '部分退貨'
   }
   return labels[status] ?? status
 }
@@ -54,7 +55,8 @@ export function getStatusColor(status: string): string {
     received: 'text-green-400 bg-green-400/10',
     completed: 'text-green-400 bg-green-400/10',
     cancelled: 'text-red-400 bg-red-400/10',
-    returned: 'text-orange-400 bg-orange-400/10'
+    returned: 'text-orange-400 bg-orange-400/10',
+    partial_return: 'text-amber-400 bg-amber-400/10'
   }
   return colors[status] ?? 'text-muted-foreground bg-muted'
 }

@@ -113,6 +113,25 @@ description: 當使用者要求新增或修改進貨、銷售、庫存異動、�
       - 預覽表格：顯示選中商品的目前價格 → 調整後價格（負值變更用紅色標示）
       - 確認後呼叫 IPC，成功後 invalidate `['products']` 和 `['reports']` query cache
 
+17. **部分退貨規範**：`sales:partialReturn(id, items: {itemId: number; returnQty: number}[])` IPC 允許對 `completed` 或 `partial_return` 狀態訂單退還部分品項：
+    - `sale_items` 表新增 `return_qty INTEGER DEFAULT 0` 欄位（migration 014），記錄累計已退貨數量
+    - IPC 驗證：`returnQty > 0` 且 `returnQty <= item.quantity - item.return_qty`（不可超退）
+    - Transaction 內完成：
+      ```
+      UPDATE sale_items SET return_qty = return_qty + ? WHERE id = ?  （每個退貨品項）
+      UPDATE products SET stock_qty = stock_qty + ?, updated_at=datetime('now') WHERE id=?
+      INSERT INTO inventory_adjustments (product_id, delta, reason, note) VALUES (?, ?, '退貨入庫', '部分退貨 #{order_no}')
+      ```
+    - 退貨後計算是否全部退完：若所有品項 `return_qty = quantity` → 更新 `sales_orders.status = 'returned'`，否則更新為 `'partial_return'`
+    - `SalesOrder.status` 型別更新：`'pending' | 'completed' | 'cancelled' | 'returned' | 'partial_return'`
+    - `SaleItem` 型別補充 `return_qty: number`
+    - UI 只在 `completed` 或 `partial_return` 訂單顯示「部分退貨」按鈕（Split icon），開啟 `PartialReturnDialog`
+    - `PartialReturnDialog` 規格：
+      - 顯示所有品項，每列顯示商品名稱、訂購數量、已退數量、本次退貨數量 input（最小 0，最大 = quantity - return_qty）
+      - 至少一個品項本次退貨 > 0 才可送出
+      - 確認後呼叫 `sales:partialReturn` IPC，成功後 invalidate `['sales']`, `['products']`, `['reports']`, `['adjustments']`
+    - `partial_return` 狀態 Badge：橘黃色「部分退貨」
+
 14. **銷售退貨規範**：`sales:return` IPC 只接受 `completed` 狀態的訂單，在同一個 transaction 內完成：
     ```
     UPDATE sales_orders SET status='returned' WHERE id=? AND status='completed'

@@ -57,6 +57,7 @@ declare global {
         complete(id: number): Promise<{ success: boolean; data?: import('./schema').SalesOrder; error?: string }>
         cancel(id: number): Promise<boolean>
         return(id: number): Promise<{ success: boolean; data?: import('./schema').SalesOrder; error?: string }>
+        partialReturn(id: number, items: { itemId: number; returnQty: number }[]): Promise<{ success: boolean; data?: import('./schema').SalesOrder; error?: string }>
         delete(id: number): Promise<boolean>
         markPaid(id: number): Promise<import('./schema').SalesOrder | null>
         setPaymentDue(id: number, dueDate: string): Promise<import('./schema').SalesOrder | null>

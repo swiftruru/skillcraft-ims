@@ -71,6 +71,8 @@ const electronAPI = {
     complete: (id: number) => ipcRenderer.invoke('sales:complete', id),
     cancel: (id: number) => ipcRenderer.invoke('sales:cancel', id),
     return: (id: number) => ipcRenderer.invoke('sales:return', id),
+    partialReturn: (id: number, items: { itemId: number; returnQty: number }[]) =>
+      ipcRenderer.invoke('sales:partialReturn', id, items),
     delete: (id: number) => ipcRenderer.invoke('sales:delete', id),
     markPaid: (id: number) => ipcRenderer.invoke('sales:markPaid', id),
     setPaymentDue: (id: number, dueDate: string) => ipcRenderer.invoke('sales:setPaymentDue', id, dueDate)
