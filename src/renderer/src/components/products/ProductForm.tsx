@@ -62,6 +62,8 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [imgPreview, setImgPreview] = useState<string | null>(null)
   const [imgSaving, setImgSaving] = useState(false)
+  const [imgError, setImgError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const { data: savedImage } = useQuery<string | null>({
     queryKey: ['products', 'image', product?.id],
@@ -74,8 +76,14 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
     setImgPreview(savedImage ?? null)
   }, [savedImage])
 
+  const MAX_FILE_MB = 10
   const compressAndUpload = async (file: File) => {
     if (!product?.id) return
+    setImgError(null)
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      setImgError(`檔案過大（${(file.size / 1024 / 1024).toFixed(1)} MB），請選擇 ${MAX_FILE_MB} MB 以內的圖片`)
+      return
+    }
     setImgSaving(true)
     const img = new Image()
     img.src = URL.createObjectURL(file)
@@ -182,34 +190,60 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {isEdit && (
-            <div className="flex items-center gap-4">
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-foreground/70">商品圖片</p>
               <div
-                className="relative group w-20 h-20 shrink-0 rounded-lg border border-border bg-muted/30 flex items-center justify-center cursor-pointer overflow-hidden"
+                className={`flex items-center gap-4 rounded-lg border-2 border-dashed p-3 transition-colors cursor-pointer ${isDragging ? 'border-primary bg-primary/5' : 'border-border bg-muted/20 hover:border-border/80'}`}
                 onClick={() => !imgSaving && fileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setIsDragging(false)
+                  const f = e.dataTransfer.files?.[0]
+                  if (f && f.type.startsWith('image/')) compressAndUpload(f)
+                }}
               >
-                {imgPreview ? (
-                  <img src={imgPreview} alt="product" className="w-full h-full object-cover" />
-                ) : (
-                  <Package className="w-8 h-8 text-muted-foreground/40" />
-                )}
-                {imgPreview && !imgSaving && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); clearImage() }}
-                    className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-background/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-                {imgSaving && (
-                  <div className="absolute inset-0 bg-background/60 flex items-center justify-center text-xs text-muted-foreground">儲存中...</div>
-                )}
+                <div className="relative group w-16 h-16 shrink-0 rounded-md border border-border bg-background flex items-center justify-center overflow-hidden">
+                  {imgPreview ? (
+                    <img src={imgPreview} alt="product" className="w-full h-full object-cover" />
+                  ) : (
+                    <Package className="w-7 h-7 text-muted-foreground/30" />
+                  )}
+                  {imgPreview && !imgSaving && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); clearImage() }}
+                      className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-background/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                  {imgSaving && (
+                    <div className="absolute inset-0 bg-background/70 flex items-center justify-center text-[10px] text-muted-foreground">儲存中...</div>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground leading-relaxed">
+                  {isDragging ? (
+                    <p className="text-primary font-medium">放開以上傳圖片</p>
+                  ) : imgPreview ? (
+                    <>
+                      <p className="text-foreground/60">已上傳圖片</p>
+                      <p>點擊或拖曳新圖片可替換</p>
+                      <p>Hover 縮圖可刪除</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-foreground/60">點擊選擇或直接拖曳圖片至此</p>
+                      <p>支援 JPG、PNG、WebP 等格式</p>
+                      <p>上限 10 MB，自動壓縮至 400×400</p>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground">
-                <p className="font-medium text-foreground/70">商品圖片</p>
-                <p>點擊左側區塊上傳圖片</p>
-                <p>自動壓縮至 400×400</p>
-              </div>
+              {imgError && (
+                <p className="text-xs text-destructive">{imgError}</p>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
