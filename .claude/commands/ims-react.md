@@ -826,3 +826,46 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 若有自訂 `font-size` 的 inline style 或 CSS，改為 `em` 或 `rem`
     - 受惠範圍：使用者在 macOS 系統偏好「顯示器縮放」或瀏覽器字型大小設定放大時，UI 正確等比縮放
 
+
+93. **HTML lang 屬性動態切換**：
+    - `App.tsx` 訂閱 `useLangStore`，每次語言切換時更新 `document.documentElement.lang`
+    - 對應值：`'zh'` → `'zh-TW'`；`'en'` → `'en'`
+    - 以 `useEffect` 監聽 `lang` 變更，初始化時也執行一次
+    - 這讓螢幕閱讀器能以正確語言口音朗讀頁面內容
+
+94. **圖表無障礙替代說明（Chart Accessibility）**：
+    - 所有 Recharts `<ResponsiveContainer>` 的外層容器加上 `role="img"` 和 `aria-label="[圖表說明]"`
+    - `aria-label` 格式：`"[圖表類型]：[主要數據摘要]"`，例如 `"銷售趨勢折線圖：最近 30 天每日營收"`
+    - 在 `<ResponsiveContainer>` 後加入 `<p className="sr-only">[文字摘要說明]</p>`，提供主要數字讓螢幕閱讀器播報
+    - 適用所有 Dashboard、Reports、StockTake、Products 等頁面的 Recharts 圖表
+
+95. **拖曳功能鍵盤替代方案（DnD Keyboard Alternative）**：
+    - `PurchaseForm` 與 `SaleForm` 的 items 列，在 `GripVertical` icon 旁（或行末）加入 `▲` / `▼` 兩個小按鈕
+    - 按鈕樣式：`h-6 w-6 rounded text-muted-foreground/60 hover:text-foreground hover:bg-muted`，`aria-label="向上移動"` / `"向下移動"`
+    - 功能：`▲` 呼叫 `move(i, i - 1)`（`i === 0` 時 disabled）；`▼` 呼叫 `move(i, i + 1)`（`i === fields.length - 1` 時 disabled）
+    - 只在 `fields.length > 1` 時顯示按鈕；grid 列多一欄容納按鈕組
+    - WCAG 2.1 SC 2.1.1：所有功能必須可透過鍵盤操作
+
+96. **Dialog 初始焦點強化（Initial Focus Management）**：
+    - Radix Dialog 會自動將焦點移至第一個可聚焦元素（通常是關閉按鈕 ×）
+    - 對於表單 Dialog（PurchaseForm、SaleForm、ProductForm），應將初始焦點移至第一個有意義的輸入欄位，而非關閉按鈕
+    - 做法：使用 Radix `DialogContent` 的 `onOpenAutoFocus` prop，呼叫 `e.preventDefault()` 後以 `setTimeout(0)` 手動 focus 第一個 input
+    - 如：`onOpenAutoFocus={(e) => { e.preventDefault(); setTimeout(() => firstInputRef.current?.focus(), 0) }}`
+    - `ConfirmDialog` 保持預設（焦點到確認按鈕）
+
+97. **焦點不被固定元素遮擋（Focus Not Obscured，WCAG 2.2 SC 2.4.11）**：
+    - 在 `globals.css` 加入全域規則：`*:focus-visible { scroll-margin-top: 3.5rem; scroll-margin-bottom: 4rem; }`
+    - `3.5rem`（56px）覆蓋 Header 高度；`4rem`（64px）覆蓋底部浮動操作列
+    - 這確保鍵盤導覽時，聚焦元素不被 sticky Header 或 fixed 底部工具列遮住
+
+98. **觸控目標最小尺寸（Touch Target Size，WCAG 2.5.8）**：
+    - WCAG 2.2 Level AA 要求觸控目標至少 24×24px（目標本身）或 44×44px（含間距）
+    - 現有 `h-7 w-7`（28px）的 icon 按鈕已符合 24px 最低要求
+    - 針對 `size="icon"` 但小於 28px 的元素（如 `h-6 w-6`），補上 `p-1`（padding）讓實際點擊區域達標
+    - 在 `globals.css` 加入：`button:focus-visible, [role="button"]:focus-visible { min-height: 24px; min-width: 24px; }`
+
+99. **非文字內容對比度（Non-text Contrast，WCAG 1.4.11）**：
+    - UI 元件邊框（`border-border`）、圖示（`text-muted-foreground`）與其背景的對比需達到 3:1
+    - 在 `globals.css` 的 `:root` 與 `.dark` 確保 `--border` HSL 值在亮色模式下達到 3:1（對白背景），暗色模式下對深色背景達到 3:1
+    - 若現有 token 對比不足，適度調整亮度值（`--border` 亮色建議 `< 65%`）
+    - Status badge 顏色（`bg-green-500/15 text-green-400`）需確保文字對背景對比 ≥ 4.5:1

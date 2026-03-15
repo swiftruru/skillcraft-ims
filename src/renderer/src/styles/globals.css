@@ -181,3 +181,35 @@ a:focus-visible,
 html {
   font-size: 100%;
 }
+
+/* A11y Rule 97: Focus not obscured — scroll margin clears sticky header/bottom bars */
+*:focus-visible {
+  scroll-margin-top: 3.5rem;
+  scroll-margin-bottom: 4rem;
+}
+
+/* A11y Rule 98: Minimum touch target size — WCAG 2.5.8 (coarse pointer / touch devices) */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"],
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* A11y Rule 99: Non-text contrast — reinforce focus ring visibility (≥3:1) */
+/* Focus ring uses --ring token (primary blue), which satisfies 3:1 against both light and dark backgrounds. */
+/* Additionally, ensure state indicators (borders on inputs, checkbox borders) are visually distinct. */
+input:not(:disabled),
+textarea:not(:disabled),
+select:not(:disabled) {
+  border-color: hsl(var(--input));
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: hsl(var(--ring));
+}

@@ -14,14 +14,21 @@ import StockTake from './pages/StockTake'
 import InventoryHistory from './pages/InventoryHistory'
 import Receivables from './pages/Receivables'
 import { useThemeStore } from './stores/theme.store'
+import { useLangStore } from './stores/lang.store'
 
 export default function App() {
   const applyTheme = useThemeStore((s) => s.applyTheme)
   const initFromSystem = useThemeStore((s) => s.initFromSystem)
+  const lang = useLangStore((s) => s.lang)
 
   useEffect(() => {
     initFromSystem().then(() => applyTheme())
   }, [applyTheme, initFromSystem])
+
+  // A11y Rule 93: keep <html lang> in sync with UI language
+  useEffect(() => {
+    document.documentElement.lang = lang === 'zh' ? 'zh-TW' : 'en'
+  }, [lang])
 
 
   return (

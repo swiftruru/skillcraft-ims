@@ -261,16 +261,19 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
         return (
           <div className="rounded-lg border border-border bg-card p-4 space-y-2">
             <p className="text-xs font-medium text-muted-foreground">差異分析（{diffItems.length} 項有差異）</p>
-            <ResponsiveContainer width="100%" height={chartHeight}>
-              <BarChart layout="vertical" data={chartData} margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="帳面數量" fill="#3b82f6" radius={[0, 3, 3, 0]} maxBarSize={16} />
-                <Bar dataKey="實際盤點" fill="#10b981" radius={[0, 3, 3, 0]} maxBarSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div role="img" aria-label="盤點差異橫向直條圖：帳面數量與實際盤點對比">
+              <ResponsiveContainer width="100%" height={chartHeight}>
+                <BarChart layout="vertical" data={chartData} margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="帳面數量" fill="#3b82f6" radius={[0, 3, 3, 0]} maxBarSize={16} />
+                  <Bar dataKey="實際盤點" fill="#10b981" radius={[0, 3, 3, 0]} maxBarSize={16} />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="sr-only">橫向直條圖對比每項有差異商品的帳面數量（藍色）與實際盤點數量（綠色）。</p>
+            </div>
           </div>
         )
       })()}

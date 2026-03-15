@@ -218,19 +218,22 @@ export default function Reports() {
         </CardHeader>
         <CardContent>
           {trendLoading ? <LoadingSpinner /> : trend && trend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => v.slice(5)} />
-                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
-                <Tooltip
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-                  formatter={(v: number) => [formatCurrency(v), r.revenue]}
-                />
-                <Legend wrapperStyle={{ fontSize: '12px' }} />
-                <Line type="monotone" dataKey="revenue" name={r.revenue} stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            <div role="img" aria-label="銷售趨勢折線圖：所選期間每日營收">
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => v.slice(5)} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                    formatter={(v: number) => [formatCurrency(v), r.revenue]}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Line type="monotone" dataKey="revenue" name={r.revenue} stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+              <p className="sr-only">折線圖顯示所選期間每日銷售金額趨勢。</p>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">{r.noData}</div>
           )}
@@ -244,23 +247,26 @@ export default function Reports() {
         </CardHeader>
         <CardContent>
           {purchaseVsSales && purchaseVsSales.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={purchaseVsSales}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => v.slice(5)} />
-                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
-                <Tooltip
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-                  formatter={(v: number, name: string) => [formatCurrency(v), name === 'purchase_amount' ? r.purchase : r.salesLabel]}
-                />
-                <Legend
-                  formatter={(value) => value === 'purchase_amount' ? r.purchase : r.salesLabel}
-                  wrapperStyle={{ fontSize: '12px' }}
-                />
-                <Bar dataKey="purchase_amount" fill="#3b82f6" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="sales_amount" fill="#10b981" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div role="img" aria-label="採購 vs 銷售比較直條圖：採購金額與銷售金額對比">
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={purchaseVsSales}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => v.slice(5)} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                    formatter={(v: number, name: string) => [formatCurrency(v), name === 'purchase_amount' ? r.purchase : r.salesLabel]}
+                  />
+                  <Legend
+                    formatter={(value) => value === 'purchase_amount' ? r.purchase : r.salesLabel}
+                    wrapperStyle={{ fontSize: '12px' }}
+                  />
+                  <Bar dataKey="purchase_amount" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="sales_amount" fill="#10b981" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="sr-only">分組直條圖對比所選期間採購金額（藍色）與銷售金額（綠色）。</p>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">{r.noData}</div>
           )}
@@ -275,17 +281,20 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             {categories && categories.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={categories} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={70} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v: number) => [formatCurrency(v), r.inventoryByCategory]} />
-                  <Bar dataKey="inventory_value" radius={[0, 4, 4, 0]}>
-                    {categories.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div role="img" aria-label="庫存分類橫向直條圖：各分類商品數、庫存量與庫存價值">
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={categories} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                    <YAxis type="category" dataKey="category" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={70} />
+                    <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v: number) => [formatCurrency(v), r.inventoryByCategory]} />
+                    <Bar dataKey="inventory_value" radius={[0, 4, 4, 0]}>
+                      {categories.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <p className="sr-only">橫向直條圖顯示各商品分類的商品數量、庫存數量與庫存總值。</p>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">{r.noData}</div>
             )}
@@ -478,20 +487,23 @@ export default function Reports() {
         <CardContent>
           {topCustomers && topCustomers.length > 0 ? (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={topCustomers.slice(0, 5)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={80} />
-                  <Tooltip
-                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-                    formatter={(v: number) => [formatCurrency(v), r.totalSpend]}
-                  />
-                  <Bar dataKey="total_spent" radius={[0, 4, 4, 0]}>
-                    {topCustomers.slice(0, 5).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div role="img" aria-label="業績排行橫向直條圖：前 10 名客戶銷售金額">
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={topCustomers.slice(0, 5)} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={80} />
+                    <Tooltip
+                      contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                      formatter={(v: number) => [formatCurrency(v), r.totalSpend]}
+                    />
+                    <Bar dataKey="total_spent" radius={[0, 4, 4, 0]}>
+                      {topCustomers.slice(0, 5).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <p className="sr-only">橫向直條圖顯示銷售金額前 10 名客戶。</p>
+              </div>
               <div className="overflow-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -674,21 +686,24 @@ export default function Reports() {
           {!monthlyPL ? (
             <LoadingSpinner />
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={monthlyPL} barSize={16} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${Math.round(v / 1000)}K`} />
-                <Tooltip
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                  formatter={(value: number, name: string) => [formatCurrency(value), name === 'revenue' ? '營收' : name === 'cost' ? '成本' : '毛利']}
-                />
-                <Legend formatter={(v) => v === 'revenue' ? '營收' : v === 'cost' ? '成本' : '毛利'} wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="revenue" fill="#3b82f6" opacity={0.7} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="cost" fill="#ef4444" opacity={0.7} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="gross_profit" fill="#10b981" opacity={0.85} radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div role="img" aria-label="月損益直條圖：收入、成本與毛利比較">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={monthlyPL} barSize={16} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${Math.round(v / 1000)}K`} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                    formatter={(value: number, name: string) => [formatCurrency(value), name === 'revenue' ? '營收' : name === 'cost' ? '成本' : '毛利']}
+                  />
+                  <Legend formatter={(v) => v === 'revenue' ? '營收' : v === 'cost' ? '成本' : '毛利'} wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="revenue" fill="#3b82f6" opacity={0.7} radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="cost" fill="#ef4444" opacity={0.7} radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="gross_profit" fill="#10b981" opacity={0.85} radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="sr-only">分組直條圖顯示所選月份的銷售收入、採購成本與毛利。</p>
+            </div>
           )}
         </CardContent>
       </Card>

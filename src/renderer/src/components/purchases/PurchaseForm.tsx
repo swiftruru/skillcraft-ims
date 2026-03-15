@@ -177,7 +177,10 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
   return (
     <>
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose() }}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-3xl max-h-[90vh] overflow-y-auto"
+        onOpenAutoFocus={(e) => { e.preventDefault(); setTimeout(() => (document.getElementById('order_date') as HTMLInputElement)?.focus(), 0) }}
+      >
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle>{tf.newPurchaseOrder}</DialogTitle>
@@ -265,20 +268,20 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
             </div>
 
             <div className="space-y-2">
-              <div className="grid grid-cols-[16px_2fr_1fr_1fr_auto] gap-2 text-xs text-muted-foreground px-1">
-                <span></span><span>{tf.productCol}</span><span>{tf.qtyCol}</span><span>{tf.purchasePriceCol}</span><span></span>
+              <div className="grid grid-cols-[16px_2fr_1fr_1fr_auto_auto] gap-2 text-xs text-muted-foreground px-1">
+                <span></span><span>{tf.productCol}</span><span>{tf.qtyCol}</span><span>{tf.purchasePriceCol}</span><span></span><span></span>
               </div>
               {fields.map((field, i) => (
                 <div
                   key={field.id}
-                  className={`grid grid-cols-[16px_2fr_1fr_1fr_auto] gap-2 items-center transition-opacity ${dragOverIdx === i && dragIdx !== i ? 'ring-1 ring-primary/50 rounded-md' : ''}`}
+                  className={`grid grid-cols-[16px_2fr_1fr_1fr_auto_auto] gap-2 items-center transition-opacity ${dragOverIdx === i && dragIdx !== i ? 'ring-1 ring-primary/50 rounded-md' : ''}`}
                   draggable
                   onDragStart={() => setDragIdx(i)}
                   onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i) }}
                   onDrop={() => { if (dragIdx !== null && dragIdx !== i) move(dragIdx, i); setDragIdx(null); setDragOverIdx(null) }}
                   onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
                 >
-                  <GripVertical className="w-4 h-4 text-muted-foreground/40 hover:text-muted-foreground cursor-grab shrink-0" />
+                  <GripVertical className="w-4 h-4 text-muted-foreground/40 hover:text-muted-foreground cursor-grab shrink-0" aria-hidden="true" />
                   <Select onValueChange={(v) => handleProductChange(i, v)}>
                     <SelectTrigger
                       className="h-9"
@@ -330,9 +333,29 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
                     className="h-9 w-9 text-destructive shrink-0"
                     onClick={() => remove(i)}
                     disabled={fields.length === 1}
+                    aria-label="移除此列"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
+                  {/* A11y Rule 95: keyboard alternative for drag-and-drop */}
+                  {fields.length > 1 && (
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        aria-label="向上移動"
+                        disabled={i === 0}
+                        onClick={() => move(i, i - 1)}
+                        className="h-4 w-5 flex items-center justify-center text-muted-foreground/50 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed rounded text-[10px] leading-none"
+                      >▲</button>
+                      <button
+                        type="button"
+                        aria-label="向下移動"
+                        disabled={i === fields.length - 1}
+                        onClick={() => move(i, i + 1)}
+                        className="h-4 w-5 flex items-center justify-center text-muted-foreground/50 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed rounded text-[10px] leading-none"
+                      >▼</button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
