@@ -152,7 +152,7 @@ export default function Customers() {
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card">
+      <div className="rounded-lg border border-border bg-card" aria-busy={isLoading} aria-label="客戶列表">
         {isLoading ? <TableSkeleton rows={8} cols={6} /> : (
           <DataTable
             data={(customers ?? []) as unknown as Record<string, unknown>[]}

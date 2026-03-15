@@ -46,6 +46,8 @@ interface DataTableProps<T> {
   rowActions?: (row: T) => React.ReactNode
   contextMenu?: (row: T) => ContextMenuItem[]
   hint?: React.ReactNode
+  /** A11y Rule 90: Label for the table (e.g. "商品列表") */
+  tableLabel?: string
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -64,7 +66,8 @@ export function DataTable<T extends Record<string, unknown>>({
   density = 'normal',
   rowActions,
   contextMenu,
-  hint
+  hint,
+  tableLabel
 }: DataTableProps<T>) {
   const t = useLang()
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
@@ -183,9 +186,25 @@ export function DataTable<T extends Record<string, unknown>>({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!onRowFocus) return
     const len = paginated.length
     if (len === 0) return
+
+    // Shift+F10 or ContextMenu key: open context menu for focused row
+    if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
+      e.preventDefault()
+      if (focusedIdx >= 0 && contextMenu) {
+        const row = paginated[focusedIdx]
+        const items = contextMenu(row)
+        const focusedEl = focusedRowRef.current
+        const rect = focusedEl?.getBoundingClientRect()
+        const x = rect ? Math.min(rect.left + 16, window.innerWidth - 170) : 100
+        const y = rect ? Math.min(rect.bottom, window.innerHeight - items.length * 34 - 16) : 100
+        setCtxMenu({ x, y, items })
+      }
+      return
+    }
+
+    if (!onRowFocus) return
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -217,8 +236,8 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div
       className="w-full outline-none"
-      tabIndex={onRowFocus ? 0 : undefined}
-      onKeyDown={onRowFocus ? handleKeyDown : undefined}
+      tabIndex={(onRowFocus || contextMenu) ? 0 : undefined}
+      onKeyDown={(onRowFocus || contextMenu) ? handleKeyDown : undefined}
       onBlur={() => setFocusedIdx(-1)}
       ref={tableContainerRef}
     >
@@ -269,38 +288,50 @@ export function DataTable<T extends Record<string, unknown>>({
       )}
 
       <div className="overflow-auto">
-        <table className="w-full text-sm">
+        {/* A11y Rules 83 + 90: role=grid, aria-label, aria-rowcount */}
+        <table className="w-full text-sm" role="grid" aria-rowcount={sorted.length} aria-label={tableLabel}>
           <thead>
-            <tr className="border-b border-border">
-              {visibleColumns.map((col) => (
-                <th
-                  key={String(col.key)}
-                  className={cn(
-                    'px-4 py-3 text-left font-medium text-muted-foreground',
-                    col.sortable && 'cursor-pointer select-none hover:text-foreground',
-                    col.className
-                  )}
-                  onClick={() => col.sortable && handleSort(String(col.key))}
-                >
-                  <div className="flex items-center gap-1">
-                    {col.header ? col.header() : col.label}
-                    {col.sortable && (
-                      <span className="opacity-50">
-                        {sortKey === col.key ? (
-                          sortDir === 'asc' ? (
-                            <ChevronUp className="w-3 h-3" />
-                          ) : (
-                            <ChevronDown className="w-3 h-3" />
-                          )
-                        ) : (
-                          <ChevronsUpDown className="w-3 h-3" />
-                        )}
-                      </span>
+            <tr className="border-b border-border" role="row">
+              {visibleColumns.map((col) => {
+                const colKey = String(col.key)
+                const ariaSortValue = col.sortable
+                  ? sortKey === colKey
+                    ? (sortDir === 'asc' ? 'ascending' : 'descending')
+                    : 'none'
+                  : undefined
+                return (
+                  <th
+                    key={colKey}
+                    scope="col"
+                    role="columnheader"
+                    aria-sort={ariaSortValue}
+                    className={cn(
+                      'px-4 py-3 text-left font-medium text-muted-foreground',
+                      col.sortable && 'cursor-pointer select-none hover:text-foreground',
+                      col.className
                     )}
-                  </div>
-                </th>
-              ))}
-              {rowActions && <th className="w-1" />}
+                    onClick={() => col.sortable && handleSort(colKey)}
+                  >
+                    <div className="flex items-center gap-1">
+                      {col.header ? col.header() : col.label}
+                      {col.sortable && (
+                        <span className="opacity-50" aria-hidden="true">
+                          {sortKey === col.key ? (
+                            sortDir === 'asc' ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )
+                          ) : (
+                            <ChevronsUpDown className="w-3 h-3" />
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                )
+              })}
+              {rowActions && <th scope="col" role="columnheader" className="w-1" aria-label="操作" />}
             </tr>
           </thead>
           <tbody>
@@ -308,9 +339,12 @@ export function DataTable<T extends Record<string, unknown>>({
               const rowKey = String(row[keyField])
               const isFocused = focusedIdx === idx
               const isFlash = flashRowId != null && String(flashRowId) === rowKey
+              const rowIndex = (page - 1) * pageSize + idx + 1
               return (
                 <tr
                   key={rowKey}
+                  role="row"
+                  aria-rowindex={rowIndex}
                   ref={isFocused ? focusedRowRef : undefined}
                   data-focused={isFocused ? 'true' : undefined}
                   className={cn(
@@ -330,13 +364,13 @@ export function DataTable<T extends Record<string, unknown>>({
                   {visibleColumns.map((col) => {
                     const value = row[String(col.key)]
                     return (
-                      <td key={String(col.key)} className={cn('px-4', DENSITY_CLASS[density], col.className)}>
+                      <td key={String(col.key)} role="gridcell" className={cn('px-4', DENSITY_CLASS[density], col.className)}>
                         {col.render ? col.render(value, row) : String(value ?? '-')}
                       </td>
                     )
                   })}
                   {rowActions && (
-                    <td className="sticky right-0 w-1 px-2 bg-transparent">
+                    <td role="gridcell" className="sticky right-0 w-1 px-2 bg-transparent">
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-0.5">
                         {rowActions(row)}
                       </div>
@@ -380,20 +414,22 @@ export function DataTable<T extends Record<string, unknown>>({
       {ctxMenu && (
         <div
           data-ctx-menu
+          role="menu"
           style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 50 }}
           className="bg-card border border-border rounded-lg shadow-xl py-1 min-w-[160px]"
         >
           {ctxMenu.items.map((item, i) => (
             <div key={i}>
-              {item.separator && i > 0 && <hr className="my-1 border-border" />}
+              {item.separator && i > 0 && <hr className="my-1 border-border" role="separator" />}
               <button
+                role="menuitem"
                 className={cn(
                   'flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/60 rounded-sm mx-1 w-[calc(100%-8px)] text-left',
                   item.variant === 'destructive' && 'text-destructive'
                 )}
                 onClick={() => { item.onClick(); setCtxMenu(null) }}
               >
-                {item.icon && <item.icon className="w-3.5 h-3.5 shrink-0" />}
+                {item.icon && <item.icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
                 {item.label}
               </button>
             </div>

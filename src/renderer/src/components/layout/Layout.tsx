@@ -46,6 +46,14 @@ export function Layout() {
     purgeDemoData().then(() => queryClient.invalidateQueries())
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A11y Rule 89: Focus main content on route change for screen reader navigation
+  useEffect(() => {
+    const main = document.getElementById('main-content') as HTMLElement | null
+    if (main) {
+      main.focus({ preventScroll: true })
+    }
+  }, [location.pathname])
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
@@ -114,7 +122,7 @@ export function Layout() {
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0">
         <Header title={title} onSearchClick={() => setPaletteOpen(true)} />
-        <main id="main-content" className="flex-1 overflow-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto outline-none">
           <Outlet />
         </main>
         <StatusBar />

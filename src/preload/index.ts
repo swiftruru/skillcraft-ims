@@ -212,10 +212,15 @@ const electronAPI = {
     markAllRead: () => ipcRenderer.invoke('notifications:markAllRead')
   },
 
-  // A11y Rule 80: nativeTheme system preference
+  // A11y Rule 80+85: nativeTheme system preference
   app: {
     getNativeTheme: () => ipcRenderer.invoke('app:getNativeTheme') as Promise<'dark' | 'light'>,
-    setNativeTheme: (source: 'light' | 'dark' | 'system') => ipcRenderer.invoke('app:setNativeTheme', source)
+    setNativeTheme: (source: 'light' | 'dark' | 'system') => ipcRenderer.invoke('app:setNativeTheme', source),
+    onNativeThemeUpdated: (callback: (theme: 'dark' | 'light') => void) => {
+      const handler = (_: Electron.IpcRendererEvent, theme: 'dark' | 'light') => callback(theme)
+      ipcRenderer.on('app:nativeThemeUpdated', handler)
+      return () => ipcRenderer.removeListener('app:nativeThemeUpdated', handler)
+    }
   }
 }
 

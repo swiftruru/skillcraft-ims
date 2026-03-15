@@ -235,6 +235,13 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = source
   })
 
+  // A11y Rule 85: Real-time system theme change notification
+  nativeTheme.on('updated', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app:nativeThemeUpdated', nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
+    }
+  })
+
   // Set dock icon (dev mode uses default Electron icon)
   if (process.platform === 'darwin' && app.dock) {
     const { nativeImage } = await import('electron')

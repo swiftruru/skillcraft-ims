@@ -155,7 +155,7 @@ export default function Suppliers() {
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card">
+      <div className="rounded-lg border border-border bg-card" aria-busy={isLoading} aria-label="供應商列表">
         {isLoading ? <TableSkeleton rows={8} cols={6} /> : (
           <DataTable
             data={(suppliers ?? []) as unknown as Record<string, unknown>[]}

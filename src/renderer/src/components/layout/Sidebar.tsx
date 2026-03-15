@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   LayoutDashboard,
@@ -21,6 +21,7 @@ import type { DashboardKPIs } from '@/types/schema'
 
 export function Sidebar() {
   const t = useLang()
+  const location = useLocation()
 
   const { data: kpis } = useQuery<DashboardKPIs>({
     queryKey: ['reports', 'kpis'],
@@ -58,16 +59,21 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-2 py-4 space-y-0.5">
-        {navItems.map((item) => (
+      <nav className="flex-1 px-2 py-4 space-y-0.5" aria-label="主要導覽">
+        {navItems.map((item) => {
+          const isActive = item.end
+            ? location.pathname === item.to
+            : location.pathname.startsWith(item.to)
+          return (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
-            className={({ isActive }) =>
+            aria-current={isActive ? 'page' : undefined}
+            className={({ isActive: a }) =>
               cn(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors titlebar-no-drag',
-                isActive
+                a
                   ? 'bg-primary/15 text-primary font-medium'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )
@@ -81,13 +87,14 @@ export function Sidebar() {
               </span>
             )}
           </NavLink>
-        ))}
+        )})}
       </nav>
 
       {/* Settings + About */}
       <div className="px-2 py-3 border-t border-sidebar-border space-y-0.5">
         <NavLink
           to="/settings"
+          aria-current={location.pathname.startsWith('/settings') ? 'page' : undefined}
           className={({ isActive }) =>
             cn(
               'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors titlebar-no-drag',
@@ -102,6 +109,7 @@ export function Sidebar() {
         </NavLink>
         <NavLink
           to="/about"
+          aria-current={location.pathname.startsWith('/about') ? 'page' : undefined}
           className={({ isActive }) =>
             cn(
               'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors titlebar-no-drag',

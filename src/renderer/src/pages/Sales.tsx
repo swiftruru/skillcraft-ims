@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useFocusReturn } from '@/lib/useFocusReturn'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt, AlignJustify, List, LayoutList, MessageSquare, FileDown, type LucideIcon } from 'lucide-react'
@@ -67,6 +68,7 @@ export default function Sales() {
   const setStatusFilter = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('status', v); else n.delete('status'); return n }, { replace: true })
 
   const [formOpen, setFormOpen] = useState(false)
+  const { capture: captureFormFocus, restore: restoreFormFocus } = useFocusReturn()
   const [density, setDensity] = useState<'compact' | 'normal' | 'relaxed'>(() =>
     (localStorage.getItem('ims-dt-density-sales') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
   )
@@ -332,7 +334,7 @@ export default function Sales() {
             onClick={(e) => { e.stopPropagation(); setStatusFilter(active ? '' : String(v)) }}
             title={active ? '點擊取消篩選' : `篩選：${getStatusLabel(String(v))}`}
           >
-            {getStatusLabel(String(v))}
+            <span className="sr-only">狀態：</span>{getStatusLabel(String(v))}
           </span>
         )
       }
@@ -345,12 +347,12 @@ export default function Sales() {
         if (row.status !== 'completed' && row.status !== 'partial_return') return null
         const isOverdue = row.payment_status === 'unpaid' && row.payment_due_date && row.payment_due_date < new Date().toISOString().slice(0, 10)
         if (row.payment_status === 'paid') {
-          return <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-400">{s.paid}</span>
+          return <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-400"><span className="sr-only">付款狀態：</span>{s.paid}</span>
         }
         if (isOverdue) {
-          return <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">{s.overdue}</span>
+          return <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400"><span className="sr-only">付款狀態：</span>{s.overdue}</span>
         }
-        return <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{s.unpaid}</span>
+        return <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"><span className="sr-only">付款狀態：</span>{s.unpaid}</span>
       }
     },
     {
@@ -565,7 +567,7 @@ export default function Sales() {
           {exporting ? t.common.exporting : t.common.exportCsv}
         </Button>
         <div className="relative">
-          <Button onClick={() => setFormOpen(true)} className="gap-2">
+          <Button onClick={() => { captureFormFocus(); setFormOpen(true) }} className="gap-2">
             <Plus className="w-4 h-4" />
             {s.addOrder}
           </Button>
@@ -598,7 +600,7 @@ export default function Sales() {
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card">
+      <div className="rounded-lg border border-border bg-card" aria-busy={isLoading} aria-label="銷售單列表">
         {isLoading ? (
           <TableSkeleton rows={8} cols={7} />
         ) : (
@@ -643,7 +645,7 @@ export default function Sales() {
         )}
       </div>
 
-      <SaleForm open={formOpen} onOpenChange={(o) => { setFormOpen(o); if (!o) setCloneData(null) }} initialData={cloneData ?? undefined} />
+      <SaleForm open={formOpen} onOpenChange={(o) => { setFormOpen(o); if (!o) { setCloneData(null); restoreFormFocus() } }} initialData={cloneData ?? undefined} />
       {detailId !== null && (
         <SaleDetail id={detailId} open={detailId !== null} onOpenChange={(open) => !open && setDetailId(null)} />
       )}

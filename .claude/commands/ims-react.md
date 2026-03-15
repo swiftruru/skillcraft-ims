@@ -724,3 +724,105 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 新增第三種主題選項 `'system'`：讀取 `nativeTheme.shouldUseDarkColors` 決定 DOM class；在 Settings 頁面加入「跟隨系統」選項
     - 系統主題偵測：`nativeTheme.on('updated', ...)` → 發送 ipc 事件到 renderer → renderer 更新 DOM class（不更新 store，避免覆蓋使用者明確設定）
 
+81. **側欄 aria-current="page"**：
+    - `Sidebar.tsx` 使用 `useLocation()` 計算每個 NavLink 的 active 狀態，在 `<NavLink>` 加上 `aria-current={isActive ? 'page' : undefined}`
+    - active 判斷規則：`end: true` 的項目用 `pathname === item.to` 嚴格比對；其餘用 `pathname.startsWith(item.to)`；Settings / About 的 `/settings`、`/about` 也適用 startsWith
+    - 底部 Settings / About `<NavLink>` 同樣加上 `aria-current`
+    - 整個 `<nav>` 加上 `aria-label="主要導覽"`，`<aside>` 加上 `role="navigation"` 改為 `<nav>` 或保留 `<aside>` 並加 `aria-label="主要導覽"`
+
+82. **Dialog 關閉後 focus 歸位（useFocusReturn）**：
+    - 建立 `useFocusReturn` hook（`src/renderer/src/lib/useFocusReturn.ts`）：
+      - `useRef` 儲存 `lastFocused: HTMLElement | null`
+      - `capture()` 方法：`lastFocused.current = document.activeElement as HTMLElement`
+      - `restore()` 方法：`lastFocused.current?.focus()`
+    - 套用範圍：Products、Purchases、Sales 頁面的「新增」按鈕觸發的 Dialog（`ProductForm`、`PurchaseForm`、`SaleForm`）
+    - 在這些頁面中：開啟 Dialog 前呼叫 `capture()`（在 `setFormOpen(true)` 前）；Dialog 的 `onOpenChange(false)` 後呼叫 `restore()`
+    - Radix `Dialog.Content` 的 `onCloseAutoFocus` 預設會嘗試返回 focus，但對於程式觸發開啟的 Dialog 不可靠，此 hook 作為補強
+    - `ProductForm` / `PurchaseForm` / `SaleForm` 新增 `onClosed?: () => void` prop，Dialog 完全關閉後呼叫（用 `onOpenChange(false)` 觸發）
+
+83. **DataTable 排序欄標題 aria-sort**：
+    - `DataTable.tsx` 的 `<th>` 排序欄加上 `aria-sort` 屬性：
+      - `sortKey === col.key && sortDir === 'asc'` → `aria-sort="ascending"`
+      - `sortKey === col.key && sortDir === 'desc'` → `aria-sort="descending"`
+      - 其他可排序欄 → `aria-sort="none"`
+      - 非排序欄 → 不加 `aria-sort`
+    - 排序按鈕改為 `<button>` 包裹欄標題文字（`role="button"` 或直接 `<button type="button">`），讓鍵盤可 focus 並按 Enter/Space 觸發排序
+    - `<th>` 加上 `scope="col"` 讓螢幕閱讀器正確識別欄標題
+
+84. **aria-busy 載入狀態**：
+    - Products、Purchases、Sales、Customers、Suppliers 頁面的主資料表容器（`<div className="rounded-lg border border-border bg-card">`）加上：
+      - `aria-busy={isLoading}` — 載入中時螢幕閱讀器知道內容尚未就緒
+      - `aria-label="資料表格"` — 給容器語義標籤
+    - `isLoading` 為 true 時，不只顯示 `TableSkeleton`，也讓輔助技術得知「正在載入」
+    - `TableSkeleton` 本身加上 `aria-hidden="true"`（骨架動畫對 AT 無語義意義）+ 外層 `<div role="status" aria-label="載入中" aria-live="polite">` 包裹一次公告
+
+85. **nativeTheme 即時反應系統主題切換**：
+    - `src/main/index.ts` 加入 `nativeTheme.on('updated', () => { mainWindow?.webContents.send('app:nativeThemeUpdated', nativeTheme.shouldUseDarkColors ? 'dark' : 'light') })`
+    - preload 加入 `app.onNativeThemeUpdated: (cb: (theme: 'dark' | 'light') => void) => ipcRenderer.on('app:nativeThemeUpdated', (_e, t) => cb(t))`
+    - `theme.store.ts` 新增 `systemTheme: 'dark' | 'light' | null` field（初始 null）；新增 `setSystemTheme(t)` action
+    - `App.tsx` 的 `useEffect` 加入 `window.electronAPI.app.onNativeThemeUpdated((t) => { if (themeStore.theme === 'system') { document.documentElement.classList.toggle('dark', t === 'dark') } })`
+    - 只在使用者選擇「跟隨系統」（`theme === 'system'`）時才自動跟隨，避免覆蓋使用者明確設定的 light/dark
+
+86. **Status Badge 螢幕閱讀器文字補強**：
+    - 套用範圍：`Purchases.tsx`、`Sales.tsx` 列表中的狀態 badge；`PurchaseDetailDialog`、`SaleDetailDialog` 中的狀態顯示
+    - 在 badge 函式（`getStatusBadge`、`getPaymentBadge`）回傳的 JSX 中，在可見文字前加 `<span className="sr-only">狀態：</span>`
+    - 純色點（若有）需搭配文字說明
+    - 逾期 badge（`bg-orange-500/20 text-orange-400`）加 `aria-label="採購單逾期"` 或在 badge 文字前加 sr-only「逾期提醒：」
+    - 目標：螢幕閱讀器播報「狀態：待確認」而非只播報「待確認」（加上語境前綴）
+
+87. **CreatableSelect 完整 ARIA Combobox 語意**：
+    - `CreatableSelect.tsx` 加入 ARIA Combobox 語意：
+      - 容器 `<div>` 加 `role="combobox"` `aria-expanded={open}` `aria-haspopup="listbox"` `aria-owns="creatable-listbox-{id}"`
+      - `<input>` 加 `aria-autocomplete="list"` `aria-controls="creatable-listbox-{id}"` `aria-activedescendant` 指向當前高亮選項 id
+      - Dropdown `<div>` 加 `role="listbox"` `id="creatable-listbox-{id}"`
+      - 每個選項 `<button>` 改為 `<div role="option">` `aria-selected={value === option.value}` `id="opt-{value}"`
+    - 鍵盤導覽強化：`ArrowDown` / `ArrowUp` 在選項間移動（`highlightedIndex` state）；`Enter` 選取當前高亮項；`Tab` 關閉 dropdown
+    - 產生唯一 id：`useId()` hook（React 18 內建）
+    - 高亮項目滾動至可見（`scrollIntoView`）
+
+88. **Context Menu 鍵盤開啟（Shift+F10 / Menu key）**：
+    - `DataTable.tsx` 的 `handleKeyDown` 加入：`Shift+F10` 或 `key === 'ContextMenu'` → 以目前 focused row 的位置開啟 context menu
+    - 位置計算：取 `focusedRowRef.current?.getBoundingClientRect()`，在列右側邊緣顯示（`x = rect.right - 160, y = rect.top`）
+    - 需要 `contextMenu` prop 且 `focusedIdx >= 0` 才啟用
+    - Context menu 開啟後，第一個選項自動獲得焦點（focus）；`ArrowUp` / `ArrowDown` 在選項間移動；`Escape` 關閉並歸還焦點到 table row
+    - Context menu div 加上 `role="menu"`；每個選項加 `role="menuitem"`
+
+89. **路由切換後 focus 移到頁面標題**：
+    - `Layout.tsx` 在現有 `useEffect` 監聽 `location.pathname` 後加入：`document.getElementById('main-content')?.focus()`
+    - `<main id="main-content">` 加上 `tabIndex={-1}`（已在 Rule 79 實作的 skip link 同一元素，如果已有 `tabIndex` 則直接用）
+    - 這讓螢幕閱讀器在換頁後重新從主內容開始讀取，而非停留在之前 focus 的側欄項目
+    - 注意：`tabIndex={-1}` 讓 `<main>` 可被程式聚焦但不在 Tab 順序中（不影響鍵盤使用者流程）
+
+90. **DataTable ARIA Table 語意**：
+    - `DataTable.tsx` 的 `<table>` 加上 `role="grid"` `aria-rowcount={sorted.length}` `aria-label` prop（由呼叫端透過 `tableLabel?: string` prop 傳入，如「商品列表」）
+    - 所有 `<th>` 加上 `scope="col"`（Rule 83 同時處理）
+    - `<thead>` 的 `<tr>` 加上 `role="row"`；`<th>` 加 `role="columnheader"`
+    - `<tbody>` 的 `<tr>` 加上 `role="row"` `aria-rowindex={idx + 1}`；`<td>` 加 `role="gridcell"`
+    - `DataTable` 新增 `tableLabel?: string` prop，傳入 `aria-label` 給 `<table>`；若未提供則省略
+
+91. **prefers-contrast: more 高對比支援**：
+    - `globals.css` 新增 `@media (prefers-contrast: more)` block：
+      - `text-muted-foreground` 對應的顏色（`--muted-foreground`）提高至接近前景色
+      - border 顏色加強（`--border` HSL 亮度拉高）
+      - 連結、badge 等 low-opacity 顏色改為不透明版本
+    - CSS 內容：
+      ```css
+      @media (prefers-contrast: more) {
+        :root {
+          --muted-foreground: 222.2 40% 20%;
+          --border: 214.3 31.8% 60%;
+        }
+        .dark {
+          --muted-foreground: 215 20.2% 85%;
+          --border: 217.2 32.6% 40%;
+        }
+      }
+      ```
+    - 僅調整 CSS token，無需改動元件
+
+92. **確保字型縮放以 rem 為基礎**：
+    - 確認 `body` 的 `font-size` 未寫死為 px（Tailwind 預設是 `16px` 但 rem 基礎），所有 Tailwind `text-*` 都是 rem
+    - 在 `globals.css` 加入 `html { font-size: 100%; }` 確保根字體尊重使用者瀏覽器偏好設定（不使用 `html { font-size: 14px; }` 等固定值）
+    - 若有自訂 `font-size` 的 inline style 或 CSS，改為 `em` 或 `rem`
+    - 受惠範圍：使用者在 macOS 系統偏好「顯示器縮放」或瀏覽器字型大小設定放大時，UI 正確等比縮放
+

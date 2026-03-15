@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useFocusReturn } from '@/lib/useFocusReturn'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, FileDown, type LucideIcon } from 'lucide-react'
@@ -58,6 +59,7 @@ export default function Products() {
     return (localStorage.getItem('ims-products-view') as 'table' | 'grid') ?? 'table'
   })
   const { flashId, triggerFlash } = useSuccessFlash()
+  const { capture: captureFormFocus, restore: restoreFormFocus } = useFocusReturn()
   const [density, setDensity] = useState<'compact' | 'normal' | 'relaxed'>(() =>
     (localStorage.getItem('ims-dt-density-products') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
   )
@@ -472,7 +474,7 @@ export default function Products() {
           {exporting ? t.common.exporting : t.common.exportCsv}
         </Button>
         <div className="relative">
-          <Button data-tour="add-product" onClick={() => { setEditProduct(null); setFormOpen(true) }} className="gap-2">
+          <Button data-tour="add-product" onClick={() => { captureFormFocus(); setEditProduct(null); setFormOpen(true) }} className="gap-2">
             <Plus className="w-4 h-4" />
             {p.addProduct}
           </Button>
@@ -528,7 +530,7 @@ export default function Products() {
 
       {/* Table / Grid */}
       {isLoading ? (
-        <div className="rounded-lg border border-border bg-card"><TableSkeleton rows={8} cols={6} /></div>
+        <div className="rounded-lg border border-border bg-card" aria-busy={true} aria-label="商品列表"><TableSkeleton rows={8} cols={6} /></div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {(products ?? []).length === 0 ? (
@@ -580,7 +582,7 @@ export default function Products() {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-border bg-card">
+        <div className="rounded-lg border border-border bg-card" aria-busy={isLoading} aria-label="商品列表">
           <DataTable
             data={(products ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
@@ -632,7 +634,7 @@ export default function Products() {
       <PurchaseSuggestionDialog open={suggestionOpen} onOpenChange={setSuggestionOpen} />
       <ProductForm
         open={formOpen}
-        onOpenChange={(open) => { setFormOpen(open); if (!open) setEditProduct(null) }}
+        onOpenChange={(open) => { setFormOpen(open); if (!open) { setEditProduct(null); restoreFormFocus() } }}
         product={editProduct}
         onSaved={triggerFlash}
       />

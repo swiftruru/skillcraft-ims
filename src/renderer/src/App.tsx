@@ -23,6 +23,20 @@ export default function App() {
     initFromSystem().then(() => applyTheme())
   }, [applyTheme, initFromSystem])
 
+  // A11y Rule 85: Real-time system theme change
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.app.onNativeThemeUpdated((systemTheme) => {
+      const { theme } = useThemeStore.getState()
+      // Only auto-apply if user hasn't set an explicit preference (theme stored as 'system')
+      if (theme === 'system') {
+        const isDark = systemTheme === 'dark'
+        const el = document.documentElement
+        isDark ? el.classList.add('dark') : el.classList.remove('dark')
+      }
+    })
+    return unsubscribe
+  }, [])
+
   return (
     <HashRouter>
       <Routes>
