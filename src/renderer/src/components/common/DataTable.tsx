@@ -53,7 +53,6 @@ export function DataTable<T extends Record<string, unknown>>({
   density = 'normal'
 }: DataTableProps<T>) {
   const t = useLang()
-  const validColKeys = useMemo(() => new Set(columns.map((c) => String(c.key))), [columns])
 
   const loadSavedSort = () => {
     if (!storageKey) return { key: null as string | null, dir: null as SortDir }

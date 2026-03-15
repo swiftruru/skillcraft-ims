@@ -494,7 +494,8 @@ export const translations = {
       stockSuffix: (n: number) => `(庫存:${n})`,
       submitCreateSale: '建立銷售單',
       paymentTermsLabel: '帳期天數',
-      paymentTermsPlaceholder: '0 表示不設定'
+      paymentTermsPlaceholder: '0 表示不設定',
+      draftRestored: '草稿已還原'
     },
     receivables: {
       title: '帳款管理',
@@ -1063,7 +1064,8 @@ export const translations = {
       stockSuffix: (n: number) => `(Stock:${n})`,
       submitCreateSale: 'Create Sales Order',
       paymentTermsLabel: 'Payment Terms (days)',
-      paymentTermsPlaceholder: '0 = no due date'
+      paymentTermsPlaceholder: '0 = no due date',
+      draftRestored: 'Draft restored'
     },
     receivables: {
       title: 'Receivables & Payables',

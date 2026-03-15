@@ -51,6 +51,8 @@ declare global {
         delete(id: number): Promise<boolean>
         markPaid(id: number): Promise<import('./schema').PurchaseOrder | null>
         setPaymentDue(id: number, dueDate: string): Promise<import('./schema').PurchaseOrder | null>
+        batchReceive(ids: number[]): Promise<{ received: number; skipped: number }>
+        getStatusHistory(orderId: number): Promise<{ id: number; from_status: string | null; to_status: string; changed_at: string; note: string | null }[]>
       }
       sales: {
         getAll(filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }): Promise<import('./schema').SalesOrder[]>
@@ -63,6 +65,8 @@ declare global {
         delete(id: number): Promise<boolean>
         markPaid(id: number): Promise<import('./schema').SalesOrder | null>
         setPaymentDue(id: number, dueDate: string): Promise<import('./schema').SalesOrder | null>
+        batchMarkPaid(ids: number[]): Promise<{ updated: number }>
+        getStatusHistory(orderId: number): Promise<{ id: number; from_status: string | null; to_status: string; changed_at: string; note: string | null }[]>
       }
       reports: {
         kpis(): Promise<import('./schema').DashboardKPIs>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, Wand2, Eye, AlignJustify, List, LayoutList } from 'lucide-react'
+import { Plus, Edit2, Trash2, Wand2, Eye, AlignJustify, List, LayoutList } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'

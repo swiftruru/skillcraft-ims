@@ -107,8 +107,6 @@ export default function Dashboard() {
       return next
     })
   }
-  const isVisible = (key: string) => !hiddenWidgets.has(key)
-
   const wrap = (key: string, label: string, content: React.ReactNode) => {
     const order = widgetOrder.indexOf(key)
     const orderStyle = order !== -1 ? { order } : {}
