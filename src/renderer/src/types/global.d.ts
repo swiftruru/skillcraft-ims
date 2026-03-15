@@ -160,6 +160,11 @@ declare global {
         markRead(id: number): Promise<boolean>
         markAllRead(): Promise<boolean>
       }
+      app: {
+        getNativeTheme(): Promise<'dark' | 'light'>
+        setNativeTheme(source: 'light' | 'dark' | 'system'): Promise<void>
+        onNativeThemeUpdated(callback: (theme: 'dark' | 'light') => void): () => void
+      }
     }
   }
 }

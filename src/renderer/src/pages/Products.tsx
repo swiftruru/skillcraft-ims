@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, FileDown, type LucideIcon } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DataTable, type Column, type ContextMenuItem } from '@/components/common/DataTable'
 import { SearchWithHistory } from '@/components/common/SearchWithHistory'
@@ -68,22 +67,20 @@ export default function Products() {
   const [btnHintVisible, setBtnHintVisible] = useState(() => !localStorage.getItem('ims-hint-shown-products'))
   const [dtHintVisible, setDtHintVisible] = useState(() => !localStorage.getItem('ims-hint-dt-shown'))
   useEffect(() => {
-    if (btnHintVisible) {
-      const t = setTimeout(() => {
-        setBtnHintVisible(false)
-        localStorage.setItem('ims-hint-shown-products', '1')
-      }, 5000)
-      return () => clearTimeout(t)
-    }
+    if (!btnHintVisible) return
+    const t = setTimeout(() => {
+      setBtnHintVisible(false)
+      localStorage.setItem('ims-hint-shown-products', '1')
+    }, 5000)
+    return () => clearTimeout(t)
   }, [btnHintVisible])
   useEffect(() => {
-    if (dtHintVisible) {
-      const t = setTimeout(() => {
-        setDtHintVisible(false)
-        localStorage.setItem('ims-hint-dt-shown', '1')
-      }, 5000)
-      return () => clearTimeout(t)
-    }
+    if (!dtHintVisible) return
+    const t = setTimeout(() => {
+      setDtHintVisible(false)
+      localStorage.setItem('ims-hint-dt-shown', '1')
+    }, 5000)
+    return () => clearTimeout(t)
   }, [dtHintVisible])
 
 

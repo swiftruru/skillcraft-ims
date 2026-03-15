@@ -48,7 +48,7 @@ import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, L
 import { useLang } from '@/lib/useLang'
 import { useCountUp } from '@/lib/useCountUp'
 import { categoryHex } from '@/lib/categoryColor'
-const WIDGET_KEYS = ['quickActions', 'kpis', 'salesTrend', 'topProducts', 'lowStock', 'pendingSales', 'purchaseSuggestions', 'aiInsight']
+const WIDGET_KEYS = ['overdueAlerts', 'dueSoonAlerts', 'quickActions', 'kpis', 'salesTrend', 'topProducts', 'lowStock', 'pendingSales', 'purchaseSuggestions', 'aiInsight']
 
 export default function Dashboard() {
   const t = useLang()
@@ -144,9 +144,9 @@ export default function Dashboard() {
         {...dragProps}
         className={`cursor-grab${isDragTarget ? ' ring-2 ring-primary/40 rounded-xl' : ''}`}
       >
-        <div>
-          <div className="flex justify-end -mb-2 pr-1">
-            <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground hover:text-foreground"
+        <div className="relative">
+          <div className="absolute top-2 right-2 z-10">
+            <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground hover:text-foreground bg-card/80 backdrop-blur-sm"
               onClick={() => toggleWidget(key)}>
               <EyeOff className="w-3 h-3" />{d.customizeHide}
             </Button>
@@ -347,9 +347,8 @@ export default function Dashboard() {
         </div>
       ))}
 
-      {/* Overdue Alerts - fixed order */}
-      <div style={{ order: -2 }}>
-      {(kpis?.overdueCount ?? 0) > 0 && (() => {
+      {/* Overdue Alerts */}
+      {wrap('overdueAlerts', d.overdueAlertsTitle, (kpis?.overdueCount ?? 0) > 0 ? (() => {
         const overdueItems: { order: UnpaidOrder; type: 'sales' | 'purchases' }[] = [
           ...(unpaidOrders?.sales.filter((o) => o.overdue) ?? []).map((o) => ({ order: o, type: 'sales' as const })),
           ...(unpaidOrders?.purchases.filter((o) => o.overdue) ?? []).map((o) => ({ order: o, type: 'purchases' as const }))
@@ -401,12 +400,10 @@ export default function Dashboard() {
             )}
           </Card>
         )
-      })()}
-      </div>
+      })() : null)}
 
-      {/* Due Soon Alerts - fixed order */}
-      <div style={{ order: -1 }}>
-      {(kpis?.dueSoonCount ?? 0) > 0 && (() => {
+      {/* Due Soon Alerts */}
+      {wrap('dueSoonAlerts', d.dueSoonTitle, (kpis?.dueSoonCount ?? 0) > 0 ? (() => {
         const today = new Date().toISOString().slice(0, 10)
         const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
         const dueSoonItems: { order: UnpaidOrder; type: 'sales' | 'purchases' }[] = [
@@ -460,8 +457,7 @@ export default function Dashboard() {
             )}
           </Card>
         )
-      })()}
-      </div>
+      })() : null)}
 
       {/* Charts Row */}
       {wrap('salesTrend', d.salesTrend, <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

@@ -77,16 +77,14 @@ export default function Sales() {
   const [btnHintVisible, setBtnHintVisible] = useState(() => !localStorage.getItem('ims-hint-shown-sales'))
   const [dtHintVisible, setDtHintVisible] = useState(() => !localStorage.getItem('ims-hint-dt-shown'))
   useEffect(() => {
-    if (btnHintVisible) {
-      const timer = setTimeout(() => { setBtnHintVisible(false); localStorage.setItem('ims-hint-shown-sales', '1') }, 5000)
-      return () => clearTimeout(timer)
-    }
+    if (!btnHintVisible) return
+    const timer = setTimeout(() => { setBtnHintVisible(false); localStorage.setItem('ims-hint-shown-sales', '1') }, 5000)
+    return () => clearTimeout(timer)
   }, [btnHintVisible])
   useEffect(() => {
-    if (dtHintVisible) {
-      const timer = setTimeout(() => { setDtHintVisible(false); localStorage.setItem('ims-hint-dt-shown', '1') }, 5000)
-      return () => clearTimeout(timer)
-    }
+    if (!dtHintVisible) return
+    const timer = setTimeout(() => { setDtHintVisible(false); localStorage.setItem('ims-hint-dt-shown', '1') }, 5000)
+    return () => clearTimeout(timer)
   }, [dtHintVisible])
 
   useEffect(() => {
