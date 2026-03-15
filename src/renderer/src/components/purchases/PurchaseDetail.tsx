@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import type { PurchaseOrder } from '@/types/schema'
-import { CheckCircle2, Circle, XCircle } from 'lucide-react'
+import { CheckCircle2, Circle, XCircle, AlertTriangle } from 'lucide-react'
 
 interface TimelineStep { label: string; date: string | null; done: boolean; cancelled?: boolean }
 
@@ -71,6 +71,29 @@ export function PurchaseDetail({
               {order.receive_date && (
                 <div><span className="text-muted-foreground">收貨日期：</span>{formatDate(order.receive_date)}</div>
               )}
+              {order.status === 'received' && (() => {
+                const today = new Date().toISOString().slice(0, 10)
+                const isOverdue = order.payment_status === 'unpaid' && !!order.payment_due_date && order.payment_due_date < today
+                return (
+                  <>
+                    <div>
+                      <span className="text-muted-foreground">付款狀態：</span>
+                      <span className={`ml-1 text-xs px-2 py-0.5 rounded-full font-medium ${order.payment_status === 'paid' ? 'bg-green-500/15 text-green-400' : isOverdue ? 'bg-red-500/15 text-red-400' : 'bg-muted text-muted-foreground'}`}>
+                        {order.payment_status === 'paid' ? '已付款' : isOverdue ? '逾期未付' : '未付款'}
+                      </span>
+                    </div>
+                    {order.payment_due_date && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-muted-foreground">付款期限：</span>
+                        <span className={isOverdue ? 'text-red-400 font-medium' : ''}>
+                          {formatDate(order.payment_due_date)}
+                        </span>
+                        {isOverdue && <AlertTriangle className="w-3.5 h-3.5 text-red-400" />}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
               {order.notes && (
                 <div className="col-span-2"><span className="text-muted-foreground">備註：</span>{order.notes}</div>
               )}

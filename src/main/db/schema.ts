@@ -27,6 +27,7 @@ export interface Supplier {
   email: string | null
   address: string | null
   notes: string | null
+  credit_limit: number
   created_at: string
 }
 
@@ -40,6 +41,7 @@ export interface Customer {
   email: string | null
   address: string | null
   notes: string | null
+  credit_limit: number
   created_at: string
 }
 
@@ -55,6 +57,8 @@ export interface PurchaseOrder {
   receive_date: string | null
   total_amount: number
   notes: string | null
+  payment_due_date: string | null
+  payment_status: 'unpaid' | 'paid'
   created_at: string
   items?: PurchaseItem[]
 }
@@ -89,10 +93,12 @@ export interface SalesOrder {
   order_no: string
   customer_id: number | null
   customer_name?: string
-  status: 'pending' | 'completed' | 'cancelled' | 'returned'
+  status: 'pending' | 'completed' | 'cancelled' | 'returned' | 'partial_return'
   order_date: string
   total_amount: number
   notes: string | null
+  payment_due_date: string | null
+  payment_status: 'unpaid' | 'paid'
   created_at: string
   items?: SaleItem[]
 }
@@ -105,6 +111,7 @@ export interface SaleItem {
   product_sku?: string
   quantity: number
   unit_price: number
+  return_qty?: number
   subtotal?: number
 }
 

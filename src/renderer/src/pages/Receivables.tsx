@@ -52,6 +52,18 @@ export default function Receivables() {
   const overdueCount = orders.filter((o) => o.overdue).length
   const totalAmount = orders.reduce((s, o) => s + o.total_amount, 0)
 
+  const getDaysOverdue = (dueDate: string | null): number => {
+    if (!dueDate) return 0
+    return Math.floor((new Date(today).getTime() - new Date(dueDate).getTime()) / 86400000)
+  }
+
+  const agingBuckets = {
+    current: orders.filter((o) => !o.overdue),
+    d1to30: orders.filter((o) => o.overdue && getDaysOverdue(o.payment_due_date) <= 30),
+    d31to60: orders.filter((o) => o.overdue && getDaysOverdue(o.payment_due_date) > 30 && getDaysOverdue(o.payment_due_date) <= 60),
+    over60: orders.filter((o) => o.overdue && getDaysOverdue(o.payment_due_date) > 60)
+  }
+
   const tabs: { key: Tab; label: string }[] = [
     { key: 'sales', label: r.salesTab },
     { key: 'purchases', label: r.purchasesTab }
@@ -102,6 +114,29 @@ export default function Receivables() {
           </button>
         ))}
       </div>
+
+      {/* Aging Analysis */}
+      {orders.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-2">{r.agingTitle}</p>
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: r.agingCurrent, items: agingBuckets.current, color: 'text-green-400', bg: 'bg-green-500/5 border-green-500/20' },
+              { label: r.aging1to30, items: agingBuckets.d1to30, color: 'text-amber-400', bg: 'bg-amber-500/5 border-amber-500/20' },
+              { label: r.aging31to60, items: agingBuckets.d31to60, color: 'text-orange-400', bg: 'bg-orange-500/5 border-orange-500/20' },
+              { label: r.agingOver60, items: agingBuckets.over60, color: 'text-red-400', bg: 'bg-red-500/5 border-red-500/20' }
+            ].map((bucket) => (
+              <div key={bucket.label} className={`rounded-lg border p-3 ${bucket.bg}`}>
+                <div className="text-xs text-muted-foreground">{bucket.label}</div>
+                <div className={`text-lg font-bold mt-1 ${bucket.items.length > 0 ? bucket.color : 'text-muted-foreground'}`}>
+                  {formatCurrency(bucket.items.reduce((s, o) => s + o.total_amount, 0))}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">{bucket.items.length} 筆</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="rounded-lg border border-border bg-card">

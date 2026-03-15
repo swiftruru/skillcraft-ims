@@ -38,7 +38,7 @@ import {
   Bar,
   Cell
 } from 'recharts'
-import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion, AiForecastResult } from '@/types/schema'
+import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion, AiForecastResult, UnpaidOrder } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 const CATEGORY_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
@@ -76,6 +76,13 @@ export default function Dashboard() {
   const { data: pendingSales } = useQuery<SalesOrder[]>({
     queryKey: ['sales', 'all', { status: 'pending' }],
     queryFn: () => window.electronAPI.sales.getAll({ status: 'pending' })
+  })
+
+  const { data: unpaidOrders } = useQuery<{ sales: UnpaidOrder[]; purchases: UnpaidOrder[] }>({
+    queryKey: ['reports', 'unpaidOrders'],
+    queryFn: () => window.electronAPI.reports.getUnpaidOrders(),
+    staleTime: 1000 * 30,
+    enabled: (kpis?.overdueCount ?? 0) > 0
   })
 
   const { data: suggestions } = useQuery<PurchaseSuggestion[]>({
@@ -205,6 +212,55 @@ export default function Dashboard() {
           color={(kpis?.unpaidPurchasesTotal ?? 0) > 0 ? 'text-rose-400' : 'text-muted-foreground'}
         />
       </div>
+
+      {/* Overdue Alerts */}
+      {(kpis?.overdueCount ?? 0) > 0 && (() => {
+        const overdueItems: { order: UnpaidOrder; type: 'sales' | 'purchases' }[] = [
+          ...(unpaidOrders?.sales.filter((o) => o.overdue) ?? []).map((o) => ({ order: o, type: 'sales' as const })),
+          ...(unpaidOrders?.purchases.filter((o) => o.overdue) ?? []).map((o) => ({ order: o, type: 'purchases' as const }))
+        ]
+        return (
+          <Card className="border-red-500/30 bg-red-500/5">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <span className="text-red-400">{d.overdueAlertsTitle}</span>
+                  <Badge className="bg-red-500/15 text-red-400 border-0">{kpis!.overdueCount}</Badge>
+                </CardTitle>
+                <button
+                  className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                  onClick={() => navigate('/receivables')}
+                >
+                  {d.viewReceivables}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">{d.overdueAlertsHint(kpis!.overdueCount)}</p>
+            </CardHeader>
+            {overdueItems.length > 0 && (
+              <CardContent className="pt-0">
+                <div className="space-y-1.5">
+                  {overdueItems.slice(0, 5).map(({ order, type }) => (
+                    <div key={`${type}-${order.id}`} className="flex items-center justify-between py-1.5 border-b border-red-500/10 last:border-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${type === 'sales' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                          {type === 'sales' ? d.overdueTypeSales : d.overdueTypePurchases}
+                        </span>
+                        <span className="text-sm font-mono text-muted-foreground shrink-0">{order.order_no}</span>
+                        <span className="text-sm truncate">{order.party_name}</span>
+                      </div>
+                      <div className="text-right shrink-0 ml-4">
+                        <div className="text-sm font-semibold text-red-400">{formatCurrency(order.total_amount)}</div>
+                        <div className="text-[10px] text-muted-foreground">{formatDate(order.payment_due_date)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        )
+      })()}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

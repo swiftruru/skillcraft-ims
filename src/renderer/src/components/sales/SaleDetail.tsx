@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import type { SalesOrder } from '@/types/schema'
-import { CheckCircle2, Circle, XCircle } from 'lucide-react'
+import { CheckCircle2, Circle, XCircle, AlertTriangle } from 'lucide-react'
 
 interface TimelineStep { label: string; date: string | null; done: boolean; cancelled?: boolean }
 
@@ -56,6 +56,29 @@ export function SaleDetail({ id, open, onOpenChange }: { id: number; open: boole
               </div>
               <div><span className="text-muted-foreground">客戶：</span>{(order as { customer_name?: string }).customer_name ?? '一般客戶'}</div>
               <div><span className="text-muted-foreground">訂單日期：</span>{formatDate(order.order_date)}</div>
+              {(order.status === 'completed' || order.status === 'partial_return') && (() => {
+                const today = new Date().toISOString().slice(0, 10)
+                const isOverdue = order.payment_status === 'unpaid' && !!order.payment_due_date && order.payment_due_date < today
+                return (
+                  <>
+                    <div>
+                      <span className="text-muted-foreground">付款狀態：</span>
+                      <span className={`ml-1 text-xs px-2 py-0.5 rounded-full font-medium ${order.payment_status === 'paid' ? 'bg-green-500/15 text-green-400' : isOverdue ? 'bg-red-500/15 text-red-400' : 'bg-muted text-muted-foreground'}`}>
+                        {order.payment_status === 'paid' ? '已付款' : isOverdue ? '逾期未付' : '未付款'}
+                      </span>
+                    </div>
+                    {order.payment_due_date && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-muted-foreground">付款期限：</span>
+                        <span className={isOverdue ? 'text-red-400 font-medium' : ''}>
+                          {formatDate(order.payment_due_date)}
+                        </span>
+                        {isOverdue && <AlertTriangle className="w-3.5 h-3.5 text-red-400" />}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
               {order.notes && <div className="col-span-2"><span className="text-muted-foreground">備註：</span>{order.notes}</div>}
             </div>
             <div className="rounded-lg border border-border overflow-hidden">
@@ -93,12 +116,14 @@ export function SaleDetail({ id, open, onOpenChange }: { id: number; open: boole
         ) : <p className="text-center text-muted-foreground py-8">找不到此銷售單</p>}
         {order && (() => {
           const isCancelled = order.status === 'cancelled'
-          const isCompleted = order.status === 'completed' || order.status === 'returned'
+          const isCompleted = ['completed', 'returned', 'partial_return'].includes(order.status)
           const isReturned = order.status === 'returned'
+          const isPartialReturn = order.status === 'partial_return'
           const steps: TimelineStep[] = [
             { label: '建立', date: formatDate(order.created_at), done: true },
             { label: isCancelled ? '已取消' : '完成', date: isCompleted ? formatDate(order.order_date) : null, done: isCompleted, cancelled: isCancelled },
-            ...(isReturned ? [{ label: '已退貨', date: null, done: true, cancelled: true }] : [])
+            ...(isReturned ? [{ label: '已退貨', date: null, done: true, cancelled: true }] : []),
+            ...(isPartialReturn ? [{ label: '部分退貨', date: null, done: true, cancelled: true }] : [])
           ]
           return <div className="border-t border-border pt-3 mt-1"><OrderTimeline steps={steps} /></div>
         })()}

@@ -112,7 +112,12 @@ export const translations = {
       unpaidReceivables: '應收帳款',
       unpaidPayables: '應付帳款',
       unpaidReceivablesHint: '已完成但未收款',
-      unpaidPayablesHint: '已收貨但未付款'
+      unpaidPayablesHint: '已收貨但未付款',
+      overdueAlertsTitle: '逾期帳款警示',
+      overdueAlertsHint: (n: number) => `共 ${n} 筆帳款已逾期，請盡快處理`,
+      overdueTypeSales: '應收',
+      overdueTypePurchases: '應付',
+      viewReceivables: '查看帳款管理 →'
     },
     products: {
       title: '商品名稱',
@@ -485,7 +490,12 @@ export const translations = {
       emptyMessage: '目前無未付款帳款',
       summary: (count: number, total: number) => `共 ${count} 筆，合計 NT$ ${total.toLocaleString('zh-TW')}`,
       overdueCount: (n: number) => `${n} 筆逾期`,
-      total: (n: number) => `共 ${n} 筆`
+      total: (n: number) => `共 ${n} 筆`,
+      agingTitle: '帳款老化分析',
+      agingCurrent: '未到期',
+      aging1to30: '逾期 1–30 天',
+      aging31to60: '逾期 31–60 天',
+      agingOver60: '逾期 >60 天'
     },
     commandPalette: {
       placeholder: '搜尋商品、供應商、客戶、訂單...',
@@ -627,7 +637,12 @@ export const translations = {
       unpaidReceivables: 'Receivables',
       unpaidPayables: 'Payables',
       unpaidReceivablesHint: 'Completed but unpaid',
-      unpaidPayablesHint: 'Received but unpaid'
+      unpaidPayablesHint: 'Received but unpaid',
+      overdueAlertsTitle: 'Overdue Payment Alerts',
+      overdueAlertsHint: (n: number) => `${n} payment(s) are overdue — please follow up`,
+      overdueTypeSales: 'Receivable',
+      overdueTypePurchases: 'Payable',
+      viewReceivables: 'View Receivables →'
     },
     products: {
       title: 'Name',
@@ -1000,7 +1015,12 @@ export const translations = {
       emptyMessage: 'No outstanding payments',
       summary: (count: number, total: number) => `${count} orders, total NT$ ${total.toLocaleString()}`,
       overdueCount: (n: number) => `${n} overdue`,
-      total: (n: number) => `${n} orders`
+      total: (n: number) => `${n} orders`,
+      agingTitle: 'Aging Analysis',
+      agingCurrent: 'Current',
+      aging1to30: '1–30 Days',
+      aging31to60: '31–60 Days',
+      agingOver60: '>60 Days'
     },
     commandPalette: {
       placeholder: 'Search products, suppliers, customers, orders...',
