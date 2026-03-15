@@ -410,6 +410,7 @@ export default function Settings() {
                 <span>{s.mockDataPurchases(mockStatus.counts.purchaseOrders)}</span>
                 <span>{s.mockDataSales(mockStatus.counts.salesOrders)}</span>
                 <span>{s.mockDataAdjustments(mockStatus.counts.adjustments)}</span>
+                <span>{s.mockDataStockTakes(mockStatus.counts.stockTakes)}</span>
               </div>
             </div>
           )}

@@ -404,7 +404,8 @@ export const translations = {
       mockDataProductsCount: (n: number) => `商品：${n}`,
       mockDataPurchases: (n: number) => `採購單：${n}`,
       mockDataSales: (n: number) => `銷售單：${n}`,
-      mockDataAdjustments: (n: number) => `庫存調整：${n}`
+      mockDataAdjustments: (n: number) => `庫存調整：${n}`,
+      mockDataStockTakes: (n: number) => `盤點記錄：${n}`
     },
     about: {
       nameConcept: '命名概念',
@@ -932,7 +933,8 @@ export const translations = {
       mockDataProductsCount: (n: number) => `Products: ${n}`,
       mockDataPurchases: (n: number) => `Purchase Orders: ${n}`,
       mockDataSales: (n: number) => `Sales Orders: ${n}`,
-      mockDataAdjustments: (n: number) => `Adjustments: ${n}`
+      mockDataAdjustments: (n: number) => `Adjustments: ${n}`,
+      mockDataStockTakes: (n: number) => `Stock Takes: ${n}`
     },
     about: {
       nameConcept: 'Name Concept',

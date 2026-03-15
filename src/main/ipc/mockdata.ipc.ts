@@ -15,6 +15,7 @@ interface MockDataResult {
     purchaseOrders: number
     salesOrders: number
     adjustments: number
+    stockTakes: number
   }
   error?: string
 }
@@ -221,7 +222,7 @@ export function registerMockDataIpc(): void {
     const CUSTOMER_CREDIT_LIMITS = [30000, 50000, 80000, 100000]
 
     try {
-      const counts = { suppliers: 0, customers: 0, products: 0, purchaseOrders: 0, salesOrders: 0, adjustments: 0 }
+      const counts = { suppliers: 0, customers: 0, products: 0, purchaseOrders: 0, salesOrders: 0, adjustments: 0, stockTakes: 0 }
 
       db.transaction(() => {
         // 1. 清除所有資料
@@ -286,6 +287,7 @@ export function registerMockDataIpc(): void {
         const productIds: number[] = []
         const productBuyPrices: number[] = []
         const productSellPrices: number[] = []
+        const productStockQtys: number[] = []
         const skuCounters: Record<string, number> = {}
 
         productTemplates.forEach((tmpl, idx) => {
@@ -318,6 +320,7 @@ export function registerMockDataIpc(): void {
           productIds.push(Number(r.lastInsertRowid))
           productBuyPrices.push(buyPrice)
           productSellPrices.push(sellPrice)
+          productStockQtys.push(stockQty)
         })
         counts.products = productIds.length
 
@@ -610,13 +613,86 @@ export function registerMockDataIpc(): void {
           }
         }
         counts.adjustments = adjCount
+
+        // 9. 插入庫存盤點記錄
+        const insertStockTake = db.prepare(`
+          INSERT INTO stock_takes (take_no, status, notes, created_at, completed_at)
+          VALUES (@take_no, @status, @notes, @created_at, @completed_at)
+        `)
+        const insertStockTakeItem = db.prepare(`
+          INSERT INTO stock_take_items (stock_take_id, product_id, system_qty, counted_qty)
+          VALUES (@stock_take_id, @product_id, @system_qty, @counted_qty)
+        `)
+
+        // 隨機抽取盤點商品子集（25–40% 的商品）
+        const pickProductsForTake = (count: number): number[] => {
+          const shuffled = [...productIds.keys()].sort(() => Math.random() - 0.5)
+          return shuffled.slice(0, count)
+        }
+
+        // 2–3 筆已完成的歷史盤點
+        const completedTakeCount = randInt(2, 3)
+        for (let i = 0; i < completedTakeCount; i++) {
+          const daysAgo = randInt(20, 90) - i * 20
+          const createdAt = addDaysDate(todayStr, -daysAgo) + ' 09:00:00'
+          const completedAt = addDaysDate(todayStr, -daysAgo) + ' 17:30:00'
+          const takeNo = `ST-${addDaysDate(todayStr, -daysAgo).replace(/-/g, '')}-${String(i + 1).padStart(3, '0')}`
+
+          const r = insertStockTake.run({
+            take_no: takeNo,
+            status: 'completed',
+            notes: i === 0 ? '季度盤點' : '月度定期盤點',
+            created_at: createdAt,
+            completed_at: completedAt,
+          })
+          const stId = Number(r.lastInsertRowid)
+
+          const itemCount = Math.floor(productIds.length * (0.25 + Math.random() * 0.15))
+          const indices = pickProductsForTake(itemCount)
+          for (const idx of indices) {
+            const systemQty = productStockQtys[idx]
+            // 80% 吻合，20% 有差異（±1 ~ ±5）
+            const hasDiff = Math.random() < 0.2
+            const counted_qty = hasDiff
+              ? Math.max(0, systemQty + (Math.random() < 0.5 ? -1 : 1) * randInt(1, 5))
+              : systemQty
+            insertStockTakeItem.run({ stock_take_id: stId, product_id: productIds[idx], system_qty: systemQty, counted_qty })
+          }
+          counts.stockTakes++
+        }
+
+        // 1 筆進行中的盤點（draft，部分已盤、部分未盤）
+        {
+          const takeNo = `ST-${todayStr.replace(/-/g, '')}-DRAFT`
+          const r = insertStockTake.run({
+            take_no: takeNo,
+            status: 'draft',
+            notes: '本月盤點（進行中）',
+            created_at: todayStr + ' 08:00:00',
+            completed_at: null,
+          })
+          const stId = Number(r.lastInsertRowid)
+
+          const itemCount = Math.floor(productIds.length * (0.3 + Math.random() * 0.15))
+          const indices = pickProductsForTake(itemCount)
+          for (const [j, idx] of indices.entries()) {
+            const systemQty = productStockQtys[idx]
+            // 前半部分已盤，後半部分未盤（counted_qty = null）
+            const alreadyCounted = j < Math.floor(indices.length * 0.6)
+            const counted_qty = alreadyCounted
+              ? (Math.random() < 0.15 ? Math.max(0, systemQty + randInt(-3, 3)) : systemQty)
+              : null
+            insertStockTakeItem.run({ stock_take_id: stId, product_id: productIds[idx], system_qty: systemQty, counted_qty })
+          }
+          counts.stockTakes++
+        }
       })()
 
       return { success: true, counts }
     } catch (err) {
       return {
         success: false,
-        counts: { suppliers: 0, customers: 0, products: 0, purchaseOrders: 0, salesOrders: 0, adjustments: 0 },
+        counts: { suppliers: 0, customers: 0, products: 0, purchaseOrders: 0, salesOrders: 0, adjustments: 0, stockTakes: 0 },
         error: String(err),
       }
     }
