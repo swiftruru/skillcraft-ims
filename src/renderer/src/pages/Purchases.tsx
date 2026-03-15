@@ -300,6 +300,7 @@ export default function Purchases() {
     {
       key: 'payment_status',
       label: p.paymentStatus,
+      sortable: true,
       hideable: true,
       render: (_v, row) => {
         if (row.status !== 'received') return null

@@ -341,6 +341,7 @@ export default function Sales() {
     {
       key: 'payment_status',
       label: s.paymentStatus,
+      sortable: true,
       hideable: true,
       render: (_v, row) => {
         if (row.status !== 'completed' && row.status !== 'partial_return') return null
