@@ -57,7 +57,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
 
   const {
     register, handleSubmit, control, watch, setValue, reset,
-    formState: { errors, isSubmitting, isDirty }
+    formState: { errors, isSubmitting, isDirty, isSubmitted }
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -189,6 +189,20 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
         </DialogHeader>
 
         <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
+          {isSubmitted && Object.keys(errors).length > 0 && (
+            <div role="alert" className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 space-y-1">
+              <p className="text-xs font-medium text-destructive">請修正以下 {Object.keys(errors).length} 個錯誤：</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {Object.entries(errors).map(([field, err]) => (
+                  <li key={field} className="text-xs text-destructive">
+                    <a href={`#pf-${field}`} className="underline hover:no-underline" onClick={(e) => { e.preventDefault(); document.getElementById(`pf-${field}`)?.focus() }}>
+                      {(err as { message?: string })?.message ?? field}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5 col-span-1">
               <Label>{tf.supplierLabel}</Label>

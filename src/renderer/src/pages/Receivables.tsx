@@ -196,6 +196,7 @@ export default function Receivables() {
           </div>
         ) : (
           <table className="w-full text-sm">
+            <caption className="sr-only">{tab === 'sales' ? '應收帳款－銷售訂單' : '應付帳款－採購訂單'}</caption>
             <thead>
               <tr className="text-xs text-muted-foreground border-b border-border">
                 {(

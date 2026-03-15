@@ -132,7 +132,7 @@ export function ProductForm({ open, onOpenChange, product, onSaved }: ProductFor
     reset,
     setValue,
     watch,
-    formState: { errors, isSubmitting }
+    formState: { errors, isSubmitting, isSubmitted }
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -208,6 +208,20 @@ export function ProductForm({ open, onOpenChange, product, onSaved }: ProductFor
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {isSubmitted && Object.keys(errors).length > 0 && (
+            <div role="alert" className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 space-y-1">
+              <p className="text-xs font-medium text-destructive">請修正以下 {Object.keys(errors).length} 個錯誤：</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {Object.entries(errors).map(([field, err]) => (
+                  <li key={field} className="text-xs text-destructive">
+                    <a href={`#${field}`} className="underline hover:no-underline" onClick={(e) => { e.preventDefault(); document.getElementById(field)?.focus() }}>
+                      {(err as { message?: string })?.message ?? field}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {isEdit && (
             <div className="space-y-1.5">
               <p className="text-xs font-medium text-foreground/70">商品圖片</p>
@@ -343,6 +357,8 @@ export function ProductForm({ open, onOpenChange, product, onSaved }: ProductFor
               <Input
                 id="sell_price"
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 {...register('sell_price')}
                 min={0}
                 step={1}
@@ -354,6 +370,8 @@ export function ProductForm({ open, onOpenChange, product, onSaved }: ProductFor
               <Input
                 id="buy_price"
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 {...register('buy_price')}
                 min={0}
                 step={1}
@@ -368,6 +386,8 @@ export function ProductForm({ open, onOpenChange, product, onSaved }: ProductFor
               <Input
                 id="stock_qty"
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 {...register('stock_qty')}
                 min={0}
                 disabled={isEdit}
@@ -379,6 +399,8 @@ export function ProductForm({ open, onOpenChange, product, onSaved }: ProductFor
               <Input
                 id="reorder_pt"
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 {...register('reorder_pt')}
                 min={0}
               />

@@ -190,15 +190,15 @@ export default function Customers() {
         )}
       </div>
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" aria-modal="true">
           <DialogHeader><DialogTitle>{editCustomer ? `${t.common.edit} ${c.name}` : c.addCustomer}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-1.5"><Label>{c.name} *</Label><Input {...register('name')} />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
+            <div className="space-y-1.5"><Label>{c.name} *</Label><Input autoComplete="organization" {...register('name')} />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5"><Label>{c.contact}</Label><Input {...register('contact')} /></div>
-              <div className="space-y-1.5"><Label>{c.phone}</Label><Input {...register('phone')} /></div>
-              <div className="space-y-1.5"><Label>{c.email}</Label><Input type="email" {...register('email')} /></div>
-              <div className="space-y-1.5"><Label>{c.address}</Label><Input {...register('address')} /></div>
+              <div className="space-y-1.5"><Label>{c.contact}</Label><Input autoComplete="name" {...register('contact')} /></div>
+              <div className="space-y-1.5"><Label>{c.phone}</Label><Input autoComplete="tel" {...register('phone')} /></div>
+              <div className="space-y-1.5"><Label>{c.email}</Label><Input type="email" autoComplete="email" {...register('email')} /></div>
+              <div className="space-y-1.5"><Label>{c.address}</Label><Input autoComplete="street-address" {...register('address')} /></div>
               <div className="space-y-1.5">
                 <Label>信用額度</Label>
                 <Input type="number" min={0} step={1000} placeholder="0 表示不限制" {...register('credit_limit')} />

@@ -46,6 +46,8 @@ export function StepperInput({ value, onChange, min = 1, max, step = 1, classNam
       </Button>
       <Input
         type="number"
+        inputMode="numeric"
+        pattern="[0-9]*"
         className="h-8 w-16 rounded-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         value={value}
         min={min}

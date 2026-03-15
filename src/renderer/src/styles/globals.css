@@ -213,3 +213,24 @@ textarea:focus-visible,
 select:focus-visible {
   border-color: hsl(var(--ring));
 }
+
+/* A11y Rule 120: Enhanced focus ring — add white outline-offset on dark backgrounds */
+.dark button:focus-visible,
+.dark [role="button"]:focus-visible,
+.dark a:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px hsl(var(--background));
+}
+
+/* A11y Rule 121: Print stylesheet */
+@media print {
+  aside, header, .no-print, [data-tour], nav { display: none !important; }
+  main { margin: 0; padding: 0; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: 4px 8px; font-size: 12px; }
+  a { text-decoration: none; color: inherit; }
+  .text-muted-foreground { color: #666 !important; }
+  .recharts-wrapper { display: none; }
+  .recharts-wrapper + p.sr-only { display: block !important; clip: auto; width: auto; height: auto; margin: 0; overflow: visible; white-space: normal; }
+}

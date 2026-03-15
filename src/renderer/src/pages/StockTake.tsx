@@ -116,6 +116,7 @@ function ListView({ onSelect, autoCreate }: { onSelect: (id: number) => void; au
       ) : (
         <div data-tour="stocktake-chart" className="rounded-lg border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
+            <caption className="sr-only">盤點作業列表</caption>
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
                 {([
@@ -348,6 +349,7 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
+          <caption className="sr-only">盤點明細：{take.take_no}</caption>
           <thead>
             <tr className="border-b border-border text-xs text-muted-foreground">
               {([

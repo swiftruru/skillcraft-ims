@@ -138,6 +138,7 @@ export default function InventoryHistory() {
           </div>
         ) : (
           <table className="w-full text-sm">
+            <caption className="sr-only">庫存異動歷史記錄</caption>
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
                 {([

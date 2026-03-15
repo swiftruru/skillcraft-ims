@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency, formatNumber } from '@/lib/utils'
-import { FileDown } from 'lucide-react'
+import { FileDown, Printer } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
@@ -146,6 +146,16 @@ export default function Reports() {
             </select>
             <span>{r.month}</span>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1.5 no-print"
+            aria-label="列印報表"
+            onClick={() => window.print()}
+          >
+            <Printer className="w-3 h-3" />
+            列印
+          </Button>
           <Button
             variant="outline"
             size="sm"

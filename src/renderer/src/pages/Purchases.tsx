@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useFocusReturn } from '@/lib/useFocusReturn'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart, AlignJustify, List, LayoutList, MessageSquare, FileDown, type LucideIcon } from 'lucide-react'
+import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart, AlignJustify, List, LayoutList, MessageSquare, FileDown, Clock, Circle, AlertTriangle as AlertTriangleIcon, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -131,6 +131,15 @@ export default function Purchases() {
       status: statusFilter || undefined
     })
   })
+
+  // Rule 116: Status icon helper
+  const getStatusIcon = (status: string) => {
+    const cls = 'w-3 h-3 shrink-0'
+    if (status === 'pending') return <Clock className={cls} aria-hidden="true" />
+    if (status === 'received') return <CheckCircle className={cls} aria-hidden="true" />
+    if (status === 'cancelled') return <XCircle className={cls} aria-hidden="true" />
+    return null
+  }
 
   // Rule 72: Summary Strip
   const summary = useMemo(() => {
@@ -284,10 +293,11 @@ export default function Purchases() {
         return (
           <div className="flex items-center gap-1.5">
             <span
-              className={`text-xs px-2 py-0.5 rounded-full cursor-pointer transition-opacity hover:opacity-80 ${getStatusColor(String(v))} ${active ? 'ring-1 ring-current' : ''}`}
+              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full cursor-pointer transition-opacity hover:opacity-80 ${getStatusColor(String(v))} ${active ? 'ring-1 ring-current' : ''}`}
               onClick={(e) => { e.stopPropagation(); setStatusFilter(active ? '' : String(v)) }}
               title={active ? '點擊取消篩選' : `篩選：${getStatusLabel(String(v))}`}
             >
+              {getStatusIcon(String(v))}
               <span className="sr-only">狀態：</span>{getStatusLabel(String(v))}
             </span>
             {isOverdue && (
@@ -306,12 +316,12 @@ export default function Purchases() {
         if (row.status !== 'received') return null
         const isOverdue = row.payment_status === 'unpaid' && row.payment_due_date && row.payment_due_date < new Date().toISOString().slice(0, 10)
         if (row.payment_status === 'paid') {
-          return <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-400"><span className="sr-only">付款狀態：</span>{p.paid}</span>
+          return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-400"><BadgeCheck className="w-3 h-3 shrink-0" aria-hidden="true" /><span className="sr-only">付款狀態：</span>{p.paid}</span>
         }
         if (isOverdue) {
-          return <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400"><span className="sr-only">付款狀態：</span>{p.overdue}</span>
+          return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400"><AlertTriangleIcon className="w-3 h-3 shrink-0" aria-hidden="true" /><span className="sr-only">付款狀態：</span>{p.overdue}</span>
         }
-        return <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"><span className="sr-only">付款狀態：</span>{p.unpaid}</span>
+        return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"><Circle className="w-3 h-3 shrink-0" aria-hidden="true" /><span className="sr-only">付款狀態：</span>{p.unpaid}</span>
       }
     },
     {

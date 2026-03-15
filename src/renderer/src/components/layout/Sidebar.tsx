@@ -1,5 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
+import { useAnnounce } from '@/lib/useAnnounce'
 import {
   LayoutDashboard,
   Package,
@@ -24,12 +26,30 @@ export function Sidebar() {
   const t = useLang()
   const location = useLocation()
   const getKey = useShortcutsStore((s) => s.getKey)
+  const { announce } = useAnnounce()
 
   const { data: kpis } = useQuery<DashboardKPIs>({
     queryKey: ['reports', 'kpis'],
     queryFn: () => window.electronAPI.reports.kpis(),
     staleTime: 1000 * 60 * 2
   })
+
+  // Announce badge increases to screen readers
+  const prevLow = useRef<number>(0)
+  const prevPurchases = useRef<number>(0)
+  const prevSales = useRef<number>(0)
+  useEffect(() => {
+    if (!kpis) return
+    const low = kpis.lowStockCount ?? 0
+    const pur = kpis.pendingPurchasesCount ?? 0
+    const sal = kpis.pendingSalesOrders ?? 0
+    if (low > prevLow.current) announce(`低庫存商品：${low} 項`)
+    if (pur > prevPurchases.current) announce(`待處理採購：${pur} 筆`)
+    if (sal > prevSales.current) announce(`待處理銷售：${sal} 筆`)
+    prevLow.current = low
+    prevPurchases.current = pur
+    prevSales.current = sal
+  }, [kpis?.lowStockCount, kpis?.pendingPurchasesCount, kpis?.pendingSalesOrders])
 
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: t.nav.dashboard, end: true },
@@ -55,7 +75,7 @@ export function Sidebar() {
           <Warehouse className="w-5 h-5" />
         </div>
         <div>
-          <div className="text-sm font-semibold text-sidebar-foreground leading-tight">SkillCraft IMS</div>
+          <div className="text-sm font-semibold text-sidebar-foreground leading-tight"><span lang="en">SkillCraft IMS</span></div>
           <div className="text-[10px] text-muted-foreground leading-tight">{t.sidebar.subtitle}</div>
         </div>
       </div>

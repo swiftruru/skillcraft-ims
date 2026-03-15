@@ -966,3 +966,120 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 套用範圍：Products「新增/編輯商品」按鈕、Purchases「新增採購單」按鈕、Sales「新增銷售單」按鈕
     - 開啟 Dialog 前呼叫 `capture()`；`onOpenChange(false)` 後呼叫 `restore()`
     - Radix Dialog 的 `onCloseAutoFocus` 已嘗試返回焦點，但對程式觸發的 Dialog 有時不可靠；此 hook 為補強手段
+
+111. **表單欄位 autocomplete 屬性**：
+    - 適用範圍：CustomerForm、SupplierForm（新增/編輯客戶與供應商的 Dialog 表單）
+    - 在對應 `<Input>` 欄位加上 `autoComplete` prop：
+      - 名稱欄位：`autoComplete="organization"`（公司名）或 `autoComplete="name"`（個人名）
+      - 聯絡人：`autoComplete="name"`
+      - 電話：`autoComplete="tel"`
+      - Email：`autoComplete="email"`
+      - 地址：`autoComplete="street-address"`
+    - 符合 WCAG 1.3.5（識別輸入用途），輔助運動障礙用戶減少輸入量
+    - 新增/編輯模式均套用；不影響 react-hook-form 行為（`autoComplete` 是獨立 HTML 屬性）
+
+112. **LoadingSpinner role="status"**：
+    - `LoadingSpinner` 元件（`src/renderer/src/components/common/LoadingSpinner.tsx`）加上語意屬性：
+      - 外層容器加 `role="status"` + `aria-label="載入中"`
+      - 內部旋轉 svg/div 加 `aria-hidden="true"`（避免重複播報）
+      - 加入 `<span className="sr-only">載入中，請稍候</span>`（螢幕閱讀器可讀文字）
+    - 套用範圍：所有使用 `<LoadingSpinner />` 的頁面自動受益，無需逐頁修改
+    - TableSkeleton 的外層 wrapper 已有 `role="status"` aria-live（Rule 84），不受影響
+
+113. **表單送出錯誤摘要（Error Summary）**：
+    - 適用範圍：`ProductForm`、`PurchaseForm`、`SaleForm`
+    - 實作：在表單 `onSubmit` 被呼叫但 `Object.keys(errors).length > 0` 時，在表單頂部以 `role="alert"` 顯示錯誤摘要區塊
+    - 摘要區塊樣式：`rounded-lg border border-destructive/50 bg-destructive/5 p-3 space-y-1`
+    - 每個錯誤顯示為可點擊連結（`<a href="#fieldId">`），點擊後 focus 到對應欄位
+    - `errors` 物件為空時不顯示此區塊（`Object.keys(errors).length === 0` → `null`）
+    - react-hook-form 的 `formState.errors` 會在驗證後自動更新，直接讀取即可
+    - 首次開啟表單（尚未送出）不顯示摘要；只在使用者點擊送出後且有錯誤才顯示
+    - i18n key（直接用固定中文）：`「請修正以下 N 個錯誤：」`
+
+114. **對話框 aria-modal="true"**：
+    - 所有使用 Radix `<DialogContent>` 的元件，確認已套用 `aria-modal="true"`（Radix UI v1.x 預設會加，但自訂覆蓋時可能遺失）
+    - 檢查並補上的元件：`ProductForm`、`PurchaseForm`、`SaleForm`、`CustomerDetailDialog`、`SupplierDetailDialog`、`QuickPurchaseDialog`、`BatchPriceDialog`、`ConfirmDialog`
+    - 實作：在各 `<DialogContent className="...">` 補上 `aria-modal="true"` 屬性
+    - 目的：告知 NVDA/JAWS/VoiceOver 焦點應被限制在 Dialog 內，防止螢幕閱讀器游走至背景遮罩後的內容
+
+115. **Sidebar 徽章動態播報**：
+    - 側欄低庫存/待處理訂單徽章數字首次出現或數值增加時，透過 `useAnnounce`（Rule 77）的 `announce()` 播報訊息
+    - 偵測方式：`useEffect` 比較前後值（`usePrevious` pattern）；只在數值從 0→N 或 N→M（M>N）時播報，避免每次 refetch 都公告
+    - 播報文字：`「低庫存商品：N 項」`、`「待處理採購：N 筆」`、`「待處理銷售：N 筆」`
+    - 實作位置：`Sidebar.tsx` 內，讀取 `useQuery(['reports', 'kpis'])` 數值後觸發
+    - 使用 `usePrevious<number>(value)` hook（inline 實作：`const ref = useRef(value); useEffect(() => { ref.current = value }); return ref.current`）
+
+116. **顏色不作為唯一傳達方式（Color-Independent Status Icons）**：
+    - 適用範圍：Purchases/Sales 列表的狀態 badge、付款狀態 badge
+    - 在每個 badge 前加入對應小圖示（`aria-hidden="true"`，視覺補充，不新增 aria 文字）：
+      - `pending`（待處理）→ `Clock` icon（`w-3 h-3`）
+      - `received` / `completed`（已收貨/已完成）→ `CheckCircle` icon
+      - `cancelled`（已取消）→ `XCircle` icon
+      - `paid`（已付款）→ `BadgeCheck` icon
+      - `unpaid`（未付款）→ `Circle` icon（空心）
+      - 逾期 → `AlertTriangle` icon
+    - badge 內 layout：`inline-flex items-center gap-1`；icon `w-3 h-3 shrink-0`
+    - 符合 WCAG 1.4.1（不只用顏色傳達資訊）
+
+117. **Tooltip accessible（role="tooltip" + aria-describedby）**：
+    - 建立 `AccessibleTooltip` 元件（`src/renderer/src/components/ui/AccessibleTooltip.tsx`）：
+      - Props：`content: string, children: React.ReactElement, id?: string`
+      - 使用 `useId()` 產生唯一 tooltip id
+      - wrapper `<span className="relative group inline-flex">`
+      - children clone 加上 `aria-describedby={tooltipId}`
+      - tooltip div：`role="tooltip" id={tooltipId}`，樣式同現有 `title` tooltip
+      - `invisible group-hover:visible group-focus-within:visible` 顯示控制
+    - 套用位置：Header 的主題切換按鈕、同步按鈕；Sidebar badge 數字；DataTable 欄位顯示設定按鈕
+    - 取代這些位置的原生 `title` 屬性（`title` 在觸控裝置不顯示，且不符合 WCAG 1.3.1）
+
+118. **數字輸入欄位 inputmode**：
+    - 適用範圍：所有 `<Input type="number">` 或金額/數量輸入欄位
+    - 補上 `inputMode="numeric"` — iOS/Android 直接彈出數字鍵盤
+    - 補上 `pattern="[0-9]*"` — iOS Safari 在有 `pattern` 時才正確顯示數字鍵盤
+    - 套用元件：`StepperInput`（quantity）、ProductForm 的 `sell_price`/`buy_price`/`stock_qty`/`reorder_pt`、PurchaseForm/SaleForm 的 `unit_price`/`quantity`、Products inline 快速編輯 input
+    - 不套用到日期或文字搜尋欄位
+
+119. **表格 `<caption>`（sr-only）**：
+    - 適用範圍：所有手動 `<table>` 元件（StockTake ListView/DetailView、InventoryHistory、Receivables）
+    - 在 `<table>` 的第一個子元素加入 `<caption className="sr-only">{說明文字}</caption>`
+    - 各表格 caption：
+      - StockTake 列表：`「盤點作業列表」`
+      - StockTake 明細：`「盤點明細：${take.take_no}」`
+      - InventoryHistory：`「庫存異動歷史記錄」`
+      - Receivables 銷售：`「應收帳款－銷售訂單」`；採購：`「應付帳款－採購訂單」`
+    - `DataTable` 元件的 `<table>` 已有 `aria-label`（Rule 90），不需再加 caption
+
+120. **焦點可見度強化（Enhanced Focus Ring）**：
+    - 在 `globals.css` 針對深色背景上的按鈕補強 focus ring 對比：
+      ```css
+      /* 深色背景按鈕 focus ring 補白邊（outline-offset 效果） */
+      .dark button:focus-visible,
+      .dark [role="button"]:focus-visible,
+      .dark a:focus-visible {
+        outline: 2px solid hsl(var(--ring));
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px hsl(var(--background));
+      }
+      ```
+    - Sidebar NavLink active 項目（深色背景）的 `:focus-visible` 補 `ring-2 ring-offset-2 ring-ring`
+    - 符合 WCAG 2.4.7（Focus Visible）與 2.4.11（Focus Not Obscured）
+
+121. **列印樣式表（Print Stylesheet）**：
+    - 在 `globals.css` 加入 `@media print` block：
+      ```css
+      @media print {
+        aside, header, .no-print, [data-tour], button, nav { display: none !important; }
+        main { margin: 0; padding: 0; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 4px 8px; }
+        a { text-decoration: none; color: inherit; }
+        .text-muted-foreground { color: #666 !important; }
+      }
+      ```
+    - Reports 頁面右上角加入「列印」按鈕（`Printer` icon，`variant="ghost" size="sm"`），呼叫 `window.print()`
+    - 列印時自動展開折疊區塊（Recharts 圖表無法列印，加 `.recharts-wrapper::after { content: "[圖表請見螢幕版]" }` 替代說明）
+
+122. **頁面品牌名語言標記（lang="en" on brand name）**：
+    - `Layout.tsx` / `Sidebar.tsx` 中品牌名稱「SkillCraft IMS」加上 `<span lang="en">SkillCraft IMS</span>`
+    - Header 的 `<h1>` 若含英文品牌名，同樣套用 `<span lang="en">`
+    - 目的：螢幕閱讀器以英文口音朗讀英文品牌名，以中文口音朗讀其餘 UI 文字，符合 WCAG 3.1.2（Language of Parts）

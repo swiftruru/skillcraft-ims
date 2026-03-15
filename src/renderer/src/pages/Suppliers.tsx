@@ -194,19 +194,19 @@ export default function Suppliers() {
       </div>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" aria-modal="true">
           <DialogHeader><DialogTitle>{editSupplier ? `${t.common.edit} ${s.name}` : s.addSupplier}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="name">{s.name} *</Label>
-              <Input id="name" {...register('name')} />
+              <Input id="name" autoComplete="organization" {...register('name')} />
               {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5"><Label>{s.contact}</Label><Input {...register('contact')} /></div>
-              <div className="space-y-1.5"><Label>{s.phone}</Label><Input {...register('phone')} /></div>
-              <div className="space-y-1.5"><Label>{s.email}</Label><Input type="email" {...register('email')} />{errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}</div>
-              <div className="space-y-1.5"><Label>{s.address}</Label><Input {...register('address')} /></div>
+              <div className="space-y-1.5"><Label>{s.contact}</Label><Input autoComplete="name" {...register('contact')} /></div>
+              <div className="space-y-1.5"><Label>{s.phone}</Label><Input autoComplete="tel" {...register('phone')} /></div>
+              <div className="space-y-1.5"><Label>{s.email}</Label><Input type="email" autoComplete="email" {...register('email')} />{errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}</div>
+              <div className="space-y-1.5"><Label>{s.address}</Label><Input autoComplete="street-address" {...register('address')} /></div>
               <div className="space-y-1.5">
                 <Label>信用額度</Label>
                 <Input type="number" min={0} step={1000} placeholder="0 表示不限制" {...register('credit_limit')} />
