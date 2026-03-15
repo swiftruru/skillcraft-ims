@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -49,6 +49,21 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
   const { fields, append, remove, move } = useFieldArray({ control, name: 'items' })
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+
+  // Rule 69: Tab auto-add row
+  const firstSelectRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const pendingFocusRow = useRef<number | null>(null)
+  useEffect(() => {
+    if (pendingFocusRow.current !== null) {
+      const idx = pendingFocusRow.current
+      pendingFocusRow.current = null
+      setTimeout(() => { firstSelectRefs.current[idx]?.focus() }, 50)
+    }
+  }, [fields.length])
+
+  // Rule 71: SKU Quick-Add Bar
+  const [skuInput, setSkuInput] = useState('')
+  const [skuError, setSkuError] = useState('')
 
   // Pre-fill when cloning, or restore draft
   useEffect(() => {
@@ -186,6 +201,38 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
                 <Plus className="w-3 h-3" />{tf.addItem}
               </Button>
             </div>
+
+            {/* Rule 71: SKU Quick-Add Bar */}
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="輸入 SKU 快速新增商品..."
+                  className={`max-w-xs h-8 text-xs ${skuError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  value={skuInput}
+                  onChange={(e) => { setSkuInput(e.target.value); setSkuError('') }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      const match = products?.find((p) => p.sku.toLowerCase() === skuInput.trim().toLowerCase())
+                      if (match) {
+                        append({ product_id: match.id, quantity: 1, unit_price: match.sell_price })
+                        setSkuInput('')
+                        setSkuError('')
+                        setTimeout(() => setSkuError(`✓ 已新增 ${match.name}`), 0)
+                        setTimeout(() => setSkuError(''), 1500)
+                      } else {
+                        setSkuError(`找不到 SKU: ${skuInput.trim()}`)
+                        setTimeout(() => setSkuError(''), 1500)
+                      }
+                    }
+                  }}
+                />
+                <span className="text-xs text-muted-foreground hidden sm:inline">按 <kbd className="font-mono border rounded px-1">Enter</kbd> 新增</span>
+              </div>
+              {skuError && (
+                <p className={`text-xs ${skuError.startsWith('✓') ? 'text-green-500' : 'text-destructive'}`}>{skuError}</p>
+              )}
+            </div>
             <div className="space-y-2">
               <div className="grid grid-cols-[16px_2fr_1fr_1fr_auto] gap-2 text-xs text-muted-foreground px-1">
                 <span></span><span>{tf.productCol}</span><span>{tf.qtyCol}</span><span>{tf.sellPriceCol}</span><span></span>
@@ -203,7 +250,12 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
                   <div className={`grid grid-cols-[16px_2fr_1fr_1fr_auto] gap-2 items-center transition-opacity ${dragOverIdx === i && dragIdx !== i ? 'ring-1 ring-primary/50 rounded-md' : ''}`}>
                     <GripVertical className="w-4 h-4 text-muted-foreground/40 hover:text-muted-foreground cursor-grab shrink-0" />
                     <Select onValueChange={(v) => handleProductChange(i, v)}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder={tf.selectProduct} /></SelectTrigger>
+                      <SelectTrigger
+                        className="h-9"
+                        ref={(el) => { firstSelectRefs.current[i] = el }}
+                      >
+                        <SelectValue placeholder={tf.selectProduct} />
+                      </SelectTrigger>
                       <SelectContent>
                         {products?.map((p) => (
                           <SelectItem key={p.id} value={String(p.id)}>
@@ -229,7 +281,19 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
                       min={1}
                       className={stockWarnings[i] ? 'ring-1 ring-destructive rounded-md' : ''}
                     />
-                    <Input type="number" min={0} className="h-9" {...register(`items.${i}.unit_price`)} />
+                    <Input
+                      type="number"
+                      min={0}
+                      className="h-9"
+                      {...register(`items.${i}.unit_price`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab' && !e.shiftKey && i === fields.length - 1) {
+                          e.preventDefault()
+                          append({ product_id: 0, quantity: 1, unit_price: 0 })
+                          pendingFocusRow.current = fields.length
+                        }
+                      }}
+                    />
                     <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive shrink-0" onClick={() => remove(i)} disabled={fields.length === 1}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>

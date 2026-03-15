@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart, AlignJustify, List, LayoutList, MessageSquare, FileDown, type LucideIcon } from 'lucide-react'
@@ -71,8 +71,28 @@ export default function Purchases() {
     (localStorage.getItem('ims-dt-density-purchases') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
   )
 
+  // Rule 74: Shortcut hint
+  const [btnHintVisible, setBtnHintVisible] = useState(() => !localStorage.getItem('ims-hint-shown-purchases'))
+  const [dtHintVisible, setDtHintVisible] = useState(() => !localStorage.getItem('ims-hint-dt-shown'))
   useEffect(() => {
-    if ((location.state as { openForm?: boolean } | null)?.openForm) {
+    if (btnHintVisible) {
+      const timer = setTimeout(() => { setBtnHintVisible(false); localStorage.setItem('ims-hint-shown-purchases', '1') }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [btnHintVisible])
+  useEffect(() => {
+    if (dtHintVisible) {
+      const timer = setTimeout(() => { setDtHintVisible(false); localStorage.setItem('ims-hint-dt-shown', '1') }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [dtHintVisible])
+
+  useEffect(() => {
+    const state = location.state as { openForm?: boolean; items?: Array<{ product_id: number; quantity: number; unit_price: number }> } | null
+    if (state?.openForm) {
+      if (state.items && state.items.length > 0) {
+        setCloneData({ items: state.items })
+      }
       setFormOpen(true)
       navigate(location.pathname, { replace: true, state: null })
     }
@@ -111,6 +131,14 @@ export default function Purchases() {
       status: statusFilter || undefined
     })
   })
+
+  // Rule 72: Summary Strip
+  const summary = useMemo(() => {
+    const list = orders ?? []
+    const pendingCount = list.filter((o) => o.status === 'pending').length
+    const totalAmount = list.reduce((sum, o) => sum + (o.total_amount ?? 0), 0)
+    return { count: list.length, pendingCount, totalAmount }
+  }, [orders])
 
   const receiveMutation = useMutation({
     mutationFn: (id: number) => window.electronAPI.purchases.receive(id),
@@ -484,10 +512,17 @@ export default function Purchases() {
           <Download className="w-4 h-4" />
           {exporting ? t.common.exporting : t.common.exportCsv}
         </Button>
-        <Button onClick={() => setFormOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          {p.addOrder}
-        </Button>
+        <div className="relative">
+          <Button onClick={() => setFormOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            {p.addOrder}
+          </Button>
+          {btnHintVisible && (
+            <div className="absolute top-full mt-1 left-0 text-xs text-muted-foreground bg-popover border rounded px-2 py-1 shadow-sm whitespace-nowrap animate-fade-in pointer-events-none z-10">
+              ↓ 按 <kbd className="font-mono border rounded px-1 text-[10px]">N</kbd> 快速新增
+            </div>
+          )}
+        </div>
         <div className="flex items-center rounded-md border border-border overflow-hidden ml-auto">
           {(['compact', 'normal', 'relaxed'] as const).map((d, i) => {
             const Icon = [AlignJustify, List, LayoutList][i]
@@ -500,6 +535,17 @@ export default function Purchases() {
         </div>
       </div>
 
+      {/* Rule 72: Summary Strip */}
+      {!isLoading && (
+        <div className="text-xs text-muted-foreground flex items-center gap-4 py-1 px-0.5">
+          <span>共 {summary.count} 筆</span>
+          <span>·</span>
+          <span>{summary.pendingCount} 筆待處理</span>
+          <span>·</span>
+          <span>總金額 {formatCurrency(summary.totalAmount)}</span>
+        </div>
+      )}
+
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? (
           <TableSkeleton rows={8} cols={7} />
@@ -511,6 +557,11 @@ export default function Purchases() {
             storageKey="purchases"
             onRowFocus={(row) => setDetailId(row.id as number)}
             density={density}
+            hint={dtHintVisible ? (
+              <span className="text-xs text-muted-foreground bg-popover border rounded px-2 py-1 shadow-sm animate-fade-in pointer-events-none">
+                ↑↓ 鍵盤導覽 · 右鍵選單
+              </span>
+            ) : undefined}
             contextMenu={(row) => {
               const order = row as unknown as PurchaseOrder
               const items: ContextMenuItem[] = [

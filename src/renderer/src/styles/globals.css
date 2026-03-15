@@ -113,6 +113,13 @@
 .animate-nav-progress { animation: nav-progress 0.9s ease-out forwards; }
 .animate-nav-fade     { animation: nav-fade 0.3s ease-out forwards; }
 
+/* Shortcut hint fade-in animation (Feature 74) */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+
 /* Electron drag region for macOS titlebar */
 .titlebar-drag {
   -webkit-app-region: drag;

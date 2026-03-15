@@ -47,8 +47,7 @@ import {
 import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion, AiForecastResult, UnpaidOrder, TopProduct } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { useCountUp } from '@/lib/useCountUp'
-
-const CATEGORY_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+import { categoryHex } from '@/lib/categoryColor'
 const WIDGET_KEYS = ['quickActions', 'kpis', 'salesTrend', 'topProducts', 'lowStock', 'pendingSales', 'purchaseSuggestions', 'aiInsight']
 
 export default function Dashboard() {
@@ -538,8 +537,8 @@ export default function Dashboard() {
                     formatter={(v: number) => [formatCurrency(v), d.inventoryValueTooltip]}
                   />
                   <Bar dataKey="inventory_value" radius={[4, 4, 0, 0]}>
-                    {categoryData.map((_, i) => (
-                      <Cell key={i} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+                    {categoryData.map((item) => (
+                      <Cell key={item.category} fill={categoryHex(item.category)} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -590,8 +589,8 @@ export default function Dashboard() {
                       formatter={(v: number) => [formatCurrency(v), d.topProductsRevenue]}
                     />
                     <Bar dataKey="total_revenue" radius={[0, 4, 4, 0]}>
-                      {topProducts.slice(0, 5).map((_, i) => (
-                        <Cell key={i} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+                      {topProducts.slice(0, 5).map((item) => (
+                        <Cell key={item.product_id} fill={categoryHex(item.category ?? '')} />
                       ))}
                     </Bar>
                   </BarChart>

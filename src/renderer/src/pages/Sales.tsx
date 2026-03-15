@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt, AlignJustify, List, LayoutList, MessageSquare, FileDown, type LucideIcon } from 'lucide-react'
@@ -18,7 +18,7 @@ import { PartialReturnDialog } from '@/components/sales/PartialReturnDialog'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import { CopyButton } from '@/components/ui/CopyButton'
 import { HoverCard } from '@/components/ui/HoverCard'
-import type { SalesOrder, Customer } from '@/types/schema'
+import type { SalesOrder, Customer, Product } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { useDemoStore } from '@/stores/demo.store'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -71,8 +71,25 @@ export default function Sales() {
     (localStorage.getItem('ims-dt-density-sales') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
   )
 
+  // Rule 74: Shortcut hint
+  const [btnHintVisible, setBtnHintVisible] = useState(() => !localStorage.getItem('ims-hint-shown-sales'))
+  const [dtHintVisible, setDtHintVisible] = useState(() => !localStorage.getItem('ims-hint-dt-shown'))
   useEffect(() => {
-    if ((location.state as { openForm?: boolean } | null)?.openForm) {
+    if (btnHintVisible) {
+      const timer = setTimeout(() => { setBtnHintVisible(false); localStorage.setItem('ims-hint-shown-sales', '1') }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [btnHintVisible])
+  useEffect(() => {
+    if (dtHintVisible) {
+      const timer = setTimeout(() => { setDtHintVisible(false); localStorage.setItem('ims-hint-dt-shown', '1') }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [dtHintVisible])
+
+  useEffect(() => {
+    const state = location.state as { openForm?: boolean } | null
+    if (state?.openForm) {
       setFormOpen(true)
       navigate(location.pathname, { replace: true, state: null })
     }
@@ -113,15 +130,58 @@ export default function Sales() {
     })
   })
 
+  // Rule 72: Summary Strip
+  const summary = useMemo(() => {
+    const list = orders ?? []
+    const completedCount = list.filter((o) => o.status === 'completed').length
+    const totalAmount = list.reduce((sum, o) => sum + (o.total_amount ?? 0), 0)
+    return { count: list.length, completedCount, totalAmount }
+  }, [orders])
+
   const completeMutation = useMutation({
-    mutationFn: (id: number) => window.electronAPI.sales.complete(id),
-    onSuccess: (result) => {
-      if ((result as {success:boolean}).success) {
+    mutationFn: async (id: number) => {
+      const order = await window.electronAPI.sales.getById(id)
+      const result = await window.electronAPI.sales.complete(id)
+      return { result, saleItems: (order?.items ?? []) as Array<{ product_id: number; quantity: number }> }
+    },
+    onSuccess: ({ result, saleItems }) => {
+      if ((result as { success: boolean }).success) {
         queryClient.invalidateQueries({ queryKey: ['sales'] })
         queryClient.invalidateQueries({ queryKey: ['products'] })
         queryClient.invalidateQueries({ queryKey: ['reports'] })
+
+        // Rule 70: Post-sale low stock alert
+        const cachedProds = queryClient.getQueriesData<Product[]>({ queryKey: ['products', 'all'] })
+        const products = cachedProds.flatMap(([, data]) => data ?? [])
+        const lowStockProds = saleItems
+          .map((item) => {
+            const prod = products.find((p) => p.id === item.product_id)
+            if (!prod) return null
+            const newStock = prod.stock_qty - item.quantity
+            return newStock <= prod.reorder_pt ? { ...prod, stock_qty: newStock } : null
+          })
+          .filter((p): p is Product => p !== null)
+
+        if (lowStockProds.length > 0) {
+          toast({
+            title: `${lowStockProds.length} 項商品庫存低於補貨點`,
+            action: {
+              label: '建立採購單',
+              onClick: () => navigate('/purchases', {
+                state: {
+                  openForm: true,
+                  items: lowStockProds.map((prod) => ({
+                    product_id: prod.id,
+                    quantity: Math.max(1, prod.reorder_pt - prod.stock_qty + 1),
+                    unit_price: prod.buy_price
+                  }))
+                }
+              })
+            }
+          })
+        }
       } else {
-        setError(result.error ?? s.opFailed)
+        setError((result as { error?: string }).error ?? s.opFailed)
       }
     }
   })
@@ -504,10 +564,17 @@ export default function Sales() {
           <Download className="w-4 h-4" />
           {exporting ? t.common.exporting : t.common.exportCsv}
         </Button>
-        <Button onClick={() => setFormOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          {s.addOrder}
-        </Button>
+        <div className="relative">
+          <Button onClick={() => setFormOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            {s.addOrder}
+          </Button>
+          {btnHintVisible && (
+            <div className="absolute top-full mt-1 left-0 text-xs text-muted-foreground bg-popover border rounded px-2 py-1 shadow-sm whitespace-nowrap animate-fade-in pointer-events-none z-10">
+              ↓ 按 <kbd className="font-mono border rounded px-1 text-[10px]">N</kbd> 快速新增
+            </div>
+          )}
+        </div>
         <div className="flex items-center rounded-md border border-border overflow-hidden ml-auto">
           {(['compact', 'normal', 'relaxed'] as const).map((d, i) => {
             const Icon = [AlignJustify, List, LayoutList][i]
@@ -520,6 +587,17 @@ export default function Sales() {
         </div>
       </div>
 
+      {/* Rule 72: Summary Strip */}
+      {!isLoading && (
+        <div className="text-xs text-muted-foreground flex items-center gap-4 py-1 px-0.5">
+          <span>共 {summary.count} 筆</span>
+          <span>·</span>
+          <span>{summary.completedCount} 筆完成</span>
+          <span>·</span>
+          <span>總金額 {formatCurrency(summary.totalAmount)}</span>
+        </div>
+      )}
+
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? (
           <TableSkeleton rows={8} cols={7} />
@@ -531,6 +609,11 @@ export default function Sales() {
             storageKey="sales"
             onRowFocus={(row) => setDetailId(row.id as number)}
             density={density}
+            hint={dtHintVisible ? (
+              <span className="text-xs text-muted-foreground bg-popover border rounded px-2 py-1 shadow-sm animate-fade-in pointer-events-none">
+                ↑↓ 鍵盤導覽 · 右鍵選單
+              </span>
+            ) : undefined}
             contextMenu={(row) => {
               const order = row as unknown as SalesOrder
               const items: ContextMenuItem[] = [

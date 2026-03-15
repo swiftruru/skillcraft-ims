@@ -148,6 +148,13 @@ export default function Suppliers() {
         </div>
       </div>
 
+      {/* Rule 72: Summary Strip */}
+      {!isLoading && (
+        <div className="text-xs text-muted-foreground flex items-center gap-4 py-1 px-0.5">
+          <span>共 {(suppliers ?? []).length} 位</span>
+        </div>
+      )}
+
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? <TableSkeleton rows={8} cols={6} /> : (
           <DataTable

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, FileDown, type LucideIcon } from 'lucide-react'
@@ -25,6 +25,7 @@ import { useToast } from '@/components/ui/use-toast'
 import type { Product } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { useSuccessFlash } from '@/lib/useSuccessFlash'
+import { categoryColor } from '@/lib/categoryColor'
 
 export default function Products() {
   const queryClient = useQueryClient()
@@ -61,6 +62,28 @@ export default function Products() {
     (localStorage.getItem('ims-dt-density-products') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
   )
 
+  // Rule 74: Shortcut hint — shown once per page
+  const [btnHintVisible, setBtnHintVisible] = useState(() => !localStorage.getItem('ims-hint-shown-products'))
+  const [dtHintVisible, setDtHintVisible] = useState(() => !localStorage.getItem('ims-hint-dt-shown'))
+  useEffect(() => {
+    if (btnHintVisible) {
+      const t = setTimeout(() => {
+        setBtnHintVisible(false)
+        localStorage.setItem('ims-hint-shown-products', '1')
+      }, 5000)
+      return () => clearTimeout(t)
+    }
+  }, [btnHintVisible])
+  useEffect(() => {
+    if (dtHintVisible) {
+      const t = setTimeout(() => {
+        setDtHintVisible(false)
+        localStorage.setItem('ims-hint-dt-shown', '1')
+      }, 5000)
+      return () => clearTimeout(t)
+    }
+  }, [dtHintVisible])
+
 
   useEffect(() => {
     const handler = () => { setEditProduct(null); setFormOpen(true) }
@@ -88,6 +111,14 @@ export default function Products() {
     : allProducts
 
   const hasFilter = categoryFilter !== '__all__' || stockFilter !== '__all__'
+
+  // Rule 72: Page Summary Strip
+  const summary = useMemo(() => {
+    const list = products ?? []
+    const lowStockCount = list.filter((p) => p.stock_qty <= p.reorder_pt).length
+    const totalValue = list.reduce((sum, p) => sum + p.stock_qty * p.buy_price, 0)
+    return { count: list.length, lowStockCount, totalValue }
+  }, [products])
 
   const deleteMutation = useMutation({
     mutationFn: ({ id }: { id: number; snapshot: Product }) => window.electronAPI.products.delete(id),
@@ -208,15 +239,15 @@ export default function Products() {
     }},
     { key: 'category', label: p.category, sortable: true, render: (v) => {
       const active = categoryFilter === String(v)
+      const colors = categoryColor(String(v))
       return (
-        <Badge
-          variant={active ? 'default' : 'secondary'}
-          className="text-xs cursor-pointer hover:opacity-80 transition-opacity"
+        <span
+          className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full cursor-pointer transition-opacity hover:opacity-80 ${colors.bg} ${colors.text} ${active ? 'ring-1 ring-current' : ''}`}
           onClick={(e) => { e.stopPropagation(); setCategoryFilter(active ? '__all__' : String(v)) }}
           title={active ? '點擊取消篩選' : `篩選：${String(v)}`}
         >
           {String(v)}
-        </Badge>
+        </span>
       )
     }},
     {
@@ -388,9 +419,17 @@ export default function Products() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">{p.allCategories}</SelectItem>
-            {(categories ?? []).map((cat) => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-            ))}
+            {(categories ?? []).map((cat) => {
+              const colors = categoryColor(cat)
+              return (
+                <SelectItem key={cat} value={cat}>
+                  <span className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
+                    {cat}
+                  </span>
+                </SelectItem>
+              )
+            })}
           </SelectContent>
         </Select>
         <Select value={stockFilter} onValueChange={setStockFilter}>
@@ -432,10 +471,17 @@ export default function Products() {
           <Download className="w-4 h-4" />
           {exporting ? t.common.exporting : t.common.exportCsv}
         </Button>
-        <Button data-tour="add-product" onClick={() => { setEditProduct(null); setFormOpen(true) }} className="gap-2">
-          <Plus className="w-4 h-4" />
-          {p.addProduct}
-        </Button>
+        <div className="relative">
+          <Button data-tour="add-product" onClick={() => { setEditProduct(null); setFormOpen(true) }} className="gap-2">
+            <Plus className="w-4 h-4" />
+            {p.addProduct}
+          </Button>
+          {btnHintVisible && (
+            <div className="absolute top-full mt-1 left-0 text-xs text-muted-foreground bg-popover border rounded px-2 py-1 shadow-sm whitespace-nowrap animate-fade-in pointer-events-none z-10">
+              ↓ 按 <kbd className="font-mono border rounded px-1 text-[10px]">N</kbd> 快速新增
+            </div>
+          )}
+        </div>
         <div className="flex items-center rounded-md border border-border overflow-hidden">
           <button
             className={`h-9 px-2.5 transition-colors ${viewMode === 'table' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
@@ -466,6 +512,19 @@ export default function Products() {
           })}
         </div>
       </div>
+
+      {/* Rule 72: Summary Strip */}
+      {!isLoading && (
+        <div className="text-xs text-muted-foreground flex items-center gap-4 py-1 px-0.5">
+          <span>共 {summary.count} 項</span>
+          <span>·</span>
+          <span className={summary.lowStockCount > 0 ? 'text-yellow-500' : ''}>
+            {summary.lowStockCount} 項低庫存
+          </span>
+          <span>·</span>
+          <span>庫存總值 {formatCurrency(summary.totalValue)}</span>
+        </div>
+      )}
 
       {/* Table / Grid */}
       {isLoading ? (
@@ -531,6 +590,11 @@ export default function Products() {
             onRowFocus={(row) => setDetailProduct(row as unknown as Product)}
             flashRowId={flashId}
             density={density}
+            hint={dtHintVisible ? (
+              <span className="text-xs text-muted-foreground bg-popover border rounded px-2 py-1 shadow-sm animate-fade-in pointer-events-none">
+                ↑↓ 鍵盤導覽 · 右鍵選單
+              </span>
+            ) : undefined}
             contextMenu={(row) => {
               const product = row as unknown as Product
               const items: ContextMenuItem[] = [
@@ -562,13 +626,6 @@ export default function Products() {
             ) : undefined}
           />
         </div>
-      )}
-
-      {/* Stats */}
-      {products && (
-        <p className="text-xs text-muted-foreground">
-          {p.statsText(products.length, products.filter((p) => p.stock_qty <= p.reorder_pt).length)}
-        </p>
       )}
 
       <ImportCsvDialog open={importOpen} onOpenChange={setImportOpen} />

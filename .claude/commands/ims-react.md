@@ -586,3 +586,72 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - CSV header 列加 BOM（`\uFEFF`）確保 Excel 正確顯示中文
     - 匯出成功後顯示 toast success（`已匯出 N 筆`）；不清空選取集合
 
+69. **表單 Tab 自動新增明細列（Auto-add Row on Tab）**：
+    - 適用範圍：`PurchaseForm` / `SaleForm` 的明細表格
+    - 在最後一行的最後一個輸入欄位（unit_price）按下 `Tab` 鍵時，自動執行 `append(defaultItem)` 並讓焦點跳到新行第一個欄位（product_id）
+    - 實作：在 unit_price input 的 `onKeyDown` handler 中攔截 `Tab`（`!e.shiftKey`）；使用 `useRef` 紀錄每列第一個輸入欄的 ref，append 後以 `setTimeout(0)` 等待 render，再呼叫 `ref.current?.focus()`
+    - `Shift+Tab` 在第一行第一欄時不觸發此行為（預設瀏覽器行為）
+    - 只在當前列是最後一列時觸發（`index === fields.length - 1`）
+
+70. **完成銷售後低庫存即時提醒（Post-Sale Low Stock Alert）**：
+    - 銷售單狀態變更為 `'completed'` 成功後（`sales:updateStatus` onSuccess），前端從 `queryClient.getQueryData(['products'])` 取出最新 products cache
+    - 篩選出剛在銷售單中異動的商品（`saleItems.map(i => i.product_id)`）中，`stock_qty <= reorder_pt` 的項目
+    - 若有低庫存商品，顯示可操作 Toast（`variant: 'default'`）：title `「N 項商品庫存低於補貨點」`，`action` 為 shadcn `ToastAction`（label `建立採購單`）
+    - 點擊「建立採購單」後：`navigate('/purchases', { state: { openForm: true, items: lowStockItems.map(...) } })`；Purchases 頁面在 `useEffect` 中讀取 `location.state?.items`，若有則帶入 `initialData.items` 開啟 PurchaseForm
+    - 採購收貨完成後同理（`purchases:updateStatus` → `'received'` onSuccess，檢查同採購單商品）
+    - 不需新 IPC，純前端 cache 計算
+
+71. **訂單表單 SKU 快速掃描列（SKU Quick-Add Bar）**：
+    - 適用範圍：`PurchaseForm` / `SaleForm` 明細表格上方
+    - UI：`<Input placeholder="輸入 SKU 快速新增商品..." className="max-w-xs" />` + 右側 `<kbd>Enter</kbd>` 提示
+    - 按 `Enter` 後：對 `products` 陣列（由 `useQuery(['products'])` 取得）精確比對 `sku`（不分大小寫）
+      - 找到：呼叫 `append({ product_id: p.id, quantity: 1, unit_price: p.buy_price })` 並清空 input，短暫顯示綠色 `✓ 已新增 {name}`
+      - 找不到：input 加上 `border-destructive` + 顯示 `text-destructive text-xs`「找不到 SKU: {input}」，1.5 秒後自動清除
+    - 支援條碼掃描器（掃描後自動送出 Enter）；input 不在 react-hook-form 的 fields 中（獨立 `useState`）
+
+72. **各頁面資料摘要列（Page Summary Strip）**：
+    - 適用範圍：Products / Purchases / Sales / Customers / Suppliers 頁面的搜尋區下方（DataTable 上方）
+    - 樣式：`text-xs text-muted-foreground flex items-center gap-4 py-1 px-0.5`，項目間以 `·` 分隔
+    - 純前端 `useMemo` 計算，隨當前 `filteredData` 即時更新
+    - 各頁面顯示內容：
+      - **Products**：`共 N 項` · `N 項低庫存`（`stock_qty <= reorder_pt`，`text-yellow-500`）· `庫存總值 NT$X`（`stock_qty * buy_price` 總和）
+      - **Purchases**：`共 N 筆` · `N 筆待處理`（`status='pending'`）· `總金額 NT$X`
+      - **Sales**：`共 N 筆` · `N 筆完成`（`status='completed'`）· `總金額 NT$X`
+      - **Customers**：`共 N 位`（無額外統計）
+      - **Suppliers**：`共 N 位`（無額外統計）
+    - 數字為 0 時仍顯示（不隱藏），低庫存數量 > 0 時才套用黃色
+
+73. **分類自訂顏色（Category Color Map）**：
+    - 定義固定顏色常數陣列（6 色）：`CATEGORY_COLORS = ['blue','violet','cyan','green','orange','rose']`，對應 Tailwind class
+    - hash 函式：`categoryColor(name: string): string` — 將分類名稱所有字元碼 sum mod 6，回傳對應色號索引
+    - 位置：`src/renderer/src/lib/categoryColor.ts`
+    - Tailwind class 映射（需用 `cn()` 拼接，避免 purge）：
+      ```ts
+      const COLOR_CLASSES = [
+        { bg: 'bg-blue-500/15', text: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500' },
+        { bg: 'bg-violet-500/15', text: 'text-violet-600 dark:text-violet-400', dot: 'bg-violet-500' },
+        { bg: 'bg-cyan-500/15', text: 'text-cyan-600 dark:text-cyan-400', dot: 'bg-cyan-500' },
+        { bg: 'bg-green-500/15', text: 'text-green-600 dark:text-green-400', dot: 'bg-green-500' },
+        { bg: 'bg-orange-500/15', text: 'text-orange-600 dark:text-orange-400', dot: 'bg-orange-500' },
+        { bg: 'bg-rose-500/15', text: 'text-rose-600 dark:text-rose-400', dot: 'bg-rose-500' },
+      ]
+      ```
+    - 套用範圍：
+      - Products 表格分類 Badge（取代原 `bg-muted` 固定色）
+      - Products 篩選 chips / 下拉選項左側小圓點
+      - Dashboard 庫存分類 Bar Chart 各 bar 顏色改用 `dot` 顏色（`fill` 屬性）
+    - 不需 DB，純前端常數
+
+74. **全頁面鍵盤提示工具列（Contextual Shortcut Hints）**：
+    - 適用範圍：Products / Purchases / Sales 主頁面
+    - 「新增」按鈕提示：第一次訪問該頁面時，在新增按鈕下方顯示向下箭頭提示 `↓ 按 N 快速新增`
+      - 樣式：`absolute top-full mt-1 left-0 text-xs text-muted-foreground bg-popover border rounded px-2 py-1 shadow-sm whitespace-nowrap animate-fade-in pointer-events-none`
+      - 5 秒後自動消失（`setTimeout`），消失後以 `localStorage['ims-hint-shown-{page}']` 記錄已顯示，不再重複
+      - 新增按鈕外層加 `relative` wrapper
+    - DataTable 提示：DataTable 首次載入時，右上角顯示 `↑↓ 鍵盤導覽 · 右鍵選單`
+      - 條件：`localStorage['ims-hint-dt-shown']` 不存在
+      - 樣式：`absolute top-2 right-2 text-xs text-muted-foreground bg-popover border rounded px-2 py-1 shadow-sm animate-fade-in pointer-events-none z-10`
+      - 5 秒後自動消失並寫入 localStorage
+    - `animate-fade-in` 定義於全域 CSS（`@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } } .animate-fade-in { animation: fadeIn 0.3s ease-out }`）
+    - DataTable 提示改由 Products 頁面控制（避免 DataTable 元件感知業務邏輯），以 `hintVisible` state 傳入 DataTable 的 `hint?: ReactNode` prop
+

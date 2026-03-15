@@ -45,6 +45,7 @@ interface DataTableProps<T> {
   density?: Density
   rowActions?: (row: T) => React.ReactNode
   contextMenu?: (row: T) => ContextMenuItem[]
+  hint?: React.ReactNode
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -62,7 +63,8 @@ export function DataTable<T extends Record<string, unknown>>({
   flashRowId,
   density = 'normal',
   rowActions,
-  contextMenu
+  contextMenu,
+  hint
 }: DataTableProps<T>) {
   const t = useLang()
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
@@ -220,9 +222,10 @@ export function DataTable<T extends Record<string, unknown>>({
       onBlur={() => setFocusedIdx(-1)}
       ref={tableContainerRef}
     >
-      {hideableColumns.length > 0 && (
-        <div className="flex justify-end px-3 pt-2 pb-1">
-          <div className="relative" ref={colMenuRef}>
+      {(hideableColumns.length > 0 || hint) && (
+        <div className="flex justify-end items-center gap-2 px-3 pt-2 pb-1">
+          {hint}
+          {hideableColumns.length > 0 && <div className="relative" ref={colMenuRef}>
             <Button
               variant="ghost"
               size="icon"
@@ -260,7 +263,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </div>
       )}
 
