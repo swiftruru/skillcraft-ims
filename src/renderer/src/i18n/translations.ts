@@ -199,7 +199,8 @@ export const translations = {
       paid: '已付款',
       unpaid: '未付款',
       paymentDue: '付款截止日',
-      saveFilter: '儲存篩選'
+      saveFilter: '儲存篩選',
+      batchMarkReceived: '批次標記收貨'
     },
     sales: {
       customer: '客戶',
@@ -236,7 +237,8 @@ export const translations = {
       unpaid: '未付款',
       overdue: '逾期',
       paymentDue: '付款截止日',
-      saveFilter: '儲存篩選'
+      saveFilter: '儲存篩選',
+      batchMarkPaid: '批次標記付款'
     },
     suppliers: {
       name: '名稱',
@@ -766,7 +768,8 @@ export const translations = {
       paid: 'Paid',
       unpaid: 'Unpaid',
       paymentDue: 'Payment Due',
-      saveFilter: 'Save Filter'
+      saveFilter: 'Save Filter',
+      batchMarkReceived: 'Batch Mark Received'
     },
     sales: {
       customer: 'Customer',
@@ -803,7 +806,8 @@ export const translations = {
       unpaid: 'Unpaid',
       overdue: 'Overdue',
       paymentDue: 'Payment Due',
-      saveFilter: 'Save Filter'
+      saveFilter: 'Save Filter',
+      batchMarkPaid: 'Batch Mark Paid'
     },
     suppliers: {
       name: 'Name',

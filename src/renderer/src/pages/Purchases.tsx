@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable, type Column } from '@/components/common/DataTable'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -51,6 +52,7 @@ export default function Purchases() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [markPaidId, setMarkPaidId] = useState<number | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
     queryKey: ['purchases', 'all', search, dateFrom, dateTo],
@@ -102,6 +104,25 @@ export default function Purchases() {
     }
   })
 
+  const batchReceiveMutation = useMutation({
+    mutationFn: (ids: number[]) => window.electronAPI.purchases.batchReceive(ids),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      setSelectedIds(new Set())
+    }
+  })
+
+  const allIds = (orders ?? []).map((o) => o.id as number)
+  const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
+  const toggleAll = () => { allSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(allIds)) }
+  const toggleOne = (id: number) => setSelectedIds((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
   const handleClone = async (id: number) => {
     const order = await window.electronAPI.purchases.getById(id)
     if (order) {
@@ -115,6 +136,15 @@ export default function Purchases() {
   }
 
   const columns: Column<PurchaseOrder>[] = [
+    {
+      key: '__check__' as keyof PurchaseOrder,
+      label: '',
+      className: 'w-10',
+      render: (_v, row) => (
+        <Checkbox checked={selectedIds.has(row.id as number)} onCheckedChange={() => toggleOne(row.id as number)} onClick={(e) => e.stopPropagation()} />
+      ),
+      header: () => <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+    },
     { key: 'order_no', label: p.orderNo, sortable: true, className: 'font-mono text-xs w-36' },
     { key: 'supplier_name', label: p.supplier, sortable: true },
     { key: 'order_date', label: p.orderDate, sortable: true, render: (v) => formatDate(String(v)) },
@@ -352,6 +382,22 @@ export default function Purchases() {
         confirmLabel={p.markPaid}
         variant="default"
       />
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-xl shadow-xl px-4 py-2.5 flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">已選 {selectedIds.size} 筆</span>
+          <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-green-400 border-green-400/30 hover:text-green-400"
+            onClick={() => batchReceiveMutation.mutate(Array.from(selectedIds))}
+            disabled={batchReceiveMutation.isPending}
+          >
+            <CheckCircle className="w-3.5 h-3.5" />
+            {p.batchMarkReceived ?? '批次標記收貨'}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelectedIds(new Set())}>
+            {t.common.cancel}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

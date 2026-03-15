@@ -95,4 +95,18 @@ export function registerSalesIpc(): void {
     getDb().prepare(`UPDATE sales_orders SET payment_due_date=? WHERE id=?`).run(dueDate, id)
     return SaleModel.findById(id)
   })
+  ipcMain.handle('sales:batchMarkPaid', (_e, ids: number[]) => {
+    const db = getDb()
+    let updated = 0
+    for (const id of ids) {
+      try {
+        const order = SaleModel.findById(id)
+        if (order && order.status === 'completed' && order.payment_status !== 'paid') {
+          db.prepare(`UPDATE sales_orders SET payment_status='paid' WHERE id=?`).run(id)
+          updated++
+        }
+      } catch { /* skip */ }
+    }
+    return { updated }
+  })
 }

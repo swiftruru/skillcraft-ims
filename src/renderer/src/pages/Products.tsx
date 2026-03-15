@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2 } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,7 +36,7 @@ export default function Products() {
   )
   const [formOpen, setFormOpen] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
-  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; snapshot: Product } | null>(null)
   const [adjustProduct, setAdjustProduct] = useState<Product | null>(null)
   const [detailProduct, setDetailProduct] = useState<Product | null>(null)
   const [exporting, setExporting] = useState(false)
@@ -47,6 +47,10 @@ export default function Products() {
   const [batchPriceOpen, setBatchPriceOpen] = useState(false)
   const [quickPurchaseProduct, setQuickPurchaseProduct] = useState<Product | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; product: Product } | null>(null)
+  const [editingCell, setEditingCell] = useState<{ id: number; field: 'sell_price' | 'stock_qty' } | null>(null)
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+    return (localStorage.getItem('ims-products-view') as 'table' | 'grid') ?? 'table'
+  })
 
   useEffect(() => {
     const close = () => setContextMenu(null)
@@ -83,8 +87,34 @@ export default function Products() {
   const hasFilter = categoryFilter !== '__all__' || stockFilter !== '__all__'
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => window.electronAPI.products.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] })
+    mutationFn: ({ id }: { id: number; snapshot: Product }) => window.electronAPI.products.delete(id),
+    onSuccess: (_data, { snapshot }) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      const { dismiss } = toast({
+        title: `已刪除「${snapshot.name}」`,
+        duration: 5000,
+        action: {
+          label: '復原',
+          onClick: async () => {
+            dismiss()
+            await window.electronAPI.products.create({
+              sku: snapshot.sku, name: snapshot.name, category: snapshot.category,
+              sell_price: snapshot.sell_price, buy_price: snapshot.buy_price,
+              stock_qty: snapshot.stock_qty, reorder_pt: snapshot.reorder_pt,
+              unit: snapshot.unit, description: snapshot.description
+            })
+            queryClient.invalidateQueries({ queryKey: ['products'] })
+          }
+        }
+      })
+    }
+  })
+
+  const inlineUpdateMutation = useMutation({
+    mutationFn: ({ id, field, value }: { id: number; field: 'sell_price' | 'stock_qty'; value: number }) =>
+      window.electronAPI.products.update(id, { [field]: value }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    onError: () => toast({ title: '更新失敗', variant: 'destructive' })
   })
 
   const batchDeleteMutation = useMutation({
@@ -160,14 +190,46 @@ export default function Products() {
       label: p.stock,
       sortable: true,
       className: 'text-right w-20',
-      render: (v, row) => (
-        <span className={row.stock_qty <= row.reorder_pt ? 'text-yellow-400 font-semibold' : ''}>
-          {formatNumber(Number(v))}
-          {row.stock_qty <= row.reorder_pt && (
-            <AlertTriangle className="inline ml-1 w-3 h-3" />
-          )}
-        </span>
-      )
+      render: (v, row) => {
+        const product = row as unknown as Product
+        if (editingCell?.id === product.id && editingCell.field === 'stock_qty') {
+          return (
+            <input
+              autoFocus
+              type="number"
+              min="0"
+              defaultValue={Number(v)}
+              className="h-7 w-20 text-right text-sm px-2 border rounded focus:ring-1 focus:ring-ring bg-background"
+              onBlur={(e) => {
+                const val = parseFloat(e.target.value)
+                if (!isNaN(val) && val >= 0 && val !== Number(v)) {
+                  inlineUpdateMutation.mutate({ id: product.id as number, field: 'stock_qty', value: val })
+                }
+                setEditingCell(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') setEditingCell(null)
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )
+        }
+        return (
+          <div
+            className="group flex items-center justify-end gap-1 cursor-pointer"
+            onClick={() => setEditingCell({ id: product.id as number, field: 'stock_qty' })}
+          >
+            <span className={product.stock_qty <= product.reorder_pt ? 'text-yellow-400 font-semibold' : ''}>
+              {formatNumber(Number(v))}
+              {product.stock_qty <= product.reorder_pt && (
+                <AlertTriangle className="inline ml-1 w-3 h-3" />
+              )}
+            </span>
+            <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-60 shrink-0" />
+          </div>
+        )
+      }
     },
     { key: 'unit', label: p.unit, className: 'w-16 text-center', hideable: true },
     {
@@ -175,8 +237,42 @@ export default function Products() {
       label: p.sellPrice,
       sortable: true,
       className: 'text-right w-24',
-      render: (v) => formatCurrency(Number(v)),
-      hideable: true
+      hideable: true,
+      render: (v, row) => {
+        const product = row as unknown as Product
+        if (editingCell?.id === product.id && editingCell.field === 'sell_price') {
+          return (
+            <input
+              autoFocus
+              type="number"
+              min="0"
+              defaultValue={Number(v)}
+              className="h-7 w-24 text-right text-sm px-2 border rounded focus:ring-1 focus:ring-ring bg-background"
+              onBlur={(e) => {
+                const val = parseFloat(e.target.value)
+                if (!isNaN(val) && val >= 0 && val !== Number(v)) {
+                  inlineUpdateMutation.mutate({ id: product.id as number, field: 'sell_price', value: val })
+                }
+                setEditingCell(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') setEditingCell(null)
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )
+        }
+        return (
+          <div
+            className="group flex items-center justify-end gap-1 cursor-pointer"
+            onClick={() => setEditingCell({ id: product.id as number, field: 'sell_price' })}
+          >
+            <span>{formatCurrency(Number(v))}</span>
+            <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-60 shrink-0" />
+          </div>
+        )
+      }
     },
     {
       key: 'buy_price',
@@ -232,7 +328,7 @@ export default function Products() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={() => setDeleteId(row.id as number)}
+            onClick={() => setPendingDelete({ id: row.id as number, snapshot: row as unknown as Product })}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
@@ -308,13 +404,77 @@ export default function Products() {
           <Plus className="w-4 h-4" />
           {p.addProduct}
         </Button>
+        <div className="flex items-center rounded-md border border-border overflow-hidden">
+          <button
+            className={`h-9 px-2.5 transition-colors ${viewMode === 'table' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => { setViewMode('table'); localStorage.setItem('ims-products-view', 'table') }}
+          >
+            <Table2 className="w-4 h-4" />
+          </button>
+          <button
+            className={`h-9 px-2.5 transition-colors ${viewMode === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => { setViewMode('grid'); localStorage.setItem('ims-products-view', 'grid') }}
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg border border-border bg-card">
-        {isLoading ? (
-          <LoadingSpinner />
-        ) : (
+      {/* Table / Grid */}
+      {isLoading ? (
+        <LoadingSpinner />
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {(products ?? []).length === 0 ? (
+            !search && !hasFilter ? (
+              <div className="col-span-full">
+                <EmptyState
+                  icon={Package}
+                  title={p.emptyTitle}
+                  description={p.emptyDesc}
+                  action={{ label: p.emptyAction, onClick: () => { setEditProduct(null); setFormOpen(true) } }}
+                />
+              </div>
+            ) : (
+              <div className="col-span-full flex items-center justify-center h-32 text-sm text-muted-foreground">{p.emptyMessage}</div>
+            )
+          ) : (products ?? []).map((product) => (
+            <div
+              key={product.id}
+              className="group relative rounded-lg border border-border bg-card p-3 cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => setDetailProduct(product)}
+            >
+              <div className="flex justify-center mb-2">
+                <ProductThumbnail productId={product.id} size={80} />
+              </div>
+              <p className="text-sm font-medium truncate">{product.name}</p>
+              <p className="text-xs text-muted-foreground font-mono">{product.sku}</p>
+              <div className="flex items-center justify-between mt-1.5">
+                <span className={`text-xs flex items-center gap-0.5 ${product.stock_qty <= product.reorder_pt ? 'text-yellow-400' : 'text-muted-foreground'}`}>
+                  {formatNumber(product.stock_qty)}
+                  {product.stock_qty <= product.reorder_pt && <AlertTriangle className="w-3 h-3" />}
+                </span>
+                <span className="text-sm font-semibold">{formatCurrency(product.sell_price)}</span>
+              </div>
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  className="h-6 w-6 flex items-center justify-center rounded bg-background border border-border text-muted-foreground hover:text-foreground"
+                  onClick={(e) => { e.stopPropagation(); setEditProduct(product); setFormOpen(true) }}
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+                <button
+                  className="h-6 w-6 flex items-center justify-center rounded bg-background border border-border text-blue-400 hover:text-blue-500"
+                  onClick={(e) => { e.stopPropagation(); setQuickPurchaseProduct(product) }}
+                >
+                  <ShoppingCart className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border bg-card">
           <DataTable
             data={(products ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
@@ -335,8 +495,8 @@ export default function Products() {
               setContextMenu({ x: e.clientX, y: e.clientY, product: row as unknown as Product })
             }}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Stats */}
       {products && (
@@ -415,11 +575,11 @@ export default function Products() {
       />
 
       <ConfirmDialog
-        open={deleteId !== null}
-        onOpenChange={(open) => !open && setDeleteId(null)}
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
         title={p.deleteTitle}
         description={p.deleteDesc}
-        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+        onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete)}
       />
 
       {contextMenu && (
@@ -455,7 +615,7 @@ export default function Products() {
           <div className="border-t border-border my-1" />
           <button
             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left text-destructive"
-            onClick={() => { setDeleteId(contextMenu.product.id as number); setContextMenu(null) }}
+            onClick={() => { setPendingDelete({ id: contextMenu.product.id as number, snapshot: contextMenu.product }); setContextMenu(null) }}
           >
             <Trash2 className="w-3.5 h-3.5" />{t.common.delete}
           </button>
@@ -465,16 +625,17 @@ export default function Products() {
   )
 }
 
-function ProductThumbnail({ productId }: { productId: number }) {
+function ProductThumbnail({ productId, size = 32 }: { productId: number; size?: number }) {
   const { data: image } = useQuery<string | null>({
     queryKey: ['products', 'image', productId],
     queryFn: () => window.electronAPI.products.getImage(productId),
     staleTime: 1000 * 60 * 5
   })
+  const cls = `rounded object-cover shrink-0`
   return image ? (
-    <img src={image} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+    <img src={image} alt="" className={cls} style={{ width: size, height: size }} />
   ) : (
-    <div className="w-8 h-8 rounded bg-muted/40 flex items-center justify-center shrink-0">
+    <div className="rounded bg-muted/40 flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
       <Package className="w-4 h-4 text-muted-foreground/30" />
     </div>
   )

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable, type Column } from '@/components/common/DataTable'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -52,6 +53,7 @@ export default function Sales() {
   const [dateTo, setDateTo] = useState('')
   const [markPaidId, setMarkPaidId] = useState<number | null>(null)
   const [partialReturnOrder, setPartialReturnOrder] = useState<SalesOrder | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   const { data: orders, isLoading } = useQuery<SalesOrder[]>({
     queryKey: ['sales', 'all', search, dateFrom, dateTo],
@@ -107,6 +109,24 @@ export default function Sales() {
     }
   })
 
+  const batchMarkPaidMutation = useMutation({
+    mutationFn: (ids: number[]) => window.electronAPI.sales.batchMarkPaid(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      setSelectedIds(new Set())
+    }
+  })
+
+  const allIds = (orders ?? []).map((o) => o.id as number)
+  const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
+  const toggleAll = () => { allSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(allIds)) }
+  const toggleOne = (id: number) => setSelectedIds((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
   const handleClone = async (id: number) => {
     const order = await window.electronAPI.sales.getById(id)
     if (order) {
@@ -120,6 +140,15 @@ export default function Sales() {
   }
 
   const columns: Column<SalesOrder>[] = [
+    {
+      key: '__check__' as keyof SalesOrder,
+      label: '',
+      className: 'w-10',
+      render: (_v, row) => (
+        <Checkbox checked={selectedIds.has(row.id as number)} onCheckedChange={() => toggleOne(row.id as number)} onClick={(e) => e.stopPropagation()} />
+      ),
+      header: () => <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+    },
     { key: 'order_no', label: s.orderNo, sortable: true, className: 'font-mono text-xs w-36' },
     { key: 'customer_name', label: s.customer, sortable: true },
     { key: 'order_date', label: s.orderDate, sortable: true, render: (v) => formatDate(String(v)) },
@@ -369,6 +398,22 @@ export default function Sales() {
         order={partialReturnOrder}
         onSuccess={() => setPartialReturnOrder(null)}
       />
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-xl shadow-xl px-4 py-2.5 flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">已選 {selectedIds.size} 筆</span>
+          <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-green-400 border-green-400/30 hover:text-green-400"
+            onClick={() => batchMarkPaidMutation.mutate(Array.from(selectedIds))}
+            disabled={batchMarkPaidMutation.isPending}
+          >
+            <BadgeCheck className="w-3.5 h-3.5" />
+            {s.batchMarkPaid ?? '批次標記付款'}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelectedIds(new Set())}>
+            {t.common.cancel}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

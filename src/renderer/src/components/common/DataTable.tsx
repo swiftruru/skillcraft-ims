@@ -39,8 +39,25 @@ export function DataTable<T extends Record<string, unknown>>({
   onRowContextMenu
 }: DataTableProps<T>) {
   const t = useLang()
-  const [sortKey, setSortKey] = useState<string | null>(null)
-  const [sortDir, setSortDir] = useState<SortDir>(null)
+  const validColKeys = useMemo(() => new Set(columns.map((c) => String(c.key))), [columns])
+
+  const loadSavedSort = () => {
+    if (!storageKey) return { key: null as string | null, dir: null as SortDir }
+    try {
+      const raw = localStorage.getItem(`dt-sort-${storageKey}`)
+      if (!raw) return { key: null, dir: null }
+      const saved = JSON.parse(raw) as { key: string; dir: SortDir }
+      const colKeys = new Set(columns.map((c) => String(c.key)))
+      if (!colKeys.has(saved.key)) return { key: null, dir: null }
+      return { key: saved.key, dir: saved.dir }
+    } catch { return { key: null, dir: null } }
+  }
+
+  const savedSort = useMemo(loadSavedSort, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [sortKey, setSortKey] = useState<string | null>(savedSort.key)
+  const [sortDir, setSortDir] = useState<SortDir>(savedSort.dir)
+
   const [page, setPage] = useState(1)
   const [showColMenu, setShowColMenu] = useState(false)
   const colMenuRef = useRef<HTMLDivElement>(null)
@@ -61,6 +78,15 @@ export function DataTable<T extends Record<string, unknown>>({
     if (!storageKey) return
     localStorage.setItem(`dt-cols-${storageKey}`, JSON.stringify(Array.from(hiddenCols)))
   }, [hiddenCols, storageKey])
+
+  useEffect(() => {
+    if (!storageKey) return
+    if (sortKey && sortDir) {
+      localStorage.setItem(`dt-sort-${storageKey}`, JSON.stringify({ key: sortKey, dir: sortDir }))
+    } else {
+      localStorage.removeItem(`dt-sort-${storageKey}`)
+    }
+  }, [sortKey, sortDir, storageKey])
 
   // Close col menu on outside click
   useEffect(() => {

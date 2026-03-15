@@ -33,4 +33,11 @@ export function registerPurchasesIpc(): void {
     db.prepare(`UPDATE purchase_orders SET payment_due_date=? WHERE id=?`).run(dueDate, id)
     return PurchaseModel.findById(id)
   })
+  ipcMain.handle('purchases:batchReceive', (_e, ids: number[]) => {
+    let updated = 0
+    for (const id of ids) {
+      try { PurchaseModel.receive(id); updated++ } catch { /* skip invalid */ }
+    }
+    return { updated }
+  })
 }

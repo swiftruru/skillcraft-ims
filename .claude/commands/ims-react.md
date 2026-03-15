@@ -242,3 +242,51 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 所有 widget 預設顯示（hidden 列表為空）；僅最後 1 個不允許隱藏（至少保留 1 個）
     - i18n key：`dashboard.customize`（按鈕文字）、`dashboard.editingMode`（提示文字）
 
+34. **刪除操作 Undo（Soft Delete Toast）**：
+    - 適用範圍：Products、Purchases、Sales、Customers、Suppliers 的刪除操作
+    - 實作模式：刪除確認後不立即呼叫 IPC，而是先執行 IPC 刪除，成功後顯示含「復原」按鈕的 Toast；按復原時呼叫對應還原 IPC（若無還原 IPC，改為先軟刪除再還原）
+    - **簡化版實作**（不需軟刪除）：刪除成功 Toast 中顯示「復原」按鈕，點擊後呼叫 `xxx:create(deletedData)` 重新建立（Products 適用，id 會不同）
+    - Toast 樣式：`variant="default"`，title 為「已刪除 [名稱]」，`action` 使用 shadcn `ToastAction`（`altText="復原"` 顯示「復原」），自動關閉時間 5 秒（shadcn Toast 預設即 5 秒）
+    - `useToast` 的 `toast()` return 值含 `dismiss`；復原按鈕點擊後先 `dismiss()` 再執行復原
+    - Products：保存刪除前資料（`productToDelete`），復原呼叫 `products:create(savedData)` 並 invalidate；不保留 id
+    - i18n keys：`common.deleted(name)`（「已刪除 {name}」）、`common.undo`（「復原」）
+
+35. **Products 網格/卡片視圖**：
+    - Products 頁面篩選列最右側新增視圖切換按鈕組（`LayoutGrid` / `Table2` icon，`variant="ghost" size="icon"`，active 狀態 `bg-muted`）
+    - 視圖偏好存 `localStorage['ims-products-view']`（`'table'` 或 `'grid'`），預設 `'table'`
+    - Grid 視圖：`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3`，每張卡片顯示：
+      - 縮圖（80×80px，無圖顯示 Package icon，`bg-muted/40 rounded-lg`）
+      - 商品名稱（`text-sm font-medium truncate`）
+      - SKU（`text-xs text-muted-foreground`）
+      - 庫存數量（低庫存顯示橙色，`flex items-center gap-1`）
+      - 售價（`text-sm font-semibold`）
+      - 右下角動作：Edit / ShoppingCart icon 按鈕（`opacity-0 group-hover:opacity-100`）
+    - 卡片整體可點擊（`onClick` → `setDetailProduct(row)`）
+    - Grid 視圖不顯示 DataTable，不影響選取/批次操作邏輯
+
+36. **DataTable 排序狀態記憶**：
+    - `DataTable` 的 `storageKey` prop 同時用於儲存排序偏好（與欄位顯示共用同一 key 空間）
+    - 排序狀態存 `localStorage['dt-sort-${storageKey}']`，格式：`{ key: string, dir: 'asc' | 'desc' } | null`
+    - DataTable 初始化時讀取存檔排序，初始 `sortKey`/`sortDir` 以 stored value 優先
+    - 每次排序變更（點擊欄標題）同步寫入 localStorage
+    - 若 stored key 已不存在於當前 columns（欄位被移除），忽略存檔值，以預設排序啟動
+
+37. **Purchases / Sales 批次操作**：
+    - 兩頁面表格最左側加 Checkbox 欄（`key: '__check__'`，`width: 40`，`hideable: false`）
+    - 表頭 Checkbox：全選/全消，`indeterminate` 狀態（部分選取時顯示）
+    - 選取 1 筆以上時底部浮現操作列（`fixed bottom-6 left-1/2 -translate-x-1/2 z-40`，`bg-card border rounded-xl shadow-xl px-4 py-2.5 flex items-center gap-3`）
+    - 操作列顯示：「已選 N 筆」+ 批次標記付款（Purchases: 標記「已收貨」、Sales: 標記「已付款」）+ 取消選取
+    - Purchases 批次標記：`purchases:batchUpdateStatus(ids[], 'received')` → invalidate `['purchases']`
+    - Sales 批次標記：`sales:batchUpdatePayment(ids[], 'paid')` → invalidate `['sales']`
+    - 操作後清空選取集合，顯示 toast success
+    - i18n keys：`purchases.batchMarkReceived`（「標記已收貨」）、`sales.batchMarkPaid`（「標記已付款」）
+
+38. **Products Inline 快速編輯（售價 / 庫存）**：
+    - Products 表格的「售價」和「庫存數量」欄位，單擊即進入 inline 編輯（`<input type="number">`），不需開啟 Dialog
+    - 觸發方式：欄位渲染時以 `editingCell: { id, field } | null` state 判斷是否顯示 input；`onClick` 設定 `editingCell`
+    - Input 樣式：`h-7 w-20 text-right text-sm px-2 border rounded focus:ring-1 focus:ring-ring bg-background`
+    - 確認方式：`onBlur` 或 `Enter` 鍵 → 呼叫對應 IPC 更新 → invalidate `['products']`；`Escape` → 取消（清除 `editingCell`）
+    - 售價更新：`products:update(id, { sell_price: newValue })`；庫存更新：`products:update(id, { stock_qty: newValue })`
+    - 合法性：值 < 0 時不允許（input `min="0"`）；空白視為取消（不送出）
+    - 欄位 hover 時顯示 `Pencil` icon 提示（`opacity-0 group-hover:opacity-60`）
+

@@ -61,7 +61,8 @@ const electronAPI = {
     return: (id: number) => ipcRenderer.invoke('purchases:return', id),
     delete: (id: number) => ipcRenderer.invoke('purchases:delete', id),
     markPaid: (id: number) => ipcRenderer.invoke('purchases:markPaid', id),
-    setPaymentDue: (id: number, dueDate: string) => ipcRenderer.invoke('purchases:setPaymentDue', id, dueDate)
+    setPaymentDue: (id: number, dueDate: string) => ipcRenderer.invoke('purchases:setPaymentDue', id, dueDate),
+    batchReceive: (ids: number[]) => ipcRenderer.invoke('purchases:batchReceive', ids)
   },
 
   // Sales
@@ -77,7 +78,8 @@ const electronAPI = {
       ipcRenderer.invoke('sales:partialReturn', id, items),
     delete: (id: number) => ipcRenderer.invoke('sales:delete', id),
     markPaid: (id: number) => ipcRenderer.invoke('sales:markPaid', id),
-    setPaymentDue: (id: number, dueDate: string) => ipcRenderer.invoke('sales:setPaymentDue', id, dueDate)
+    setPaymentDue: (id: number, dueDate: string) => ipcRenderer.invoke('sales:setPaymentDue', id, dueDate),
+    batchMarkPaid: (ids: number[]) => ipcRenderer.invoke('sales:batchMarkPaid', ids)
   },
 
   // Reports
