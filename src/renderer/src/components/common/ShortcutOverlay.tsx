@@ -120,8 +120,12 @@ export function ShortcutOverlay({ open, onClose }: ShortcutOverlayProps) {
           ))}
         </div>
 
-        <div className="px-5 py-3 border-t border-border bg-muted/30 text-center">
-          <span className="text-xs text-muted-foreground">按 <kbd className="inline-flex items-center rounded border border-border bg-background px-1 py-0.5 text-xs font-mono">Esc</kbd> 關閉</span>
+        <div className="px-5 py-3 border-t border-border bg-muted/30 space-y-2">
+          <p className="text-center text-xs text-muted-foreground">按 <kbd className="inline-flex items-center rounded border border-border bg-background px-1 py-0.5 text-xs font-mono">Esc</kbd> 關閉</p>
+          {/* A11y Rule 106: WCAG 2.1.4 — inform users that single-char shortcuts are auto-disabled in input fields */}
+          <p className="text-xs text-muted-foreground/70 text-center leading-snug">
+            在輸入框、文字欄位或選單中時，所有單鍵快捷鍵會自動停用，不影響文字輸入。
+          </p>
         </div>
       </div>
     </div>

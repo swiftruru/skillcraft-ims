@@ -869,3 +869,100 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 在 `globals.css` 的 `:root` 與 `.dark` 確保 `--border` HSL 值在亮色模式下達到 3:1（對白背景），暗色模式下對深色背景達到 3:1
     - 若現有 token 對比不足，適度調整亮度值（`--border` 亮色建議 `< 65%`）
     - Status badge 顏色（`bg-green-500/15 text-green-400`）需確保文字對背景對比 ≥ 4.5:1
+
+100. **DataTable 完整語意標記（Semantic Table Markup）**：
+    - `<table>` 加上 `role="grid"`、`aria-label` 由呼叫端透過 `tableLabel?: string` prop 傳入（如「商品列表」、「採購單列表」）
+    - 所有 `<th>` 加上 `scope="col"` — 讓螢幕閱讀器知道這是欄標題
+    - 可排序欄的 `<th>` 加上 `aria-sort`：
+      - 目前升冪 → `aria-sort="ascending"`
+      - 目前降冪 → `aria-sort="descending"`
+      - 其他可排序欄 → `aria-sort="none"`
+      - 不可排序欄 → 不加 `aria-sort`
+    - 排序觸發按鈕由 `<span>` 改為 `<button type="button">` 包裹欄位文字（讓鍵盤可 focus 並以 Enter/Space 觸發）
+    - `<tbody>` 每個 `<tr>` 加 `role="row"`；`<td>` 加 `role="gridcell"` `aria-rowindex={idx + 2}`（+2 因 header 佔 1）
+    - 各頁面呼叫 `<DataTable tableLabel="商品列表" />` 等傳入 label
+
+101. **各頁面 `<h1>` 標題（Page-level Heading）**：
+    - WCAG 2.4.6：每頁應有清晰的標題描述頁面內容
+    - Products、Purchases、Sales、Customers、Suppliers、Reports、Settings、About、StockTake、InventoryHistory、Receivables 頁面頂部的 `<h2>` 或 `text-xl font-bold` 的 `<div>` 改為 `<h1 className="text-xl font-bold">`
+    - Layout 的頁面容器不輸出任何 heading；各頁面自行決定 `<h1>`
+    - Dialog 標題使用 `<h2>`（Radix `DialogTitle` 已是 `<h2>`，保持不動）
+    - 卡片標題使用 `<h3>`
+
+102. **商品圖片 alt 文字（Product Image Alt Text）**：
+    - Products 表格縮圖 `<img>` 加上 `alt={product.name}`（若有圖）；無圖佔位符的 Package icon 外層 `<div>` 加 `aria-label={product.name}` 或以 `role="img"` + `aria-label`
+    - ProductForm 圖片預覽區的 `<img>` 加 `alt="商品圖片預覽"`
+    - 以 base64 或 objectURL 顯示圖片時，alt 使用商品名稱（從 form `watch('name')` 取得）
+    - 無意義裝飾圖片（dashboard icons 等）使用空 `alt=""`
+
+103. **搜尋結果數量即時公告（Search Result Live Region）**：
+    - 在 Products、Purchases、Sales、Customers、Suppliers 各頁面加入隱藏的 `aria-live` 公告區：
+      ```tsx
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {search && `找到 ${filteredData.length} 筆結果`}
+      </div>
+      ```
+    - 此元素隨 `filteredData.length` 與 `search` 變化，讓螢幕閱讀器播報「找到 N 筆結果」
+    - 只在 `search` 非空時才輸出文字（空搜尋不播報）
+    - `aria-atomic="true"` 確保整句一起播報，避免只播報數字
+
+104. **分頁列完整 ARIA（Pagination ARIA）**：
+    - DataTable 分頁區包在 `<nav aria-label="分頁導覽">` 內
+    - 上一頁按鈕加 `aria-label="上一頁"` `disabled` 時加 `aria-disabled="true"`
+    - 下一頁按鈕加 `aria-label="下一頁"` `disabled` 時加 `aria-disabled="true"`
+    - 「第 X / Y 頁」文字加上 `aria-live="polite"` `aria-atomic="true"`，讓翻頁時螢幕閱讀器播報目前頁碼
+
+105. **表單明細區塊語意包覆（Form Items Fieldset）**：
+    - `PurchaseForm` 與 `SaleForm` 的明細表格區塊用 `<fieldset>` 包裹：
+      ```tsx
+      <fieldset className="space-y-3 border-0 p-0 m-0">
+        <legend className="sr-only">訂單明細項目</legend>
+        {/* items grid */}
+      </fieldset>
+      ```
+    - `border-0 p-0 m-0` 去除 `<fieldset>` 的預設邊框與間距，不改變視覺外觀
+    - `<legend className="sr-only">` 讓螢幕閱讀器在進入表格時播報「訂單明細項目」
+
+106. **單字元快捷鍵說明（Single-char Shortcut Disclosure，WCAG 2.1.4）**：
+    - WCAG 2.1 SC 2.1.4：若有以單一字母鍵觸發的快捷鍵，需提供停用或重新對應的方式
+    - 在 `ShortcutOverlay.tsx` 快捷鍵說明面板底部加入一段說明：
+      > 「在輸入框、文字欄位或選單內時，所有單鍵快捷鍵（N、?、G 組合鍵等）會自動停用，不影響文字輸入。」
+    - 樣式：`mt-4 pt-3 border-t border-border text-xs text-muted-foreground`
+    - Layout keydown handler 已有 `if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return` 保護邏輯，此說明文字是使用者可見的確認
+
+107. **狀態變更後螢幕閱讀器公告（Status Change Announcement）**：
+    - Purchases、Sales 頁面在訂單狀態成功更新後，除顯示 Toast 外，同時呼叫 `announce()` 公告
+    - 公告文字格式：`「訂單 {orderNo} 已{動作}」`（如「訂單 PO-0012 已標記收貨」、「銷售單 SO-0005 已完成」）
+    - `announce()` 為 Rule 77 定義的 `useAnnounce` hook；`variant='success'` toast 使用 polite channel，`variant='destructive'` 使用 assertive channel
+    - 批次操作（batchReceive、batchComplete）公告：`「已批次更新 N 筆訂單」`
+
+108. **鍵盤可及的 Context Menu（Context Menu Keyboard Access）**：
+    - `DataTable.tsx` 的 keyboard handler 新增：聚焦列按 `Shift+F10` 或 `ContextMenu` key → 以聚焦列座標開啟 context menu
+    - 位置：取 `document.querySelector('[data-focused]')?.getBoundingClientRect()`，在列右側顯示
+    - Context menu 開啟後：第一項自動聚焦；`ArrowUp`/`ArrowDown` 在項目間移動；`Enter`/`Space` 選取；`Escape` 關閉並歸還焦點到 table
+    - Context menu container 加 `role="menu"`；每個選項加 `role="menuitem"`；分隔線加 `role="separator"`
+    - 只在 `contextMenu` prop 存在且 `focusedIdx >= 0` 時啟用鍵盤觸發
+
+109. **路由切換後焦點移至主內容（Route Change Focus）**：
+    - `Layout.tsx` 的 `useEffect` 監聽 `location.pathname` 變化後：
+      ```ts
+      useEffect(() => {
+        document.getElementById('main-content')?.focus()
+      }, [location.pathname])
+      ```
+    - `<main id="main-content" tabIndex={-1}>` 已在 Rule 79 定義（確認已加 `tabIndex={-1}`）
+    - 這讓螢幕閱讀器換頁後從主內容重新開始讀取，不停留在側欄
+
+110. **Dialog 關閉後焦點歸位（Focus Return After Dialog Close）**：
+    - 建立 `useFocusReturn` hook（`src/renderer/src/lib/useFocusReturn.ts`）：
+      ```ts
+      export function useFocusReturn() {
+        const ref = useRef<HTMLElement | null>(null)
+        const capture = () => { ref.current = document.activeElement as HTMLElement }
+        const restore = () => { ref.current?.focus() }
+        return { capture, restore }
+      }
+      ```
+    - 套用範圍：Products「新增/編輯商品」按鈕、Purchases「新增採購單」按鈕、Sales「新增銷售單」按鈕
+    - 開啟 Dialog 前呼叫 `capture()`；`onOpenChange(false)` 後呼叫 `restore()`
+    - Radix Dialog 的 `onCloseAutoFocus` 已嘗試返回焦點，但對程式觸發的 Dialog 有時不可靠；此 hook 為補強手段

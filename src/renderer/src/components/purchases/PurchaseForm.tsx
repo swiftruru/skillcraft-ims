@@ -219,8 +219,9 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
             </div>
           </div>
 
-          {/* Items */}
-          <div className="space-y-3">
+          {/* Items — Rule 105: fieldset gives semantic group to screen readers */}
+          <fieldset className="space-y-3 border-0 p-0 m-0">
+          <legend className="sr-only">訂單明細項目</legend>
             <div className="flex items-center justify-between">
               <Label>{tf.itemsLabel}</Label>
               <Button
@@ -364,7 +365,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
             <div className="text-right text-sm font-semibold pt-1 border-t border-border">
               合計：NT$ {total.toLocaleString('zh-TW')}
             </div>
-          </div>
+          </fieldset>
 
           {creditExceeded && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">

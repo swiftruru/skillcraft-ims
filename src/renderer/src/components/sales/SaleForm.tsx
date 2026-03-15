@@ -199,7 +199,9 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
             </div>
           </div>
 
-          <div className="space-y-3">
+          {/* Rule 105: fieldset gives semantic group to screen readers */}
+          <fieldset className="space-y-3 border-0 p-0 m-0">
+          <legend className="sr-only">訂單明細項目</legend>
             <div className="flex items-center justify-between">
               <Label>{tf.salesItemsLabel}</Label>
               <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: 0, quantity: 1, unit_price: 0 })} className="gap-1 h-7 text-xs">
@@ -326,7 +328,7 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
             <div className="text-right text-sm font-semibold pt-1 border-t border-border">
               合計：NT$ {total.toLocaleString('zh-TW')}
             </div>
-          </div>
+          </fieldset>
 
           {creditExceeded && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">

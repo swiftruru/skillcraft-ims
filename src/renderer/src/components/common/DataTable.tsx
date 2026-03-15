@@ -307,14 +307,16 @@ export function DataTable<T extends Record<string, unknown>>({
                     aria-sort={ariaSortValue}
                     className={cn(
                       'px-4 py-3 text-left font-medium text-muted-foreground',
-                      col.sortable && 'cursor-pointer select-none hover:text-foreground',
                       col.className
                     )}
-                    onClick={() => col.sortable && handleSort(colKey)}
                   >
-                    <div className="flex items-center gap-1">
-                      {col.header ? col.header() : col.label}
-                      {col.sortable && (
+                    {col.sortable ? (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 hover:text-foreground select-none"
+                        onClick={() => handleSort(colKey)}
+                      >
+                        {col.header ? col.header() : col.label}
                         <span className="opacity-50" aria-hidden="true">
                           {sortKey === col.key ? (
                             sortDir === 'asc' ? (
@@ -326,8 +328,12 @@ export function DataTable<T extends Record<string, unknown>>({
                             <ChevronsUpDown className="w-3 h-3" />
                           )}
                         </span>
-                      )}
-                    </div>
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        {col.header ? col.header() : col.label}
+                      </div>
+                    )}
                   </th>
                 )
               })}
@@ -384,14 +390,15 @@ export function DataTable<T extends Record<string, unknown>>({
       </div>
 
       {showPagination && (
-        <div className="flex items-center justify-between px-4 py-2 border-t border-border text-xs text-muted-foreground">
-          <span>{t.common.pagination(page, totalPages, sorted.length)}</span>
+        <nav aria-label="分頁導覽" className="flex items-center justify-between px-4 py-2 border-t border-border text-xs text-muted-foreground">
+          <span aria-live="polite" aria-atomic="true">{t.common.pagination(page, totalPages, sorted.length)}</span>
           <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
               className="h-7 w-7 p-0"
               disabled={page === 1}
+              aria-disabled={page === 1}
               onClick={() => setPage((p) => p - 1)}
               aria-label="上一頁"
             >
@@ -402,13 +409,14 @@ export function DataTable<T extends Record<string, unknown>>({
               size="sm"
               className="h-7 w-7 p-0"
               disabled={page === totalPages}
+              aria-disabled={page === totalPages}
               onClick={() => setPage((p) => p + 1)}
               aria-label="下一頁"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </Button>
           </div>
-        </div>
+        </nav>
       )}
 
       {ctxMenu && (

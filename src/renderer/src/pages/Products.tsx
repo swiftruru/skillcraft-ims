@@ -213,7 +213,7 @@ export default function Products() {
       const product = row as unknown as Product
       return (
         <div className="flex items-center gap-2">
-          <ProductThumbnail productId={product.id} />
+          <ProductThumbnail productId={product.id} name={product.name} />
           <HoverCard trigger={
             <button
               className="text-left hover:text-primary hover:underline transition-colors"
@@ -561,7 +561,7 @@ export default function Products() {
               onClick={() => setDetailProduct(product)}
             >
               <div className="flex justify-center mb-2">
-                <ProductThumbnail productId={product.id} size={80} />
+                <ProductThumbnail productId={product.id} size={80} name={product.name} />
               </div>
               <p className="text-sm font-medium truncate">{product.name}</p>
               <p className="text-xs text-muted-foreground font-mono">{product.sku}</p>
@@ -590,8 +590,14 @@ export default function Products() {
           ))}
         </div>
       ) : (
+        <>
+        {/* A11y Rule 103: Announce search results to screen readers */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {search ? `找到 ${(products ?? []).length} 筆結果` : ''}
+        </div>
         <div className="rounded-lg border border-border bg-card" aria-busy={isLoading} aria-label="商品列表">
           <DataTable
+            tableLabel="商品列表"
             data={(products ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
@@ -636,6 +642,7 @@ export default function Products() {
             ) : undefined}
           />
         </div>
+        </>
       )}
 
       <ImportCsvDialog open={importOpen} onOpenChange={setImportOpen} />
@@ -741,7 +748,7 @@ export default function Products() {
   )
 }
 
-function ProductThumbnail({ productId, size = 32 }: { productId: number; size?: number }) {
+function ProductThumbnail({ productId, size = 32, name = '' }: { productId: number; size?: number; name?: string }) {
   const { data: image } = useQuery<string | null>({
     queryKey: ['products', 'image', productId],
     queryFn: () => window.electronAPI.products.getImage(productId),
@@ -749,7 +756,7 @@ function ProductThumbnail({ productId, size = 32 }: { productId: number; size?: 
   })
   const cls = `rounded object-cover shrink-0`
   return image ? (
-    <img src={image} alt="" className={cls} style={{ width: size, height: size }} />
+    <img src={image} alt={name} className={cls} style={{ width: size, height: size }} />
   ) : (
     <div className="rounded bg-muted/40 flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
       <Package className="w-4 h-4 text-muted-foreground/30" />

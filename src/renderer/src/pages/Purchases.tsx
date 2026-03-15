@@ -559,11 +559,16 @@ export default function Purchases() {
         </div>
       )}
 
+      {/* A11y Rule 103: Announce search results to screen readers */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {search ? `找到 ${(orders ?? []).length} 筆結果` : ''}
+      </div>
       <div className="rounded-lg border border-border bg-card" aria-busy={isLoading} aria-label="採購單列表">
         {isLoading ? (
           <TableSkeleton rows={8} cols={7} />
         ) : (
           <DataTable
+            tableLabel="採購單列表"
             data={(orders ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
