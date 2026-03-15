@@ -100,6 +100,19 @@
   animation: flash 0.6s ease-out forwards;
 }
 
+/* Nav progress bar animations (Feature 65) */
+@keyframes nav-progress {
+  0%   { width: 0%; opacity: 1; }
+  60%  { width: 75%; }
+  100% { width: 100%; }
+}
+@keyframes nav-fade {
+  0%   { opacity: 1; width: 100%; }
+  100% { opacity: 0; width: 100%; }
+}
+.animate-nav-progress { animation: nav-progress 0.9s ease-out forwards; }
+.animate-nav-fade     { animation: nav-fade 0.3s ease-out forwards; }
+
 /* Electron drag region for macOS titlebar */
 .titlebar-drag {
   -webkit-app-region: drag;

@@ -520,3 +520,69 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 次要連結（Products 頁才顯示）：「載入範例資料」→ 呼叫 `window.electronAPI.mockData.generate({ scale: 'S', scenario: 'normal' })` 並 invalidate 所有 query，顯示 loading spinner
     - EmptyState 元件新增可選 `secondaryAction?: { label: string; onClick: () => void; loading?: boolean }` prop
 
+63. **點擊狀態快速篩選（Click-to-Filter Badges）**：
+    - 適用範圍：Purchases、Sales 頁面的狀態 badge；Products 頁面的分類 badge
+    - Purchases/Sales：點擊列表中的「待確認 / 已收貨 / 已完成 / 已取消」badge → 立即設定 `status` URL param（`setSearchParams({ status: value }, { replace: true })`）；已在篩選中的狀態再次點擊則清除（toggle 行為）
+    - Products：點擊分類欄的分類文字 → 立即設定 `categoryFilter` state 並同步 URL param
+    - badge 本身加上 `cursor-pointer hover:opacity-80 transition-opacity` 樣式
+    - Purchases/Sales 的 `getAll` filter 新增 `status?` 參數（SQL `WHERE status = ?`），queryKey 加入 `status`；URL param key 為 `status`
+    - 搜尋列旁加入「狀態」`<Select>` 顯示目前 status 篩選（選項：全部 / 待確認 / 已收貨/已完成 / 已取消），與 URL param 雙向綁定
+    - IPC `purchases:getAll` / `sales:getAll` 已有 `status?` 參數，確認 handler 正確套用 WHERE 條件
+
+64. **懸停快速預覽卡（Hover Preview Card）**：
+    - 建立 `HoverCard` 元件（`src/renderer/src/components/ui/HoverCard.tsx`）：純 CSS hover trigger，無需 state
+      - Props：`trigger: React.ReactNode, children: React.ReactNode, side?: 'top'|'bottom'|'right'（預設 bottom）`
+      - 實作：`<div className="relative group inline-block">` 包裹 trigger，children 置於 `absolute z-50 ... invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 delay-300` 的 popover div
+      - 樣式：`bg-card border border-border rounded-xl shadow-xl p-3 min-w-[200px]`；位置由 `side` 決定（bottom: `top-full mt-1`，top: `bottom-full mb-1`）
+    - **商品預覽**（採購/銷售表單 SelectItem / 明細列中的商品名）：
+      - 顯示：縮圖（32px，無圖顯示 Package icon）、商品名稱、SKU、庫存量（帶顏色 badge）、售價 / 進價
+      - 縮圖以 `useQuery(['products', 'image', id], ..., { staleTime: Infinity })` 懶載入
+    - **客戶/供應商預覽**（Purchases/Sales 列表中的客戶名 / 供應商名）：
+      - 顯示：名稱、聯絡人、電話（附 Copy icon）、Email（附 Copy icon）
+      - 資料來源：現有 `useQuery(['customers'])` / `['suppliers']` 陣列中 find by id，不新增 IPC
+    - 套用範圍：Products 表格的「商品名稱」欄（`HoverCard` 顯示分類/庫存/售價）；Purchases/Sales 的「供應商/客戶」欄
+
+65. **頂部導航進度條（Top Navigation Progress Bar）**：
+    - 建立 `NavProgressBar` 元件（`src/renderer/src/components/layout/NavProgressBar.tsx`）
+    - 掛載於 `Layout.tsx` 頂部（在 `<Header>` 之前渲染，`fixed top-0 left-0 right-0 z-[9999]`）
+    - 顯示條件：監聽 React Query 的全域 `isFetching` 狀態（`useIsFetching()` from `@tanstack/react-query`）
+    - 動畫：`isFetching > 0` 時顯示；進度條高 2px，`bg-primary`；以 CSS animation 模擬進度（`0% width:0, 70% width:70%, 100% width:100%`，duration 800ms ease-out）；
+      `isFetching` 歸零後再播放 `fadeOut`（`opacity: 0`，200ms），結束後隱藏元素
+    - 使用 `useEffect` 監聽 `isFetching`，控制 `active` 與 `finishing` 兩個 state 驅動 CSS class
+    - 不阻塞任何互動；不顯示數字百分比
+
+66. **一鍵複製（Copy to Clipboard）**：
+    - 建立 `CopyButton` 元件（`src/renderer/src/components/ui/CopyButton.tsx`）：
+      - Props：`value: string, className?: string`
+      - 點擊後呼叫 `navigator.clipboard.writeText(value)`，icon 切換為 `Check`（綠色 `text-green-500`），1200ms 後自動恢復 `Copy` icon
+      - 樣式：`inline-flex items-center justify-center w-5 h-5 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity cursor-pointer`
+    - 套用位置（外層容器加 `group` class）：
+      - Products 表格 SKU 欄：SKU 文字右側出現 `CopyButton`
+      - Purchases/Sales 表格訂單號欄：訂單號右側出現 `CopyButton`
+      - Customers/Suppliers 詳情 Dialog 的電話、Email 欄：欄位右側出現 `CopyButton`
+    - 不顯示 Toast；僅靠 icon 切換給予視覺回饋，保持介面安靜
+
+67. **Dashboard KPI 數值動畫（Number Count-Up）**：
+    - 建立 `useCountUp(target: number, duration?: number)` hook（`src/renderer/src/lib/useCountUp.ts`）：
+      - `duration` 預設 600ms
+      - 使用 `requestAnimationFrame` 驅動，以 ease-out 曲線（`1 - Math.pow(1 - t, 3)`）插值
+      - `target` 改變時重新啟動動畫（前一個 rAF 以 ref 儲存，cleanup 時 `cancelAnimationFrame`）
+      - 回傳當前顯示值（`number`）
+    - 套用範圍：Dashboard KPI 卡片的四個數值（庫存總值、本月營收、本月毛利率、低庫存數量）
+      - 金額類（庫存值、營收）：`useCountUp(value)` 後以 `formatCurrency` 格式化
+      - 百分比類（毛利率）：`useCountUp(value, 400)` 後以 `toFixed(1)` 格式化
+      - 整數類（低庫存數量）：`useCountUp(value, 400)` 直接顯示
+    - 首次載入（`isLoading`）期間不啟動動畫（顯示 skeleton）；`isLoading` → `false` 後 target 從 0 開始動畫
+    - 切換語言或主題時不重新觸發（`target` 未變化則不重跑）
+
+68. **批次匯出選取列（Export Selected Rows CSV）**：
+    - 適用範圍：Products、Purchases、Sales 頁面，當 `selectedIds.size > 0` 時批次操作浮動列加入「匯出選取」按鈕（`FileDown` icon）
+    - 純前端實作：不需新 IPC，從現有 `orders` / `products` 陣列 filter 出 `selectedIds` 對應列，序列化為 CSV 字串
+    - CSV 序列化：
+      - Products：欄位 `SKU, 商品名稱, 分類, 庫存, 補貨點, 售價, 進價`
+      - Purchases：欄位 `訂單號, 供應商, 訂單日期, 狀態, 付款狀態, 金額`
+      - Sales：欄位 `訂單號, 客戶, 訂單日期, 狀態, 付款狀態, 金額`
+    - 下載方式：建立 Blob（`new Blob([csv], { type: 'text/csv;charset=utf-8;' })`）→ `URL.createObjectURL` → `<a>` click → `URL.revokeObjectURL`；檔名格式：`{page}-export-{YYYY-MM-DD}.csv`
+    - CSV header 列加 BOM（`\uFEFF`）確保 Excel 正確顯示中文
+    - 匯出成功後顯示 toast success（`已匯出 N 筆`）；不清空選取集合
+

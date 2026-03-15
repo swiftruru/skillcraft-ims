@@ -46,6 +46,7 @@ import {
 } from 'recharts'
 import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion, AiForecastResult, UnpaidOrder, TopProduct } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
+import { useCountUp } from '@/lib/useCountUp'
 
 const CATEGORY_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
 const WIDGET_KEYS = ['quickActions', 'kpis', 'salesTrend', 'topProducts', 'lowStock', 'pendingSales', 'purchaseSuggestions', 'aiInsight']
@@ -239,6 +240,17 @@ export default function Dashboard() {
     createPOMutation.mutate(items)
   }
 
+  // KPI count-up animations — must be before early return to obey rules of hooks
+  const animInventoryValue = useCountUp(kpis?.totalInventoryValue ?? 0, 700)
+  const animMonthlyRevenue = useCountUp(kpis?.monthlyRevenue ?? 0, 700)
+  const animProfitMarginRaw = useCountUp(
+    kpis?.monthlyRevenue
+      ? (kpis.monthlyGrossProfit / kpis.monthlyRevenue) * 100
+      : 0,
+    500
+  )
+  const animLowStockCount = useCountUp(kpis?.lowStockCount ?? 0, 400)
+
   if (kpisLoading) return <LoadingSpinner />
 
   const revenueChange = calcChangePercent(
@@ -249,11 +261,6 @@ export default function Dashboard() {
     kpis?.monthlyGrossProfit ?? 0,
     kpis?.monthlyGrossProfitPrev ?? 0
   )
-  const profitMargin =
-    kpis?.monthlyRevenue
-      ? ((kpis.monthlyGrossProfit / kpis.monthlyRevenue) * 100).toFixed(1)
-      : '0.0'
-
   return (
     <div className="p-6 space-y-6">
       {/* Header with Customize button */}
@@ -294,28 +301,28 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
             <KpiCard
               title={d.inventoryValue}
-              value={formatCurrency(kpis?.totalInventoryValue ?? 0)}
+              value={formatCurrency(animInventoryValue)}
               subtitle={d.totalProducts(kpis?.totalProducts ?? 0)}
               icon={<Package className="w-4 h-4" />}
               color="text-blue-400"
             />
             <KpiCard
               title={d.monthlyRevenue}
-              value={formatCurrency(kpis?.monthlyRevenue ?? 0)}
+              value={formatCurrency(animMonthlyRevenue)}
               subtitle={<ChangeIndicator value={revenueChange} suffix={d.vsLastMonth} />}
               icon={<DollarSign className="w-4 h-4" />}
               color="text-green-400"
             />
             <KpiCard
               title={d.grossMargin}
-              value={`${profitMargin}%`}
+              value={`${animProfitMarginRaw.toFixed(1)}%`}
               subtitle={<ChangeIndicator value={profitChange} suffix={d.vsLastMonth} />}
               icon={<BarChart2 className="w-4 h-4" />}
               color="text-purple-400"
             />
             <KpiCard
               title={d.lowStockAlert}
-              value={String(kpis?.lowStockCount ?? 0)}
+              value={String(Math.round(animLowStockCount))}
               subtitle={d.itemsNeedRestock}
               icon={<AlertTriangle className="w-4 h-4" />}
               color={kpis?.lowStockCount ? 'text-yellow-400' : 'text-muted-foreground'}

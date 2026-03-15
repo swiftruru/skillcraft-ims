@@ -5,6 +5,7 @@ import type { DashboardKPIs } from '@/types/schema'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { StatusBar } from './StatusBar'
+import { NavProgressBar } from './NavProgressBar'
 import { CommandPalette } from '../common/CommandPalette'
 import { Toaster } from '../ui/toaster'
 import { ShortcutOverlay } from '../common/ShortcutOverlay'
@@ -102,6 +103,7 @@ export function Layout() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
+      <NavProgressBar />
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0">
         <Header title={title} onSearchClick={() => setPaletteOpen(true)} />

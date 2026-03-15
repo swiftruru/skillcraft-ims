@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart, AlignJustify, List, LayoutList, MessageSquare, type LucideIcon } from 'lucide-react'
+import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart, AlignJustify, List, LayoutList, MessageSquare, FileDown, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable, type Column, type ContextMenuItem } from '@/components/common/DataTable'
@@ -15,7 +16,9 @@ import { PurchaseForm } from '@/components/purchases/PurchaseForm'
 import { PurchaseDetail } from '@/components/purchases/PurchaseDetail'
 import { ReceivePurchaseDialog } from '@/components/purchases/ReceivePurchaseDialog'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
-import type { PurchaseOrder } from '@/types/schema'
+import { CopyButton } from '@/components/ui/CopyButton'
+import { HoverCard } from '@/components/ui/HoverCard'
+import type { PurchaseOrder, Supplier } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { useDemoStore } from '@/stores/demo.store'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -56,10 +59,12 @@ export default function Purchases() {
   const search = searchParams.get('q') ?? ''
   const dateFrom = searchParams.get('from') ?? ''
   const dateTo = searchParams.get('to') ?? ''
+  const statusFilter = searchParams.get('status') ?? ''
 
   const setSearch = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('q', v); else n.delete('q'); return n }, { replace: true })
   const setDateFrom = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('from', v); else n.delete('from'); return n }, { replace: true })
   const setDateTo = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('to', v); else n.delete('to'); return n }, { replace: true })
+  const setStatusFilter = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('status', v); else n.delete('status'); return n }, { replace: true })
 
   const [formOpen, setFormOpen] = useState(false)
   const [density, setDensity] = useState<'compact' | 'normal' | 'relaxed'>(() =>
@@ -91,12 +96,19 @@ export default function Purchases() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [notePopover, setNotePopover] = useState<{ id: number; notes: string } | null>(null)
 
+  const { data: suppliers } = useQuery<Supplier[]>({
+    queryKey: ['suppliers', 'all'],
+    queryFn: () => window.electronAPI.suppliers.getAll(),
+    staleTime: 1000 * 60 * 5
+  })
+
   const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
-    queryKey: ['purchases', 'all', search, dateFrom, dateTo],
+    queryKey: ['purchases', 'all', search, dateFrom, dateTo, statusFilter],
     queryFn: () => window.electronAPI.purchases.getAll({
       search: search || undefined,
       dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined
+      dateTo: dateTo || undefined,
+      status: statusFilter || undefined
     })
   })
 
@@ -201,8 +213,37 @@ export default function Purchases() {
       ),
       header: () => <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
     },
-    { key: 'order_no', label: p.orderNo, sortable: true, className: 'font-mono text-xs w-36' },
-    { key: 'supplier_name', label: p.supplier, sortable: true },
+    { key: 'order_no', label: p.orderNo, sortable: true, className: 'font-mono text-xs w-36', render: (v) => (
+      <div className="group flex items-center gap-1">
+        <span>{String(v)}</span>
+        <CopyButton value={String(v)} />
+      </div>
+    )},
+    { key: 'supplier_name', label: p.supplier, sortable: true, render: (v, row) => {
+      const order = row as unknown as PurchaseOrder
+      const supplier = (suppliers ?? []).find((s) => s.id === order.supplier_id)
+      if (!supplier || !String(v)) return <span>{String(v ?? '—')}</span>
+      return (
+        <HoverCard trigger={<span className="cursor-default">{String(v)}</span>}>
+          <div className="space-y-1 text-xs">
+            <p className="font-medium text-sm">{supplier.name}</p>
+            {supplier.contact && <p className="text-muted-foreground">{supplier.contact}</p>}
+            {supplier.phone && (
+              <div className="group flex items-center gap-1">
+                <span>{supplier.phone}</span>
+                <CopyButton value={supplier.phone} />
+              </div>
+            )}
+            {supplier.email && (
+              <div className="group flex items-center gap-1">
+                <span className="truncate max-w-[160px]">{supplier.email}</span>
+                <CopyButton value={supplier.email} />
+              </div>
+            )}
+          </div>
+        </HoverCard>
+      )
+    }},
     { key: 'order_date', label: p.orderDate, sortable: true, render: (v) => formatDate(String(v)) },
     {
       key: 'status',
@@ -211,9 +252,14 @@ export default function Purchases() {
       render: (v, row) => {
         const isOverdue = v === 'pending' &&
           Math.floor((Date.now() - new Date(String(row.created_at)).getTime()) / 86400000) > 30
+        const active = statusFilter === String(v)
         return (
           <div className="flex items-center gap-1.5">
-            <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(String(v))}`}>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full cursor-pointer transition-opacity hover:opacity-80 ${getStatusColor(String(v))} ${active ? 'ring-1 ring-current' : ''}`}
+              onClick={(e) => { e.stopPropagation(); setStatusFilter(active ? '' : String(v)) }}
+              title={active ? '點擊取消篩選' : `篩選：${getStatusLabel(String(v))}`}
+            >
               {getStatusLabel(String(v))}
             </span>
             {isOverdue && (
@@ -385,6 +431,17 @@ export default function Purchases() {
         {(dateFrom || dateTo) && (
           <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('from'); n.delete('to'); return n }, { replace: true })}>{p.clearDates}</button>
         )}
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === '__all__' ? '' : v)}>
+          <SelectTrigger className="h-9 w-28 text-xs">
+            <SelectValue placeholder={t.common.status} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__" className="text-xs">全部狀態</SelectItem>
+            <SelectItem value="pending" className="text-xs">{t.status.pending}</SelectItem>
+            <SelectItem value="received" className="text-xs">{t.status.received}</SelectItem>
+            <SelectItem value="cancelled" className="text-xs">{t.status.cancelled}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex items-center gap-1.5 flex-wrap">
         {DATE_PRESETS.map((preset) => {
@@ -542,6 +599,25 @@ export default function Purchases() {
           >
             <XCircle className="w-3.5 h-3.5" />
             批次取消
+          </Button>
+          <Button
+            size="sm" variant="outline" className="gap-1.5 h-8 text-xs"
+            onClick={() => {
+              const rows = (orders ?? []).filter((o) => selectedIds.has(o.id as number))
+              const header = '訂單號,供應商,訂單日期,狀態,付款狀態,金額'
+              const lines = rows.map((o) =>
+                [`"${o.order_no}"`, `"${o.supplier_name ?? ''}"`, o.order_date, o.status, o.payment_status ?? '', o.total_amount].join(',')
+              )
+              const csv = '\uFEFF' + [header, ...lines].join('\n')
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url; a.download = `purchases-export-${new Date().toISOString().slice(0, 10)}.csv`
+              a.click(); URL.revokeObjectURL(url)
+              toast({ title: `已匯出 ${rows.length} 筆`, variant: 'success' })
+            }}
+          >
+            <FileDown className="w-3.5 h-3.5" />匯出選取
           </Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelectedIds(new Set())}>
             {t.common.cancel}

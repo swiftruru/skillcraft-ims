@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, type LucideIcon } from 'lucide-react'
+import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, FileDown, type LucideIcon } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,8 @@ import { ImportCsvDialog } from '@/components/products/ImportCsvDialog'
 import { QuickPurchaseDialog } from '@/components/purchases/QuickPurchaseDialog'
 import { BatchPriceDialog } from '@/components/products/BatchPriceDialog'
 import { formatCurrency, formatNumber } from '@/lib/utils'
+import { CopyButton } from '@/components/ui/CopyButton'
+import { HoverCard } from '@/components/ui/HoverCard'
 import { useToast } from '@/components/ui/use-toast'
 import type { Product } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
@@ -171,21 +173,52 @@ export default function Products() {
         />
       )
     },
-    { key: 'sku', label: 'SKU', sortable: true, className: 'font-mono text-xs w-32' },
-    { key: 'name', label: p.title, sortable: true, render: (v, row) => (
-      <div className="flex items-center gap-2">
-        <ProductThumbnail productId={(row as unknown as Product).id} />
-        <button
-          className="text-left hover:text-primary hover:underline transition-colors"
-          onClick={() => setDetailProduct(row as unknown as Product)}
-        >
-          {String(v)}
-        </button>
+    { key: 'sku', label: 'SKU', sortable: true, className: 'font-mono text-xs w-32', render: (v) => (
+      <div className="group flex items-center gap-1">
+        <span>{String(v)}</span>
+        <CopyButton value={String(v)} />
       </div>
     )},
-    { key: 'category', label: p.category, sortable: true, render: (v) => (
-      <Badge variant="secondary" className="text-xs">{String(v)}</Badge>
-    )},
+    { key: 'name', label: p.title, sortable: true, render: (v, row) => {
+      const product = row as unknown as Product
+      return (
+        <div className="flex items-center gap-2">
+          <ProductThumbnail productId={product.id} />
+          <HoverCard trigger={
+            <button
+              className="text-left hover:text-primary hover:underline transition-colors"
+              onClick={() => setDetailProduct(product)}
+            >
+              {String(v)}
+            </button>
+          }>
+            <div className="space-y-1 text-xs">
+              <p className="font-medium text-sm truncate max-w-[180px]">{product.name}</p>
+              <p className="text-muted-foreground">{product.category}</p>
+              <div className="flex items-center justify-between gap-4 pt-1">
+                <span className={product.stock_qty <= product.reorder_pt ? 'text-yellow-400 font-medium' : ''}>
+                  庫存 {product.stock_qty}
+                </span>
+                <span className="text-muted-foreground">{formatCurrency(product.sell_price)}</span>
+              </div>
+            </div>
+          </HoverCard>
+        </div>
+      )
+    }},
+    { key: 'category', label: p.category, sortable: true, render: (v) => {
+      const active = categoryFilter === String(v)
+      return (
+        <Badge
+          variant={active ? 'default' : 'secondary'}
+          className="text-xs cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={(e) => { e.stopPropagation(); setCategoryFilter(active ? '__all__' : String(v)) }}
+          title={active ? '點擊取消篩選' : `篩選：${String(v)}`}
+        >
+          {String(v)}
+        </Badge>
+      )
+    }},
     {
       key: 'stock_qty',
       label: p.stock,
@@ -575,6 +608,27 @@ export default function Products() {
             onClick={() => setBatchPriceOpen(true)}
           >
             {p.adjustPrice}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs h-8"
+            onClick={() => {
+              const rows = (products ?? []).filter((item) => selectedIds.has(item.id))
+              const header = 'SKU,商品名稱,分類,庫存,補貨點,售價,進價'
+              const lines = rows.map((item) =>
+                [item.sku, `"${item.name}"`, item.category, item.stock_qty, item.reorder_pt, item.sell_price, item.buy_price].join(',')
+              )
+              const csv = '\uFEFF' + [header, ...lines].join('\n')
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url; a.download = `products-export-${new Date().toISOString().slice(0, 10)}.csv`
+              a.click(); URL.revokeObjectURL(url)
+              toast({ title: `已匯出 ${rows.length} 筆`, variant: 'success' })
+            }}
+          >
+            <FileDown className="w-3.5 h-3.5" />匯出選取
           </Button>
           <Button
             variant="destructive"

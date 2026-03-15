@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt, AlignJustify, List, LayoutList, MessageSquare, type LucideIcon } from 'lucide-react'
+import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt, AlignJustify, List, LayoutList, MessageSquare, FileDown, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable, type Column, type ContextMenuItem } from '@/components/common/DataTable'
@@ -15,7 +16,9 @@ import { SaleForm } from '@/components/sales/SaleForm'
 import { SaleDetail } from '@/components/sales/SaleDetail'
 import { PartialReturnDialog } from '@/components/sales/PartialReturnDialog'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
-import type { SalesOrder } from '@/types/schema'
+import { CopyButton } from '@/components/ui/CopyButton'
+import { HoverCard } from '@/components/ui/HoverCard'
+import type { SalesOrder, Customer } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { useDemoStore } from '@/stores/demo.store'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -56,10 +59,12 @@ export default function Sales() {
   const search = searchParams.get('q') ?? ''
   const dateFrom = searchParams.get('from') ?? ''
   const dateTo = searchParams.get('to') ?? ''
+  const statusFilter = searchParams.get('status') ?? ''
 
   const setSearch = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('q', v); else n.delete('q'); return n }, { replace: true })
   const setDateFrom = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('from', v); else n.delete('from'); return n }, { replace: true })
   const setDateTo = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('to', v); else n.delete('to'); return n }, { replace: true })
+  const setStatusFilter = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('status', v); else n.delete('status'); return n }, { replace: true })
 
   const [formOpen, setFormOpen] = useState(false)
   const [density, setDensity] = useState<'compact' | 'normal' | 'relaxed'>(() =>
@@ -92,12 +97,19 @@ export default function Sales() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [notePopover, setNotePopover] = useState<{ id: number; notes: string } | null>(null)
 
+  const { data: customers } = useQuery<Customer[]>({
+    queryKey: ['customers', 'all'],
+    queryFn: () => window.electronAPI.customers.getAll(),
+    staleTime: 1000 * 60 * 5
+  })
+
   const { data: orders, isLoading } = useQuery<SalesOrder[]>({
-    queryKey: ['sales', 'all', search, dateFrom, dateTo],
+    queryKey: ['sales', 'all', search, dateFrom, dateTo, statusFilter],
     queryFn: () => window.electronAPI.sales.getAll({
       search: search || undefined,
       dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined
+      dateTo: dateTo || undefined,
+      status: statusFilter || undefined
     })
   })
 
@@ -216,18 +228,54 @@ export default function Sales() {
       ),
       header: () => <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
     },
-    { key: 'order_no', label: s.orderNo, sortable: true, className: 'font-mono text-xs w-36' },
-    { key: 'customer_name', label: s.customer, sortable: true },
+    { key: 'order_no', label: s.orderNo, sortable: true, className: 'font-mono text-xs w-36', render: (v) => (
+      <div className="group flex items-center gap-1">
+        <span>{String(v)}</span>
+        <CopyButton value={String(v)} />
+      </div>
+    )},
+    { key: 'customer_name', label: s.customer, sortable: true, render: (v, row) => {
+      const order = row as unknown as SalesOrder
+      const customer = (customers ?? []).find((c) => c.id === order.customer_id)
+      if (!customer || !String(v)) return <span>{String(v ?? '—')}</span>
+      return (
+        <HoverCard trigger={<span className="cursor-default">{String(v)}</span>}>
+          <div className="space-y-1 text-xs">
+            <p className="font-medium text-sm">{customer.name}</p>
+            {customer.contact && <p className="text-muted-foreground">{customer.contact}</p>}
+            {customer.phone && (
+              <div className="group flex items-center gap-1">
+                <span>{customer.phone}</span>
+                <CopyButton value={customer.phone} />
+              </div>
+            )}
+            {customer.email && (
+              <div className="group flex items-center gap-1">
+                <span className="truncate max-w-[160px]">{customer.email}</span>
+                <CopyButton value={customer.email} />
+              </div>
+            )}
+          </div>
+        </HoverCard>
+      )
+    }},
     { key: 'order_date', label: s.orderDate, sortable: true, render: (v) => formatDate(String(v)) },
     {
       key: 'status',
       label: t.common.status,
       sortable: true,
-      render: (v) => (
-        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(String(v))}`}>
-          {getStatusLabel(String(v))}
-        </span>
-      )
+      render: (v) => {
+        const active = statusFilter === String(v)
+        return (
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full cursor-pointer transition-opacity hover:opacity-80 ${getStatusColor(String(v))} ${active ? 'ring-1 ring-current' : ''}`}
+            onClick={(e) => { e.stopPropagation(); setStatusFilter(active ? '' : String(v)) }}
+            title={active ? '點擊取消篩選' : `篩選：${getStatusLabel(String(v))}`}
+          >
+            {getStatusLabel(String(v))}
+          </span>
+        )
+      }
     },
     {
       key: 'payment_status',
@@ -403,6 +451,17 @@ export default function Sales() {
         {(dateFrom || dateTo) && (
           <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('from'); n.delete('to'); return n }, { replace: true })}>{s.clearDates}</button>
         )}
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === '__all__' ? '' : v)}>
+          <SelectTrigger className="h-9 w-28 text-xs">
+            <SelectValue placeholder={t.common.status} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__" className="text-xs">全部狀態</SelectItem>
+            <SelectItem value="pending" className="text-xs">{t.status.pending}</SelectItem>
+            <SelectItem value="completed" className="text-xs">{t.status.completed}</SelectItem>
+            <SelectItem value="cancelled" className="text-xs">{t.status.cancelled}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex items-center gap-1.5 flex-wrap">
         {DATE_PRESETS.map((preset) => {
@@ -576,6 +635,25 @@ export default function Sales() {
           >
             <XCircle className="w-3.5 h-3.5" />
             批次取消
+          </Button>
+          <Button
+            size="sm" variant="outline" className="gap-1.5 h-8 text-xs"
+            onClick={() => {
+              const rows = (orders ?? []).filter((o) => selectedIds.has(o.id as number))
+              const header = '訂單號,客戶,訂單日期,狀態,付款狀態,金額'
+              const lines = rows.map((o) =>
+                [`"${o.order_no}"`, `"${o.customer_name ?? ''}"`, o.order_date, o.status, o.payment_status ?? '', o.total_amount].join(',')
+              )
+              const csv = '\uFEFF' + [header, ...lines].join('\n')
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url; a.download = `sales-export-${new Date().toISOString().slice(0, 10)}.csv`
+              a.click(); URL.revokeObjectURL(url)
+              toast({ title: `已匯出 ${rows.length} 筆`, variant: 'success' })
+            }}
+          >
+            <FileDown className="w-3.5 h-3.5" />匯出選取
           </Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelectedIds(new Set())}>
             {t.common.cancel}
