@@ -41,7 +41,7 @@ const config: Configuration = {
   },
   publish: {
     provider: 'github',
-    owner: 'ruru-o',
+    owner: 'swiftruru',
     repo: 'skillcraft-ims'
   }
 }
