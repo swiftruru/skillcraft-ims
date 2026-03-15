@@ -169,7 +169,20 @@ function checkLowStockNotification(): void {
 }
 
 function setupAutoUpdater(win: BrowserWindow): void {
-  if (is.dev) return // skip updates in dev mode
+  // Always register IPC handlers so renderer never gets "no handler" error
+  ipcMain.handle('updater:checkForUpdates', () => {
+    if (is.dev) {
+      win.webContents.send('updater:update-not-available')
+      return null
+    }
+    return autoUpdater.checkForUpdates()
+  })
+  ipcMain.handle('updater:install', () => {
+    if (is.dev) return
+    autoUpdater.quitAndInstall(false, true)
+  })
+
+  if (is.dev) return // skip autoUpdater events & startup check in dev mode
 
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
@@ -188,11 +201,6 @@ function setupAutoUpdater(win: BrowserWindow): void {
   })
   autoUpdater.on('error', (err) => {
     win.webContents.send('updater:error', err.message)
-  })
-
-  ipcMain.handle('updater:checkForUpdates', () => autoUpdater.checkForUpdates())
-  ipcMain.handle('updater:install', () => {
-    autoUpdater.quitAndInstall(false, true)
   })
 
   // Check on startup (30s delay to avoid blocking app load)

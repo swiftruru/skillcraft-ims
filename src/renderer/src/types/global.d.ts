@@ -154,6 +154,7 @@ declare global {
       }
       ai: {
         forecast(): Promise<import('./schema').AiForecastResult>
+        getLatest(): Promise<import('./schema').AiForecastResult | null>
       }
       notifications: {
         getAll(): Promise<import('./schema').AppNotification[]>

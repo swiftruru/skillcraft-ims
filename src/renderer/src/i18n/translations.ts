@@ -11,7 +11,8 @@ export const translations = {
       '/settings': '系統設定',
       '/about': '關於 SkillCraft IMS',
       '/stock-take': '庫存盤點',
-      '/inventory-history': '庫存異動歷史'
+      '/inventory-history': '庫存異動歷史',
+      '/ai': 'AI 需求預測'
     },
     nav: {
       dashboard: '總覽',
@@ -24,6 +25,7 @@ export const translations = {
       stockTake: '庫存盤點',
       inventoryHistory: '異動歷史',
       receivables: '帳款管理',
+      ai: 'AI 需求預測',
       settings: '設定',
       about: '關於'
     },
@@ -567,6 +569,24 @@ export const translations = {
       goReports: '前往報表分析',
       goSettings: '前往系統設定',
       newItem: '新增（目前頁面）'
+    },
+    ai: {
+      title: 'AI 需求預測',
+      generate: '生成預測',
+      generating: '分析中...',
+      summary: '分析摘要',
+      lastGenerated: (dt: string) => `上次生成：${dt}`,
+      colProduct: '商品',
+      colStock: '目前庫存',
+      colDaysLeft: '預估售完天數',
+      colSuggestQty: '建議補貨量',
+      colReasoning: '補貨建議',
+      noApiKey: '尚未設定 Claude API Key，請前往設定頁面填入後再使用。',
+      noData: '近 30 天無銷售資料，無法進行預測。',
+      empty: '尚無預測資料，點擊「生成預測」開始分析。',
+      errorRetry: '發生錯誤，請重試。',
+      createPurchase: '建立採購單',
+      goToSettings: '前往設定'
     }
   },
 
@@ -582,7 +602,8 @@ export const translations = {
       '/settings': 'Settings',
       '/about': 'About SkillCraft IMS',
       '/stock-take': 'Stock Take',
-      '/inventory-history': 'Inventory History'
+      '/inventory-history': 'Inventory History',
+      '/ai': 'AI Insights'
     },
     nav: {
       dashboard: 'Dashboard',
@@ -595,6 +616,7 @@ export const translations = {
       stockTake: 'Stock Take',
       inventoryHistory: 'History',
       receivables: 'Receivables',
+      ai: 'AI Insights',
       settings: 'Settings',
       about: 'About'
     },
@@ -1138,6 +1160,24 @@ export const translations = {
       goReports: 'Go to Reports',
       goSettings: 'Go to Settings',
       newItem: 'New (current page)'
+    },
+    ai: {
+      title: 'AI Demand Forecast',
+      generate: 'Generate Forecast',
+      generating: 'Analyzing...',
+      summary: 'Analysis Summary',
+      lastGenerated: (dt: string) => `Last generated: ${dt}`,
+      colProduct: 'Product',
+      colStock: 'Stock',
+      colDaysLeft: 'Days Remaining',
+      colSuggestQty: 'Suggested Qty',
+      colReasoning: 'Reasoning',
+      noApiKey: 'Claude API Key not set. Please go to Settings to add it.',
+      noData: 'No sales data in the last 30 days.',
+      empty: 'No forecast yet. Click "Generate Forecast" to start.',
+      errorRetry: 'An error occurred. Please try again.',
+      createPurchase: 'Create Purchase',
+      goToSettings: 'Go to Settings'
     }
   }
 }

@@ -1083,3 +1083,24 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - `Layout.tsx` / `Sidebar.tsx` 中品牌名稱「SkillCraft IMS」加上 `<span lang="en">SkillCraft IMS</span>`
     - Header 的 `<h1>` 若含英文品牌名，同樣套用 `<span lang="en">`
     - 目的：螢幕閱讀器以英文口音朗讀英文品牌名，以中文口音朗讀其餘 UI 文字，符合 WCAG 3.1.2（Language of Parts）
+
+123. **AI 需求預測獨立頁面（/ai）**：
+    - 路由：`/ai`，元件位於 `src/renderer/src/pages/AiInsight.tsx`
+    - 側邊欄新增 nav item：`{ to: '/ai', icon: Brain, label: t.nav.ai }`，插入在 `reports` 之前；需從 lucide-react import `Brain`
+    - 翻譯鍵：
+      - `nav.ai`（zh: `'AI 需求預測'`、en: `'AI Insights'`）
+      - `pageTitles['/ai']`（zh: `'AI 需求預測'`、en: `'AI Insights'`）
+      - 新增 `ai` section 涵蓋：`title`、`generate`、`generating`、`summary`、`lastGenerated`、`colProduct`、`colStock`、`colDaysLeft`、`colSuggestQty`、`colReasoning`、`noApiKey`、`noData`、`empty`、`createPurchase`
+    - AiInsight.tsx 結構：
+      - 頁面頂部：標題 + 「生成預測」Button（`RefreshCw` icon，loading 時 `animate-spin`，`isPending` 時 disabled）
+      - 使用 `useMutation({ mutationFn: () => window.electronAPI.ai.forecast() })`
+      - 四種狀態：空白提示（`Brain` icon + 說明文字）/ Loading（`LoadingSpinner`）/ 錯誤（`text-destructive` 錯誤訊息）/ 結果
+      - 結果區：summary 卡片（`bg-primary/5 border border-primary/20 rounded-lg p-4`）+ 時間戳 + 完整商品表格
+      - 表格欄位：商品名稱（+SKU font-mono）、目前庫存、預估售完天數（null→`—`；≤7天→橘色 `text-orange-400` + AlertTriangle icon）、建議補貨量（0→`—`）、補貨建議原因
+      - `suggested_reorder_qty > 0` 的列在末欄顯示「建立採購單」ghost button → `navigate('/purchases', { state: { openForm: true } })`
+      - API Key 未設定時（錯誤訊息含「API Key」）顯示連結跳至 `/settings`
+    - Dashboard `aiInsight` widget 替換為輕量摘要卡：
+      - 無預測資料：顯示「前往 AI 需求預測」Button（navigate to `/ai`）
+      - 有預測資料（由 `aiForecast` state 持有）：顯示 summary 前 80 字 + 時間戳 + 「查看詳情 →」連結
+      - 移除 Dashboard 內的 `aiForecastMutation` 與 generate button；`aiForecast` state 改由 Dashboard 讀取，不再主動呼叫 IPC
+      - Widget 仍受 customization 系統（`hiddenWidgets`）控制

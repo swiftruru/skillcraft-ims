@@ -13,6 +13,7 @@ import About from './pages/About'
 import StockTake from './pages/StockTake'
 import InventoryHistory from './pages/InventoryHistory'
 import Receivables from './pages/Receivables'
+import AiInsight from './pages/AiInsight'
 import { useThemeStore } from './stores/theme.store'
 import { useLangStore } from './stores/lang.store'
 
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/stock-take" element={<StockTake />} />
           <Route path="/inventory-history" element={<InventoryHistory />} />
           <Route path="/receivables" element={<Receivables />} />
+          <Route path="/ai" element={<AiInsight />} />
         </Route>
       </Routes>
     </HashRouter>

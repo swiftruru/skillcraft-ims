@@ -235,9 +235,11 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 
 ### AI 需求預測
 
-- 設定頁面填入 Claude API Key 後啟用
-- 分析近 30 天銷售資料，呼叫 **Claude Haiku** 模型產生需求預測
-- 回傳整體趨勢摘要 + 各商品建議補貨量與原因（繁體中文）
+- **獨立功能頁面**：側邊欄獨立入口，完整呈現分析結果，不再受 Dashboard 空間限制
+- **結果持久化**：預測結果存入本地 SQLite，重啟 App 或再次進入頁面仍保留上次結果，不需重複生成
+- 設定頁面填入 Claude API Key 後啟用；分析近 30 天銷售資料，呼叫 **Claude Haiku** 模型產生需求預測
+- 回傳整體趨勢摘要 + 各商品建議補貨量與原因（繁體中文）；預估售完天數 < 7 天以橘色醒目標示
+- 每列可直接點擊「建立採購單」，跳轉至採購管理並自動開啟新增表單
 
 ### 庫存盤點
 
@@ -271,6 +273,18 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 - **美化採購單 / 銷售單**：公司標頭（名稱、地址、電話）、彩色狀態標籤、斑馬紋表格、簽名欄
 - **月報 PDF**：Reports 頁面指定月份後一鍵匯出
 - **公司資訊設定**：在設定頁面填入後，自動帶入所有 PDF 文件
+
+### 無障礙（Accessibility）
+
+本專案依 WCAG 2.1 / 2.2 標準，系統性實作 99 項無障礙規則（詳見 `.claude/commands/ims-react.md`）：
+
+- **鍵盤完整可操作**：所有表格支援 ↑↓ 鍵導覽、Enter 開啟詳情、Home/End 首末列；拖曳排序提供 ▲▼ 鍵盤替代按鈕
+- **螢幕閱讀器支援**：`aria-sort`、`aria-busy`、`aria-invalid`、`aria-live` 公告區、`role="grid"` / `role="status"` 語意完整
+- **表單無障礙**：所有表單欄位含 `aria-invalid` + `aria-describedby` 錯誤關聯，提交失敗時顯示錯誤摘要區塊
+- **焦點管理**：Dialog 開啟後 focus 移至第一個輸入欄位，關閉後 focus 歸還至觸發按鈕；Skip Navigation 連結
+- **視覺強化**：`prefers-reduced-motion` 停用動畫；`prefers-contrast: more` 提高對比；所有 icon-only 按鈕補 `aria-label`
+- **系統主題整合**：跟隨 macOS / Windows 深淺色主題，`nativeTheme` 即時反應系統切換
+- **HTML `lang` 動態切換**：語言切換時同步更新 `<html lang>`，螢幕閱讀器以正確語言口音朗讀
 
 ### Google Sheets 整合
 

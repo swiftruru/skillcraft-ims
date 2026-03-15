@@ -14,7 +14,7 @@ export function StatusBar() {
         <Database className="w-3 h-3" />
         <span className="truncate max-w-xs">{settings?.dbPath ?? '載入中...'}</span>
       </div>
-      <div className="ml-auto">SkillCraft IMS v0.1.0</div>
+      <div className="ml-auto">SkillCraft IMS v{import.meta.env.VITE_APP_VERSION}</div>
     </div>
   )
 }

@@ -91,6 +91,27 @@ ${salesData
     if (start === -1 || end === -1 || end <= start) throw new Error('AI 回應格式錯誤，請重試。')
     const jsonStr = text.slice(start, end + 1)
     const parsed = JSON.parse(jsonStr)
-    return { ...parsed, generatedAt: new Date().toISOString() }
+    const result = { ...parsed, generatedAt: new Date().toISOString() }
+
+    // Persist to DB (keep only the latest row)
+    db.prepare('DELETE FROM ai_forecasts').run()
+    db.prepare(
+      'INSERT INTO ai_forecasts (summary, items_json, generated_at) VALUES (?, ?, ?)'
+    ).run(result.summary, JSON.stringify(result.items), result.generatedAt)
+
+    return result
+  })
+
+  ipcMain.handle('ai:getLatest', () => {
+    const db = getDb()
+    const row = db
+      .prepare('SELECT summary, items_json, generated_at FROM ai_forecasts ORDER BY id DESC LIMIT 1')
+      .get() as { summary: string; items_json: string; generated_at: string } | undefined
+    if (!row) return null
+    return {
+      summary: row.summary,
+      items: JSON.parse(row.items_json),
+      generatedAt: row.generated_at
+    }
   })
 }

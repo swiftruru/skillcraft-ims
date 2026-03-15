@@ -202,7 +202,8 @@ const electronAPI = {
 
   // AI
   ai: {
-    forecast: () => ipcRenderer.invoke('ai:forecast')
+    forecast: () => ipcRenderer.invoke('ai:forecast'),
+    getLatest: () => ipcRenderer.invoke('ai:getLatest')
   },
 
   // Notifications

@@ -15,7 +15,8 @@ import {
   Settings,
   Warehouse,
   Info,
-  Wallet
+  Wallet,
+  Brain
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLang } from '@/lib/useLang'
@@ -59,6 +60,7 @@ export function Sidebar() {
     { to: '/suppliers', icon: Truck, label: t.nav.suppliers },
     { to: '/customers', icon: Users, label: t.nav.customers },
     { to: '/receivables', icon: Wallet, label: t.nav.receivables, badge: kpis?.overdueCount, badgeStyle: 'bg-red-500/20 text-red-500' },
+    { to: '/ai', icon: Brain, label: t.nav.ai },
     { to: '/reports', icon: BarChart3, label: t.nav.reports },
     { to: '/stock-take', icon: ClipboardList, label: t.nav.stockTake },
     { to: '/inventory-history', icon: History, label: t.nav.inventoryHistory }
