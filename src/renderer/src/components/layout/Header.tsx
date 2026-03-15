@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2, Search, Sun, Moon, Play, Sparkles } from 'lucide-react'
 import { modKey } from '@/lib/platform'
 import { Button } from '@/components/ui/button'
@@ -92,10 +93,15 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
 
         {/* Low stock alert */}
         {lowStockCount > 0 && (
-          <div data-tour="low-stock-header" className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 px-2.5 py-1 rounded-full">
+          <Link
+            data-tour="low-stock-header"
+            to="/products"
+            state={{ stockFilter: 'low' }}
+            className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 px-2.5 py-1 rounded-full hover:bg-yellow-400/20 transition-colors"
+          >
             <AlertTriangle className="w-3 h-3" />
             {t.header.lowStock(lowStockCount)}
-          </div>
+          </Link>
         )}
 
         {/* Sync status */}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -26,9 +27,12 @@ export default function Products() {
   const { toast } = useToast()
   const t = useLang()
   const p = t.products
+  const location = useLocation()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('__all__')
-  const [stockFilter, setStockFilter] = useState('__all__')
+  const [stockFilter, setStockFilter] = useState<string>(
+    (location.state as { stockFilter?: string } | null)?.stockFilter ?? '__all__'
+  )
   const [formOpen, setFormOpen] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
