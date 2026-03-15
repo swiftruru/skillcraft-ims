@@ -114,11 +114,11 @@ export default function Customers() {
         {String(v)}
       </button>
     )},
-    { key: 'contact', label: c.contact },
-    { key: 'phone', label: c.phone },
-    { key: 'email', label: c.email },
-    { key: 'address', label: c.address },
-    { key: 'credit_limit', label: '信用額度', render: (v) => (Number(v) > 0 ? formatCurrency(Number(v)) : <span className="text-muted-foreground">—</span>) },
+    { key: 'contact', label: c.contact, sortable: true },
+    { key: 'phone', label: c.phone, sortable: true },
+    { key: 'email', label: c.email, sortable: true },
+    { key: 'address', label: c.address, sortable: true },
+    { key: 'credit_limit', label: '信用額度', sortable: true, render: (v) => (Number(v) > 0 ? formatCurrency(Number(v)) : <span className="text-muted-foreground">—</span>) },
   ]
 
   return (

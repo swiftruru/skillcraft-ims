@@ -116,11 +116,11 @@ export default function Suppliers() {
         {String(v)}
       </button>
     )},
-    { key: 'contact', label: s.contact },
-    { key: 'phone', label: s.phone },
-    { key: 'email', label: s.email },
-    { key: 'address', label: s.address },
-    { key: 'credit_limit', label: '信用額度', render: (v) => (Number(v) > 0 ? formatCurrency(Number(v)) : <span className="text-muted-foreground">—</span>) },
+    { key: 'contact', label: s.contact, sortable: true },
+    { key: 'phone', label: s.phone, sortable: true },
+    { key: 'email', label: s.email, sortable: true },
+    { key: 'address', label: s.address, sortable: true },
+    { key: 'credit_limit', label: '信用額度', sortable: true, render: (v) => (Number(v) > 0 ? formatCurrency(Number(v)) : <span className="text-muted-foreground">—</span>) },
   ]
 
   return (
