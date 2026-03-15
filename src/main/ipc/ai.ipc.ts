@@ -30,7 +30,7 @@ export function registerAiIpc(): void {
          GROUP BY p.id
          HAVING sold_30d > 0
          ORDER BY sold_30d DESC
-         LIMIT 20`
+         LIMIT 10`
       )
       .all() as {
         product_id: number
@@ -80,15 +80,17 @@ ${salesData
     const client = new Anthropic({ apiKey })
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }]
     })
 
     const text = message.content[0].type === 'text' ? message.content[0].text : ''
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('AI 回應格式錯誤，請重試。')
-
-    const parsed = JSON.parse(jsonMatch[0])
+    // Extract the outermost JSON object robustly
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start === -1 || end === -1 || end <= start) throw new Error('AI 回應格式錯誤，請重試。')
+    const jsonStr = text.slice(start, end + 1)
+    const parsed = JSON.parse(jsonStr)
     return { ...parsed, generatedAt: new Date().toISOString() }
   })
 }
