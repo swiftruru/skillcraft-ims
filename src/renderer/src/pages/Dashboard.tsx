@@ -22,7 +22,9 @@ import {
   LayoutDashboard,
   Eye,
   EyeOff,
-  Trophy
+  Trophy,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -79,6 +81,8 @@ export default function Dashboard() {
   })
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  const [overdueCollapsed, setOverdueCollapsed] = useState(true)
+  const [dueSoonCollapsed, setDueSoonCollapsed] = useState(true)
 
   useEffect(() => {
     localStorage.setItem('ims-dashboard-order', JSON.stringify(widgetOrder))
@@ -346,23 +350,29 @@ export default function Dashboard() {
         ]
         return (
           <Card className="border-red-500/30 bg-red-500/5">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 cursor-pointer select-none" onClick={() => setOverdueCollapsed((v) => !v)}>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-400" />
                   <span className="text-red-400">{d.overdueAlertsTitle}</span>
                   <Badge className="bg-red-500/15 text-red-400 border-0">{kpis!.overdueCount}</Badge>
                 </CardTitle>
-                <button
-                  className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                  onClick={() => navigate('/receivables')}
-                >
-                  {d.viewReceivables}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); navigate('/receivables') }}
+                  >
+                    {d.viewReceivables}
+                  </button>
+                  {overdueCollapsed
+                    ? <ChevronDown className="w-4 h-4 text-red-400/60" />
+                    : <ChevronUp className="w-4 h-4 text-red-400/60" />
+                  }
+                </div>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">{d.overdueAlertsHint(kpis!.overdueCount)}</p>
             </CardHeader>
-            {overdueItems.length > 0 && (
+            {!overdueCollapsed && overdueItems.length > 0 && (
               <CardContent className="pt-0">
                 <div className="space-y-1.5">
                   {overdueItems.slice(0, 5).map(({ order, type }) => (
@@ -399,23 +409,29 @@ export default function Dashboard() {
         ]
         return (
           <Card className="border-amber-500/30 bg-amber-500/5">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 cursor-pointer select-none" onClick={() => setDueSoonCollapsed((v) => !v)}>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-400" />
                   <span className="text-amber-400">{d.dueSoonTitle}</span>
                   <Badge className="bg-amber-500/15 text-amber-400 border-0">{kpis!.dueSoonCount}</Badge>
                 </CardTitle>
-                <button
-                  className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
-                  onClick={() => navigate('/receivables')}
-                >
-                  {d.viewReceivables}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); navigate('/receivables') }}
+                  >
+                    {d.viewReceivables}
+                  </button>
+                  {dueSoonCollapsed
+                    ? <ChevronDown className="w-4 h-4 text-amber-400/60" />
+                    : <ChevronUp className="w-4 h-4 text-amber-400/60" />
+                  }
+                </div>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">{d.dueSoonHint(kpis!.dueSoonCount)}</p>
             </CardHeader>
-            {dueSoonItems.length > 0 && (
+            {!dueSoonCollapsed && dueSoonItems.length > 0 && (
               <CardContent className="pt-0">
                 <div className="space-y-1.5">
                   {dueSoonItems.slice(0, 5).map(({ order, type }) => (
