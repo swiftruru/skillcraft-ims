@@ -27,7 +27,6 @@ export function registerAiIpc(): void {
          LEFT JOIN sales_orders so ON si.sales_order_id = so.id
            AND so.status = 'completed'
            AND so.order_date >= date('now', '-30 days')
-         WHERE p.stock_qty > 0 OR COALESCE(sold_30d, 0) > 0
          GROUP BY p.id
          HAVING sold_30d > 0
          ORDER BY sold_30d DESC
