@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { DashboardKPIs } from '@/types/schema'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { StatusBar } from './StatusBar'
@@ -26,6 +27,18 @@ export function Layout() {
   const [shortcutOpen, setShortcutOpen] = useState(false)
   const gMode = useRef(false)
   const gTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const { data: kpis } = useQuery<DashboardKPIs>({
+    queryKey: ['reports', 'kpis'],
+    queryFn: () => window.electronAPI.reports.kpis(),
+    staleTime: 1000 * 60 * 2
+  })
+
+  // 動態更新視窗標題：有緊急事項時加上計數前綴
+  useEffect(() => {
+    const urgent = (kpis?.lowStockCount ?? 0) + (kpis?.overdueCount ?? 0)
+    document.title = urgent > 0 ? `(${urgent}) SkillCraft IMS` : 'SkillCraft IMS'
+  }, [kpis?.lowStockCount, kpis?.overdueCount])
 
   // 每次 App 啟動時自動清理遺留 Demo 資料
   useEffect(() => {

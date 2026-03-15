@@ -33,7 +33,7 @@ function getDaysForPeriod(period: string): number {
 export default function Reports() {
   const t = useLang()
   const r = t.reports
-  const [period, setPeriod] = useState('30')
+  const [period, setPeriod] = useState(() => localStorage.getItem('ims-reports-range') ?? '30')
   const [slowDays, setSlowDays] = useState(60)
   const [turnoverDays, setTurnoverDays] = useState(30)
   const [pdfExporting, setPdfExporting] = useState(false)
@@ -181,7 +181,7 @@ export default function Reports() {
                 size="sm"
                 variant={period === p.value ? 'default' : 'outline'}
                 className="h-7 text-xs"
-                onClick={() => setPeriod(p.value)}
+                onClick={() => { setPeriod(p.value); localStorage.setItem('ims-reports-range', p.value) }}
               >
                 {p.label}
               </Button>

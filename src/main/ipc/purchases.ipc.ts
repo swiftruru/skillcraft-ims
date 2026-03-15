@@ -88,4 +88,9 @@ export function registerPurchasesIpc(): void {
       `SELECT id, order_id, from_status, to_status, changed_at, note FROM purchase_status_history WHERE order_id = ? ORDER BY changed_at DESC`
     ).all(orderId)
   })
+  ipcMain.handle('purchases:updateNotes', (_e, id: number, notes: string) => {
+    const db = getDb()
+    db.prepare(`UPDATE purchase_orders SET notes=? WHERE id=?`).run(notes, id)
+    return PurchaseModel.findById(id)
+  })
 }

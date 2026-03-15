@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt, AlignJustify, List, LayoutList, type LucideIcon } from 'lucide-react'
+import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt, AlignJustify, List, LayoutList, MessageSquare, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable, type Column, type ContextMenuItem } from '@/components/common/DataTable'
 import { SearchWithHistory } from '@/components/common/SearchWithHistory'
@@ -88,6 +90,7 @@ export default function Sales() {
   const [markPaidId, setMarkPaidId] = useState<number | null>(null)
   const [partialReturnOrder, setPartialReturnOrder] = useState<SalesOrder | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [notePopover, setNotePopover] = useState<{ id: number; notes: string } | null>(null)
 
   const { data: orders, isLoading } = useQuery<SalesOrder[]>({
     queryKey: ['sales', 'all', search, dateFrom, dateTo],
@@ -172,6 +175,16 @@ export default function Sales() {
     }
   })
 
+  const updateNotesMutation = useMutation({
+    mutationFn: ({ id, notes }: { id: number; notes: string }) =>
+      window.electronAPI.sales.updateNotes(id, notes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      setNotePopover(null)
+      toast({ title: '備註已儲存', variant: 'success' })
+    }
+  })
+
   const allIds = (orders ?? []).map((o) => o.id as number)
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
   const toggleAll = () => { allSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(allIds)) }
@@ -245,6 +258,39 @@ export default function Sales() {
       className: 'w-36 text-right',
       render: (_v, row) => (
         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-1">
+          <Popover
+            open={notePopover?.id === (row.id as number)}
+            onOpenChange={(open) => { if (!open) setNotePopover(null) }}
+          >
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost" size="icon"
+                className={`h-7 w-7 ${row.notes ? 'text-primary' : 'text-muted-foreground'}`}
+                title="快速備註"
+                onClick={(e) => { e.stopPropagation(); setNotePopover({ id: row.id as number, notes: String(row.notes ?? '') }) }}
+              >
+                <MessageSquare className={`w-3.5 h-3.5 ${row.notes ? 'fill-current' : ''}`} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" onClick={(e) => e.stopPropagation()}>
+              <p className="text-xs font-medium mb-2">快速備註</p>
+              <Textarea
+                rows={3}
+                className="text-xs resize-none"
+                placeholder="新增備註..."
+                value={notePopover?.id === (row.id as number) ? notePopover.notes : ''}
+                onChange={(e) => setNotePopover((prev) => prev ? { ...prev, notes: e.target.value } : null)}
+              />
+              <Button
+                size="sm"
+                className="mt-2 w-full h-7 text-xs"
+                disabled={updateNotesMutation.isPending}
+                onClick={() => notePopover && updateNotesMutation.mutate({ id: notePopover.id, notes: notePopover.notes })}
+              >
+                儲存
+              </Button>
+            </PopoverContent>
+          </Popover>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailId(row.id)}>
             <Eye className="w-3.5 h-3.5" />
           </Button>

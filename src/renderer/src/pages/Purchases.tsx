@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart, AlignJustify, List, LayoutList, type LucideIcon } from 'lucide-react'
+import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart, AlignJustify, List, LayoutList, MessageSquare, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable, type Column, type ContextMenuItem } from '@/components/common/DataTable'
 import { SearchWithHistory } from '@/components/common/SearchWithHistory'
@@ -87,6 +89,7 @@ export default function Purchases() {
   const [cloneData, setCloneData] = useState<Record<string, unknown> | null>(null)
   const [markPaidId, setMarkPaidId] = useState<number | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [notePopover, setNotePopover] = useState<{ id: number; notes: string } | null>(null)
 
   const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
     queryKey: ['purchases', 'all', search, dateFrom, dateTo],
@@ -154,6 +157,16 @@ export default function Purchases() {
       queryClient.invalidateQueries({ queryKey: ['purchases'] })
       setSelectedIds(new Set())
       toast({ title: `批次取消：${res.cancelled} 筆成功，${res.skipped} 筆跳過`, variant: 'success' })
+    }
+  })
+
+  const updateNotesMutation = useMutation({
+    mutationFn: ({ id, notes }: { id: number; notes: string }) =>
+      window.electronAPI.purchases.updateNotes(id, notes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      setNotePopover(null)
+      toast({ title: '備註已儲存', variant: 'success' })
     }
   })
 
@@ -239,6 +252,39 @@ export default function Purchases() {
       className: 'w-36 text-right',
       render: (_v, row) => (
         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-1">
+          <Popover
+            open={notePopover?.id === (row.id as number)}
+            onOpenChange={(open) => { if (!open) setNotePopover(null) }}
+          >
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost" size="icon"
+                className={`h-7 w-7 ${row.notes ? 'text-primary' : 'text-muted-foreground'}`}
+                title="快速備註"
+                onClick={(e) => { e.stopPropagation(); setNotePopover({ id: row.id as number, notes: String(row.notes ?? '') }) }}
+              >
+                <MessageSquare className={`w-3.5 h-3.5 ${row.notes ? 'fill-current' : ''}`} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" onClick={(e) => e.stopPropagation()}>
+              <p className="text-xs font-medium mb-2">快速備註</p>
+              <Textarea
+                rows={3}
+                className="text-xs resize-none"
+                placeholder="新增備註..."
+                value={notePopover?.id === (row.id as number) ? notePopover.notes : ''}
+                onChange={(e) => setNotePopover((prev) => prev ? { ...prev, notes: e.target.value } : null)}
+              />
+              <Button
+                size="sm"
+                className="mt-2 w-full h-7 text-xs"
+                disabled={updateNotesMutation.isPending}
+                onClick={() => notePopover && updateNotesMutation.mutate({ id: notePopover.id, notes: notePopover.notes })}
+              >
+                儲存
+              </Button>
+            </PopoverContent>
+          </Popover>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailId(row.id)}>
             <Eye className="w-3.5 h-3.5" />
           </Button>

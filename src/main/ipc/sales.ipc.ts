@@ -165,4 +165,9 @@ export function registerSalesIpc(): void {
       `SELECT id, order_id, from_status, to_status, changed_at, note FROM sale_status_history WHERE order_id = ? ORDER BY changed_at DESC`
     ).all(orderId)
   })
+  ipcMain.handle('sales:updateNotes', (_e, id: number, notes: string) => {
+    const db = getDb()
+    db.prepare(`UPDATE sales_orders SET notes=? WHERE id=?`).run(notes, id)
+    return SaleModel.findById(id)
+  })
 }

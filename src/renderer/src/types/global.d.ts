@@ -54,6 +54,7 @@ declare global {
         batchReceive(ids: number[]): Promise<{ received: number; skipped: number }>
         batchCancel(ids: number[]): Promise<{ cancelled: number; skipped: number }>
         getStatusHistory(orderId: number): Promise<{ id: number; from_status: string | null; to_status: string; changed_at: string; note: string | null }[]>
+        updateNotes(id: number, notes: string): Promise<import('./schema').PurchaseOrder | null>
       }
       sales: {
         getAll(filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }): Promise<import('./schema').SalesOrder[]>
@@ -68,6 +69,7 @@ declare global {
         setPaymentDue(id: number, dueDate: string): Promise<import('./schema').SalesOrder | null>
         batchMarkPaid(ids: number[]): Promise<{ updated: number }>
         getStatusHistory(orderId: number): Promise<{ id: number; from_status: string | null; to_status: string; changed_at: string; note: string | null }[]>
+        updateNotes(id: number, notes: string): Promise<import('./schema').SalesOrder | null>
       }
       reports: {
         kpis(): Promise<import('./schema').DashboardKPIs>

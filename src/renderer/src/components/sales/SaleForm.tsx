@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Wand2, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Wand2, AlertTriangle, GripVertical } from 'lucide-react'
 import { StepperInput } from '@/components/ui/StepperInput'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -46,7 +46,9 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
     defaultValues: { customer_id: null, order_date: today, payment_terms: 0, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] }
   })
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+  const { fields, append, remove, move } = useFieldArray({ control, name: 'items' })
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
 
   // Pre-fill when cloning, or restore draft
   useEffect(() => {
@@ -185,18 +187,38 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
               </Button>
             </div>
             <div className="space-y-2">
-              <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 text-xs text-muted-foreground px-1">
-                <span>{tf.productCol}</span><span>{tf.qtyCol}</span><span>{tf.sellPriceCol}</span><span></span>
+              <div className="grid grid-cols-[16px_2fr_1fr_1fr_auto] gap-2 text-xs text-muted-foreground px-1">
+                <span></span><span>{tf.productCol}</span><span>{tf.qtyCol}</span><span>{tf.sellPriceCol}</span><span></span>
               </div>
               {fields.map((field, i) => (
-                <div key={field.id} className="space-y-1">
-                  <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 items-center">
+                <div
+                  key={field.id}
+                  className="space-y-1"
+                  draggable
+                  onDragStart={() => setDragIdx(i)}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i) }}
+                  onDrop={() => { if (dragIdx !== null && dragIdx !== i) move(dragIdx, i); setDragIdx(null); setDragOverIdx(null) }}
+                  onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+                >
+                  <div className={`grid grid-cols-[16px_2fr_1fr_1fr_auto] gap-2 items-center transition-opacity ${dragOverIdx === i && dragIdx !== i ? 'ring-1 ring-primary/50 rounded-md' : ''}`}>
+                    <GripVertical className="w-4 h-4 text-muted-foreground/40 hover:text-muted-foreground cursor-grab shrink-0" />
                     <Select onValueChange={(v) => handleProductChange(i, v)}>
                       <SelectTrigger className="h-9"><SelectValue placeholder={tf.selectProduct} /></SelectTrigger>
                       <SelectContent>
                         {products?.map((p) => (
                           <SelectItem key={p.id} value={String(p.id)}>
-                            [{p.sku}] {p.name} {tf.stockSuffix(p.stock_qty)}
+                            <span className="flex items-center justify-between gap-3 w-full">
+                              <span>[{p.sku}] {p.name}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
+                                p.stock_qty === 0
+                                  ? 'bg-red-500/15 text-red-400'
+                                  : p.stock_qty <= p.reorder_pt
+                                    ? 'bg-orange-500/15 text-orange-400'
+                                    : 'text-muted-foreground'
+                              }`}>
+                                {p.stock_qty === 0 ? '缺貨' : `庫存 ${p.stock_qty}`}
+                              </span>
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>

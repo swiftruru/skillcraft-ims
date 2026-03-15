@@ -50,6 +50,7 @@ export default function Products() {
   const [batchPriceOpen, setBatchPriceOpen] = useState(false)
   const [quickPurchaseProduct, setQuickPurchaseProduct] = useState<Product | null>(null)
   const [editingCell, setEditingCell] = useState<{ id: number; field: 'sell_price' | 'stock_qty' } | null>(null)
+  const [generatingMock, setGeneratingMock] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
     return (localStorage.getItem('ims-products-view') as 'table' | 'grid') ?? 'table'
   })
@@ -514,6 +515,16 @@ export default function Products() {
                 title={p.emptyTitle}
                 description={p.emptyDesc}
                 action={{ label: p.emptyAction, onClick: () => { setEditProduct(null); setFormOpen(true) } }}
+                secondaryAction={{
+                  label: '載入範例資料',
+                  loading: generatingMock,
+                  onClick: async () => {
+                    setGeneratingMock(true)
+                    await window.electronAPI.mockData.generate({ scale: 'S', scenario: 'normal' })
+                    await queryClient.invalidateQueries()
+                    setGeneratingMock(false)
+                  }
+                }}
               />
             ) : undefined}
           />

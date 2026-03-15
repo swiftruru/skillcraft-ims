@@ -462,3 +462,61 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 每項顯示格式：左側 label、右側 `<kbd>` badge（`font-mono text-xs border rounded px-1.5 py-0.5 bg-muted`）；多鍵以 `+` 或空格分隔並分別包裹 `<kbd>`
     - 右下角常駐 `?` 浮動按鈕：`fixed bottom-4 right-4 z-40 rounded-full w-8 h-8 bg-muted/80 hover:bg-muted border flex items-center justify-center text-sm font-mono text-muted-foreground`；點擊同樣開啟 overlay
 
+57. **視窗標題動態計數（Dynamic Document Title）**：
+    - 在 `Layout.tsx` 中，依 KPI 資料動態更新 `document.title`
+    - 計數來源：`kpis.lowStockCount`（低庫存）+ `kpis.overdueCount`（逾期帳款），兩者之和 > 0 時在標題前加 `(N) `
+    - 格式：`(24) SkillCraft IMS` → `(0)` 時回復為 `SkillCraft IMS`
+    - KPI 資料以 `useQuery(['reports', 'kpis'], ..., { staleTime: 1000 * 60 * 2 })` 取得（與 Sidebar badge 共用同一筆 cache）
+    - `useEffect` 監聽 `kpis` 變化後更新；元件 unmount 時恢復預設標題
+    - 頁面切換時標題也需保留計數（整合進現有 `title` state 前綴，而非覆寫）
+
+58. **訂單表單商品選擇器庫存提示（Product Picker Stock Badge）**：
+    - 適用範圍：`PurchaseForm` 與 `SaleForm` 的商品下拉選單
+    - 在每個 `<SelectItem>` 右側顯示庫存數量 badge：
+      - `stock_qty === 0`：紅色 `bg-red-500/15 text-red-400`，顯示「缺貨」
+      - `stock_qty <= reorder_pt`：橙色 `bg-orange-500/15 text-orange-400`，顯示 `庫存 N`
+      - `stock_qty > reorder_pt`：灰色 `text-muted-foreground`，顯示 `庫存 N`
+    - SelectItem 內部 layout：`flex items-center justify-between gap-4`，左側商品名稱，右側 badge
+    - `PurchaseForm` 顯示所有商品（採購不受庫存限制）；`SaleForm` 缺貨商品仍可選但 badge 明顯標紅
+    - 資料來源：現有 `useQuery(['products', 'all'])` 回傳的 `products` 陣列（已包含 `stock_qty` 與 `reorder_pt`）
+
+59. **訂單項目拖曳排序（Drag-and-Drop Order Items）**：
+    - 適用範圍：`PurchaseForm` 與 `SaleForm` 的 items `useFieldArray`
+    - 每列最左側加 `GripVertical` icon（`cursor-grab text-muted-foreground/40 hover:text-muted-foreground`），僅在 hover 時完全顯示
+    - 使用 HTML5 原生 DnD（`draggable`、`onDragStart`、`onDragOver`、`onDrop`）不引入額外套件
+    - `dragIndex` state 記錄被拖曳列的 index；`dragOverIndex` 記錄懸停目標
+    - `onDrop`：用 `move(dragIndex, dropIndex)`（`useFieldArray` 內建）重新排序
+    - 拖曳中目標列顯示 `ring-1 ring-primary/50` 高亮；grid 加一欄：`grid-cols-[16px_2fr_auto_1fr_auto]`
+
+60. **報表頁日期預選與記憶（Reports Date Presets + Persistence）**：
+    - Reports 頁面圖表區上方加入快選 chips：`本週`（7天）/ `本月`（30天）/ `近90天`（90天）/ `近180天`（180天）
+    - 共用 state `[reportDays, setReportDays] = useState(30)`，初始從 `localStorage['ims-reports-range']` 讀取
+    - 切換後同步更新：銷售趨勢（`salesTrend`）、TopProducts（`topProducts`）、採購比較（`purchaseVsSales`）的 query `days` 參數
+    - chips 樣式：`rounded-full px-3 py-1 text-xs border`；active 狀態 `bg-primary text-primary-foreground border-primary`；non-active `bg-muted/40 hover:bg-muted`
+    - 切換時寫入 `localStorage['ims-reports-range']`
+    - `topProductDays` 現有 state 改為與 `reportDays` 同步（移除獨立的 30/90/180 切換按鈕，改用統一 chips）
+
+61. **訂單快速備註（Quick Note Popover）**：
+    - 適用範圍：Purchases 與 Sales 頁面的表格列
+    - 在 `rowActions` 動作按鈕區加入 `MessageSquare` 圖示按鈕（`h-7 w-7 text-muted-foreground`）
+    - 點擊後在原地顯示 Popover（使用 shadcn `Popover` + `PopoverContent`）：
+      - 標題「快速備註」
+      - `<Textarea rows={3} placeholder="新增備註...">`，預填現有 `notes` 欄位
+      - 底部「儲存」Button（`size="sm"`）
+    - 送出呼叫現有 `purchases:update(id, { notes })` / `sales:update(id, { notes })` IPC
+    - 成功後 `invalidate(['purchases'])` / `invalidate(['sales'])`，顯示 toast success，關閉 Popover
+    - 若訂單已有備註，`MessageSquare` icon 顯示 filled 樣式（`fill-current text-primary`）以提示有內容
+    - IPC `purchases:update` / `sales:update` 若尚未存在，需新增至 model 與 IPC handler
+
+62. **空狀態引導（Guided Empty State）**：
+    - 適用範圍：Products、Purchases、Sales 三頁面，**僅在完全無資料且無任何篩選條件時**顯示
+    - 顯示條件：`data.length === 0 && !search && !dateFrom && !dateTo && !categoryFilter`（各頁依現有 filter state 判斷）
+    - 元件使用現有 `EmptyState`（`src/renderer/src/components/common/EmptyState.tsx`），但傳入自訂 `action` 與 secondary hint
+    - 各頁面 icon / title / description：
+      - Products：`Package` icon、「還沒有任何商品」、「新增第一筆商品，或載入範例資料快速體驗」
+      - Purchases：`ShoppingCart` icon、「還沒有任何採購單」、「建立採購單以追蹤進貨與成本」
+      - Sales：`Receipt` icon、「還沒有任何銷售單」、「建立銷售單以記錄出貨與營收」
+    - 主要 action 按鈕：「＋ 新增第一筆」→ `setFormOpen(true)`
+    - 次要連結（Products 頁才顯示）：「載入範例資料」→ 呼叫 `window.electronAPI.mockData.generate({ scale: 'S', scenario: 'normal' })` 並 invalidate 所有 query，顯示 loading spinner
+    - EmptyState 元件新增可選 `secondaryAction?: { label: string; onClick: () => void; loading?: boolean }` prop
+
