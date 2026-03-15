@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud, Database, Shuffle } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud, Database, Shuffle, RotateCcw } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { AppSettings } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
+import { useShortcutsStore, DEFAULT_SHORTCUTS } from '@/stores/shortcuts.store'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 type DbOpStatus = { type: 'idle' | 'loading' | 'success' | 'error'; msg?: string }
@@ -491,7 +492,96 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      {/* Nav Shortcuts */}
+      <ShortcutsCard />
     </div>
+  )
+}
+
+function ShortcutsCard() {
+  const t = useLang()
+  const { shortcuts, setKey, resetAll } = useShortcutsStore()
+  const [editingPath, setEditingPath] = useState<string | null>(null)
+  const [inputVal, setInputVal] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const NAV_LABELS: Record<string, string> = {
+    '/': t.nav.dashboard,
+    '/products': t.nav.products,
+    '/purchases': t.nav.purchases,
+    '/sales': t.nav.sales,
+    '/suppliers': t.nav.suppliers,
+    '/customers': t.nav.customers,
+    '/receivables': t.nav.receivables,
+    '/reports': t.nav.reports,
+    '/stock-take': t.nav.stockTake,
+    '/inventory-history': t.nav.inventoryHistory,
+    '/settings': t.nav.settings,
+  }
+
+  const startEdit = (path: string, currentKey: string) => {
+    setEditingPath(path)
+    setInputVal(currentKey)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const commitEdit = (path: string) => {
+    if (inputVal.trim()) setKey(path, inputVal.trim())
+    setEditingPath(null)
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center justify-between">
+          <span>導覽快捷鍵</span>
+          <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-muted-foreground" onClick={resetAll}>
+            <RotateCcw className="w-3 h-3" />恢復預設
+          </Button>
+        </CardTitle>
+        <CardDescription>按 <kbd className="font-mono text-xs border rounded px-1">G</kbd> 後再按對應鍵即可跳轉頁面。點擊鍵值可自訂。</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-1">
+          {DEFAULT_SHORTCUTS.map(({ path }) => {
+            const current = shortcuts.find((s) => s.path === path)
+            const key = current?.key ?? ''
+            const isEditing = editingPath === path
+            return (
+              <div key={path} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
+                <span className="text-sm">{NAV_LABELS[path] ?? path}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-mono">G +</span>
+                  {isEditing ? (
+                    <input
+                      ref={inputRef}
+                      className="w-10 h-7 text-center text-sm font-mono border border-primary rounded bg-background focus:outline-none focus:ring-1 focus:ring-ring uppercase"
+                      maxLength={1}
+                      value={inputVal.toUpperCase()}
+                      onChange={(e) => setInputVal(e.target.value.toLowerCase())}
+                      onBlur={() => commitEdit(path)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitEdit(path)
+                        if (e.key === 'Escape') setEditingPath(null)
+                      }}
+                    />
+                  ) : (
+                    <button
+                      title="點擊自訂"
+                      className="w-10 h-7 font-mono text-sm border border-border rounded hover:border-primary hover:text-primary transition-colors bg-muted/40"
+                      onClick={() => startEdit(path, key)}
+                    >
+                      {key ? key.toUpperCase() : <span className="text-muted-foreground/40">—</span>}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

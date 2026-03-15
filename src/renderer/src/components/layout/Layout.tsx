@@ -13,10 +13,7 @@ import { DemoController } from '../demo/DemoController'
 import { UxTourOverlay } from '../demo/UxTourOverlay'
 import { useLang } from '@/lib/useLang'
 import { purgeDemoData } from '@/lib/purgeDemoData'
-
-const G_KEY_MAP: Record<string, string> = {
-  h: '/', p: '/products', b: '/purchases', s: '/sales', r: '/reports', ',': '/settings'
-}
+import { useShortcutsStore } from '@/stores/shortcuts.store'
 
 export function Layout() {
   const location = useLocation()
@@ -28,6 +25,7 @@ export function Layout() {
   const [shortcutOpen, setShortcutOpen] = useState(false)
   const gMode = useRef(false)
   const gTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const getNavPath = useShortcutsStore((s) => s.getPath)
 
   const { data: kpis } = useQuery<DashboardKPIs>({
     queryKey: ['reports', 'kpis'],
@@ -80,9 +78,9 @@ export function Layout() {
         return
       }
 
-      // G+key two-key navigation
+      // G+key two-key navigation (reads from customizable shortcuts store)
       if (gMode.current) {
-        const route = G_KEY_MAP[e.key.toLowerCase()]
+        const route = getNavPath(e.key.toLowerCase())
         gMode.current = false
         if (gTimer.current) clearTimeout(gTimer.current)
         if (route) { e.preventDefault(); navigate(route) }
@@ -107,7 +105,7 @@ export function Layout() {
       window.removeEventListener('keydown', handler)
       if (gTimer.current) clearTimeout(gTimer.current)
     }
-  }, [navigate])
+  }, [navigate, getNavPath])
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">

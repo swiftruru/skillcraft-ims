@@ -18,10 +18,12 @@ import {
 import { cn } from '@/lib/utils'
 import { useLang } from '@/lib/useLang'
 import type { DashboardKPIs } from '@/types/schema'
+import { useShortcutsStore } from '@/stores/shortcuts.store'
 
 export function Sidebar() {
   const t = useLang()
   const location = useLocation()
+  const getKey = useShortcutsStore((s) => s.getKey)
 
   const { data: kpis } = useQuery<DashboardKPIs>({
     queryKey: ['reports', 'kpis'],
@@ -72,7 +74,7 @@ export function Sidebar() {
             aria-current={isActive ? 'page' : undefined}
             className={({ isActive: a }) =>
               cn(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors titlebar-no-drag',
+                'group flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors titlebar-no-drag',
                 a
                   ? 'bg-primary/15 text-primary font-medium'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -85,6 +87,11 @@ export function Sidebar() {
               <span className={cn('text-xs font-semibold rounded-full px-1.5 py-0.5 leading-none tabular-nums', item.badgeStyle)}>
                 {item.badge}
               </span>
+            )}
+            {getKey(item.to) && (
+              <kbd className="hidden group-hover:inline-flex items-center text-[9px] font-mono leading-none border border-border/60 rounded px-1 py-0.5 text-muted-foreground/60 bg-muted/40 shrink-0">
+                G+{getKey(item.to)?.toUpperCase()}
+              </kbd>
             )}
           </NavLink>
         )})}
