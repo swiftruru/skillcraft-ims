@@ -501,11 +501,11 @@ export default function Products() {
             contextMenu={(row) => {
               const product = row as unknown as Product
               const items: ContextMenuItem[] = [
-                { label: p.edit ?? '編輯商品', icon: Edit2 as LucideIcon, onClick: () => { setEditProduct(product); setFormOpen(true) } },
+                { label: t.common.edit, icon: Edit2 as LucideIcon, onClick: () => { setEditProduct(product); setFormOpen(true) } },
                 { label: p.adjustInventory, icon: SlidersHorizontal as LucideIcon, onClick: () => setAdjustProduct(product) },
                 { label: p.quickPurchase, icon: ShoppingCart as LucideIcon, onClick: () => setQuickPurchaseProduct(product) },
                 { label: p.adjustHistory, icon: History as LucideIcon, onClick: () => setDetailProduct(product) },
-                { label: p.delete ?? '刪除商品', icon: Trash2 as LucideIcon, variant: 'destructive', separator: true, onClick: () => setPendingDelete({ id: product.id as number, snapshot: product }) },
+                { label: t.common.delete, icon: Trash2 as LucideIcon, variant: 'destructive', separator: true, onClick: () => setPendingDelete({ id: product.id as number, snapshot: product }) },
               ]
               return items
             }}

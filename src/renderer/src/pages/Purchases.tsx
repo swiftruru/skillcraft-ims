@@ -457,7 +457,7 @@ export default function Purchases() {
             contextMenu={(row) => {
               const order = row as unknown as PurchaseOrder
               const items: ContextMenuItem[] = [
-                { label: p.viewDetail ?? '查看詳情', icon: Eye as LucideIcon, onClick: () => setDetailId(order.id as number) },
+                { label: t.common.view, icon: Eye as LucideIcon, onClick: () => setDetailId(order.id as number) },
                 { label: p.cloneOrder, icon: Copy as LucideIcon, onClick: () => handleClone(order.id as number) },
               ]
               if (order.status === 'pending') {

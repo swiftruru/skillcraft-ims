@@ -68,6 +68,8 @@ declare global {
         markPaid(id: number): Promise<import('./schema').SalesOrder | null>
         setPaymentDue(id: number, dueDate: string): Promise<import('./schema').SalesOrder | null>
         batchMarkPaid(ids: number[]): Promise<{ updated: number }>
+        batchComplete(ids: number[]): Promise<{ completed: number; skipped: number }>
+        batchCancel(ids: number[]): Promise<{ cancelled: number; skipped: number }>
         getStatusHistory(orderId: number): Promise<{ id: number; from_status: string | null; to_status: string; changed_at: string; note: string | null }[]>
         updateNotes(id: number, notes: string): Promise<import('./schema').SalesOrder | null>
       }
@@ -111,6 +113,7 @@ declare global {
         purchases(): Promise<{ success: boolean; filePath?: string; error?: string }>
         sales(): Promise<{ success: boolean; filePath?: string; error?: string }>
         adjustments(): Promise<{ success: boolean; filePath?: string; error?: string }>
+        report(days?: number): Promise<{ success: boolean; filePath?: string; error?: string }>
       }
       inventory: {
         getPurchaseSuggestions(): Promise<import('./schema').PurchaseSuggestion[]>
