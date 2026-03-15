@@ -82,7 +82,7 @@ Claude Code 比對所有 Skill 的 description
 TypeScript 型別檢查驗證（tsc --noEmit）
 ```
 
-### 本專案 Skill 清單（19 個）
+### 本專案 Skill 清單（20 個）
 
 #### 開發規範 Skills（核心 10 個）
 
@@ -94,14 +94,14 @@ TypeScript 型別檢查驗證（tsc --noEmit）
 | `ims-sqlite.md` | 新增/修改 DB 操作、Model、Migration | Transaction 強制要求、WAL 模式、庫存保護邏輯 |
 | `ims-ipc.md` | 新增/修改 IPC 功能、preload bridge | 三層同步原則、Channel 命名、禁止直接 import |
 | `ims-inventory.md` | 進貨、銷售、庫存異動業務邏輯 | 不可逆狀態、Transaction 結構、庫存扣減驗證 |
-| `ims-electron.md` | Electron 主程序、系統通知、原生 API | 通知格式、低庫存自動寫入 app_notifications |
+| `ims-electron.md` | Electron 主程序、系統通知、原生 API、自動更新 | 通知格式、低庫存自動寫入 app_notifications、auto-update via GitHub Releases |
 | `ims-report.md` | Dashboard、KPI 卡片、圖表、報表 | Recharts 規範、金額格式、React Query 快取 |
 | `ims-receivables.md` | 帳款管理、帳齡分析、逾期追蹤 | 帳款 KPI、帳齡色段、到期提醒規範 |
 | `ims-credit-limit.md` | 客戶 / 供應商信用額度 | 超額警示、信用進度條顯示規範 |
 | `ims-payment-notify.md` | 帳期到期提醒、逾期通知 | Dashboard 警示卡片、7 天內到期 badge 規範 |
 | `ims-ai.md` | AI 需求預測、Claude API 整合 | Haiku 模型、JSON prompt 規範、API Key 管理 |
 
-#### 操作型 Skills（任務輔助 9 個）
+#### 操作型 Skills（任務輔助 10 個）
 
 這些 Skill 提供具體任務的執行指引：
 
@@ -116,6 +116,7 @@ TypeScript 型別檢查驗證（tsc --noEmit）
 | `reorder-alert.md` | 補貨量計算與採購建議 |
 | `generate-mock-data.md` | 測試資料生成（含 in-app 一鍵產生） |
 | `import-data.md` | CSV 批次匯入規範 |
+| `ims-payment-notify.md` | 帳期到期提醒、逾期通知、Dashboard 警示卡片規範 |
 
 ### Skill 檔案格式範例
 
@@ -376,8 +377,10 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 | `G` → `S` | 導覽至銷售頁 |
 | `G` → `R` | 導覽至報表頁 |
 | `G` → `,` | 導覽至設定頁 |
+| ↑↓ | 表格列鍵盤導航（Enter 開啟詳情，Home/End 跳到首末列） |
 
 > G+key 為兩鍵序列，按下 G 後 1.5 秒內按第二鍵即跳轉，類似 vim/GitHub 的導覽模式。
+> **所有 G+key 快捷鍵均可在設定頁面自訂**，並於 Sidebar 導覽項目 hover 時顯示提示。
 
 ### 側邊欄狀態徽章
 
@@ -395,8 +398,15 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 - **訂單狀態時間軸**：採購單與銷售單詳情底部的水平步驟條，直觀呈現訂單生命週期
 - **批次操作浮動列**：選取商品後從畫面底部滑入，不佔用常駐版面
 - **清除篩選**：只要任一篩選條件非預設值，出現「清除篩選」連結，一鍵重置
-- **深淺色主題**：記憶上次設定，重啟自動套用
+- **深淺色主題**：記憶上次設定，重啟自動套用；跟隨系統主題（可在設定頁選擇）
 - **中英切換**：Header 右上角一鍵切換繁體中文 / English，所有頁面即時更新
+- **頂部導航進度條**：任何背景請求進行中時，畫面頂端顯示 2px 進度條動畫
+- **頁面摘要列**：表格上方即時顯示當前資料的統計數字（總數、待處理數、金額等）
+- **一鍵複製**：SKU、訂單號、聯絡資訊等欄位 hover 時顯示複製 icon，點擊後圖示切換確認
+- **分類色彩系統**：商品分類 Badge 依名稱 hash 自動套用 6 色，讓不同分類視覺上更易區分
+- **KPI 數字動畫**：Dashboard KPI 卡片數值載入時以 ease-out 曲線動畫到目標值
+- **DataTable 密度切換**：表格行高三段可調（緊密 / 標準 / 寬鬆），設定存入 localStorage
+- **自動更新**：設定頁面「關於與更新」卡片可手動檢查更新，有新版本時顯示下載進度，下載完成可一鍵安裝重啟
 
 ---
 

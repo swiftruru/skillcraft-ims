@@ -1,5 +1,45 @@
 # Changelog
 
+## [v0.6.0] — 2026-03-15
+
+### 新功能
+
+- **自動更新**：透過 GitHub Releases 自動偵測並安裝新版本；App 啟動 30 秒後背景靜默檢查，有更新時在設定頁顯示版本號與下載進度條，下載完成後可一鍵安裝並重啟
+- **可自訂 G+key 快捷鍵**：所有導覽快捷鍵（G+H/P/B/S/R/,…）現可在設定頁逐一修改，Sidebar hover 時顯示對應快捷鍵提示，支援「恢復預設」
+- **頂部導航進度條（NavProgressBar）**：任何資料請求進行中時，頁面頂部顯示 2px 藍色進度條
+- **一鍵複製（CopyButton）**：SKU、訂單號、聯絡資訊欄位右側新增複製 icon
+- **懸停快速預覽卡（Hover Preview Card）**：供應商/客戶名稱 hover 顯示聯絡資訊卡片
+- **分類自訂顏色（Category Color Map）**：商品分類 Badge 依 hash 自動對應 6 色，Dashboard 庫存分佈圖同步套用
+- **批次匯出選取列 CSV**：多選後浮動操作列新增「匯出選取」，純前端生成含 BOM 的 CSV
+- **DataTable 鍵盤導航**：↑↓ Arrow 移動、Enter 開啟詳情、Home/End 跳到首末列
+- **DataTable 密度切換**：三段密度（緊密／標準／寬鬆）獨立儲存
+- **搜尋框最近搜尋記錄**：聚焦時顯示最近 8 筆歷史下拉選單
+- **成功操作動畫回饋（Flash）**：新增/更新後對應列閃現綠色背景動畫
+- **Dashboard KPI Count-Up 動畫**：KPI 數值以 ease-out 曲線動畫到目標值
+- **訂單快速備註（Quick Note Popover）**：Row Actions 新增 inline Popover 快速新增備註
+- **SKU 快速掃描列**：表單明細表格上方 SKU 輸入列，精確比對後自動 append，支援條碼掃描器
+- **Tab 鍵自動新增明細列**：最後一行最後欄按 Tab 自動新增新列
+- **頁面資料摘要列（Page Summary Strip）**：表格上方即時統計（總數、低庫存數、總金額等）
+- **日期區間快選按鈕**：「今天／本週／本月／上月／近90天」快選 chip
+- **點擊狀態快速篩選**：採購/銷售狀態 badge 可直接點擊套用篩選
+- **可互動 Summary Chips**：「N 項低庫存」、「N 筆待處理」、「N 筆逾期」均為可點擊篩選 chip
+- **庫存盤點 N 鍵快速新增**：StockTake 頁面補齊 N 鍵快速建立盤點單
+
+### 無障礙（Accessibility / WCAG AA）
+
+- aria-current="page"、useFocusReturn、aria-sort、role="grid"、aria-busy
+- 系統深淺色主題即時同步（nativeTheme.on('updated')）
+- Status badge sr-only 文字前綴、CreatableSelect 完整 ARIA combobox
+- Context Menu 鍵盤開啟（Shift+F10）、路由切換後自動聚焦主內容
+- prefers-contrast CSS 強化、rem 字型基礎、prefers-reduced-motion 動畫停用
+
+### UX 修復
+
+- 修正 Dashboard「隱藏」按鈕被卡片內容覆蓋
+- 修正多處 TypeScript 型別錯誤與 lint 警告
+
+---
+
 ## [v0.5.0] — 2026-03-15
 
 ### 新功能
