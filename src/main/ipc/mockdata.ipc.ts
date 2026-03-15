@@ -161,11 +161,18 @@ function randDate(daysBack: number): string {
   return d.toISOString().slice(0, 19).replace('T', ' ')
 }
 
-/** 在指定日期之後 N 天的日期 */
+/** 在指定日期之後 N 天的 datetime 字串 */
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr)
   d.setDate(d.getDate() + days)
   return d.toISOString().slice(0, 19).replace('T', ' ')
+}
+
+/** 在指定日期之後 N 天的 YYYY-MM-DD 字串（用於 payment_due_date） */
+function addDaysDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr.slice(0, 10))
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 function weightedStatus<T extends string>(weights: Array<[T, number]>): T {
@@ -207,9 +214,14 @@ export function registerMockDataIpc(): void {
       L: { products: 100, purchases: 150, sales: 300 },
     }
     const cfg = scaleConfig[options.scale]
+    const todayStr = new Date().toISOString().slice(0, 10)
+
+    const TERM_DAYS = [30, 45, 60]
+    const SUPPLIER_CREDIT_LIMITS = [50000, 100000, 150000, 200000]
+    const CUSTOMER_CREDIT_LIMITS = [30000, 50000, 80000, 100000]
 
     try {
-      let counts = { suppliers: 0, customers: 0, products: 0, purchaseOrders: 0, salesOrders: 0, adjustments: 0 }
+      const counts = { suppliers: 0, customers: 0, products: 0, purchaseOrders: 0, salesOrders: 0, adjustments: 0 }
 
       db.transaction(() => {
         // 1. 清除所有資料
@@ -226,33 +238,38 @@ export function registerMockDataIpc(): void {
           DELETE FROM suppliers;
         `)
 
-        // 2. 插入供應商
+        // 2. 插入供應商（含信用額度）
         const insertSupplier = db.prepare(`
-          INSERT INTO suppliers (name, contact, phone, email, address, notes, created_at)
-          VALUES (@name, @contact, @phone, @email, @address, @notes, @created_at)
+          INSERT INTO suppliers (name, contact, phone, email, address, notes, credit_limit, created_at)
+          VALUES (@name, @contact, @phone, @email, @address, @notes, @credit_limit, @created_at)
         `)
         const supplierIds: number[] = []
         for (const s of SUPPLIERS) {
-          const r = insertSupplier.run({ ...s, created_at: randDate(180) })
+          const credit_limit = Math.random() < 0.4
+            ? SUPPLIER_CREDIT_LIMITS[randInt(0, SUPPLIER_CREDIT_LIMITS.length - 1)]
+            : 0
+          const r = insertSupplier.run({ ...s, credit_limit, created_at: randDate(180) })
           supplierIds.push(Number(r.lastInsertRowid))
         }
         counts.suppliers = supplierIds.length
 
-        // 3. 插入客戶
+        // 3. 插入客戶（含信用額度）
         const insertCustomer = db.prepare(`
-          INSERT INTO customers (name, contact, phone, email, address, notes, created_at)
-          VALUES (@name, @contact, @phone, @email, @address, @notes, @created_at)
+          INSERT INTO customers (name, contact, phone, email, address, notes, credit_limit, created_at)
+          VALUES (@name, @contact, @phone, @email, @address, @notes, @credit_limit, @created_at)
         `)
         const customerIds: number[] = []
         for (const c of CUSTOMERS) {
-          const r = insertCustomer.run({ ...c, created_at: randDate(180) })
+          const credit_limit = Math.random() < 0.3
+            ? CUSTOMER_CREDIT_LIMITS[randInt(0, CUSTOMER_CREDIT_LIMITS.length - 1)]
+            : 0
+          const r = insertCustomer.run({ ...c, credit_limit, created_at: randDate(180) })
           customerIds.push(Number(r.lastInsertRowid))
         }
         counts.customers = customerIds.length
 
         // 4. 插入商品
         const pool = PRODUCT_POOL.slice(0, Math.min(cfg.products, PRODUCT_POOL.length))
-        // 若 cfg.products > pool.length，循環補足
         const productTemplates: ProductTemplate[] = []
         while (productTemplates.length < cfg.products) {
           for (const p of pool) {
@@ -276,7 +293,6 @@ export function registerMockDataIpc(): void {
           skuCounters[prefix] = (skuCounters[prefix] ?? 0) + 1
           const sku = `${prefix}-${String(skuCounters[prefix]).padStart(4, '0')}`
 
-          // 價格微幅隨機浮動 ±10%
           const buyVariance = 0.9 + Math.random() * 0.2
           const sellVariance = 0.9 + Math.random() * 0.2
           const buyPrice = Math.round(tmpl.buy * buyVariance)
@@ -284,7 +300,6 @@ export function registerMockDataIpc(): void {
           const stockQty = calcStock(tmpl.reorder, idx, cfg.products, options.scenario)
           const createdAt = randDate(180)
 
-          // 若名稱重複（pool 循環時），加上序號區分
           const nameSuffix = skuCounters[prefix] > pool.filter(p => p.category === tmpl.category).length ? ` (${skuCounters[prefix]})` : ''
 
           const r = insertProduct.run({
@@ -306,10 +321,10 @@ export function registerMockDataIpc(): void {
         })
         counts.products = productIds.length
 
-        // 5. 插入採購單
+        // 5. 插入採購單（含帳款資訊）
         const insertPO = db.prepare(`
-          INSERT INTO purchase_orders (order_no, supplier_id, status, order_date, receive_date, total_amount, notes, created_at)
-          VALUES (@order_no, @supplier_id, @status, @order_date, @receive_date, @total_amount, @notes, @created_at)
+          INSERT INTO purchase_orders (order_no, supplier_id, status, order_date, receive_date, total_amount, payment_status, payment_due_date, notes, created_at)
+          VALUES (@order_no, @supplier_id, @status, @order_date, @receive_date, @total_amount, @payment_status, @payment_due_date, @notes, @created_at)
         `)
         const insertPI = db.prepare(`
           INSERT INTO purchase_items (purchase_order_id, product_id, quantity, unit_price)
@@ -324,10 +339,23 @@ export function registerMockDataIpc(): void {
           const orderDate = randDate(90)
           const status = weightedStatus(poStatuses)
           const receiveDate = status === 'received' ? addDays(orderDate, randInt(1, 7)) : null
+
+          let payment_status = 'unpaid'
+          let payment_due_date: string | null = null
+          if (status === 'received') {
+            if (Math.random() < 0.6) {
+              const termDays = TERM_DAYS[randInt(0, TERM_DAYS.length - 1)]
+              payment_due_date = addDaysDate(orderDate, termDays)
+              // 已過期的訂單約 50% 標記為已付
+              if (payment_due_date < todayStr && Math.random() < 0.5) {
+                payment_status = 'paid'
+              }
+            }
+          }
+
           const supplierId = supplierIds[randInt(0, supplierIds.length - 1)]
           const orderNo = `PO-${orderDate.slice(0, 10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`
 
-          // 每張單 1~4 個品項，隨機不重複商品
           const itemCount = randInt(1, 4)
           const usedIdx = new Set<number>()
           let totalAmount = 0
@@ -349,6 +377,8 @@ export function registerMockDataIpc(): void {
             order_date: orderDate,
             receive_date: receiveDate,
             total_amount: totalAmount,
+            payment_status,
+            payment_due_date,
             notes: status === 'returned' ? '品質問題退貨' : null,
             created_at: orderDate,
           })
@@ -359,18 +389,18 @@ export function registerMockDataIpc(): void {
         }
         counts.purchaseOrders = cfg.purchases
 
-        // 6. 插入銷售單
+        // 6. 插入銷售單（含帳款資訊、partial_return 狀態）
         const insertSO = db.prepare(`
-          INSERT INTO sales_orders (order_no, customer_id, status, order_date, total_amount, notes, created_at)
-          VALUES (@order_no, @customer_id, @status, @order_date, @total_amount, @notes, @created_at)
+          INSERT INTO sales_orders (order_no, customer_id, status, order_date, total_amount, payment_status, payment_due_date, notes, created_at)
+          VALUES (@order_no, @customer_id, @status, @order_date, @total_amount, @payment_status, @payment_due_date, @notes, @created_at)
         `)
         const insertSI = db.prepare(`
           INSERT INTO sale_items (sales_order_id, product_id, quantity, unit_price)
           VALUES (@sales_order_id, @product_id, @quantity, @unit_price)
         `)
 
-        const soStatuses: Array<['pending' | 'completed' | 'cancelled' | 'returned', number]> = [
-          ['completed', 70], ['pending', 20], ['cancelled', 7], ['returned', 3],
+        const soStatuses: Array<['pending' | 'completed' | 'cancelled' | 'returned' | 'partial_return', number]> = [
+          ['completed', 65], ['partial_return', 5], ['pending', 20], ['cancelled', 7], ['returned', 3],
         ]
 
         for (let i = 0; i < cfg.sales; i++) {
@@ -378,6 +408,19 @@ export function registerMockDataIpc(): void {
           const status = weightedStatus(soStatuses)
           const customerId = customerIds[randInt(0, customerIds.length - 1)]
           const orderNo = `SO-${orderDate.slice(0, 10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`
+
+          let payment_status = 'unpaid'
+          let payment_due_date: string | null = null
+          if (status === 'completed' || status === 'partial_return') {
+            if (Math.random() < 0.6) {
+              const termDays = TERM_DAYS[randInt(0, TERM_DAYS.length - 1)]
+              payment_due_date = addDaysDate(orderDate, termDays)
+              // 已過期的訂單約 50% 標記為已付
+              if (payment_due_date < todayStr && Math.random() < 0.5) {
+                payment_status = 'paid'
+              }
+            }
+          }
 
           const itemCount = randInt(1, 5)
           const usedIdx = new Set<number>()
@@ -399,6 +442,8 @@ export function registerMockDataIpc(): void {
             status,
             order_date: orderDate,
             total_amount: totalAmount,
+            payment_status,
+            payment_due_date,
             notes: status === 'returned' ? '客戶申請退貨' : null,
             created_at: orderDate,
           })
@@ -409,7 +454,138 @@ export function registerMockDataIpc(): void {
         }
         counts.salesOrders = cfg.sales
 
-        // 7. 插入庫存調整記錄
+        // 7. 帳款情境訂單（確保警示功能可見）
+        // 輔助：生成單品 SO
+        const insertScenarioSO = (
+          orderNo: string,
+          customerId: number,
+          status: string,
+          orderDateStr: string,
+          paymentDueDate: string | null,
+          paymentStatus: string
+        ) => {
+          const pidx = randInt(0, productIds.length - 1)
+          const qty = randInt(1, 10)
+          const price = productSellPrices[pidx]
+          const soResult = insertSO.run({
+            order_no: orderNo,
+            customer_id: customerId,
+            status,
+            order_date: orderDateStr + ' 09:00:00',
+            total_amount: qty * price,
+            payment_status: paymentStatus,
+            payment_due_date: paymentDueDate,
+            notes: null,
+            created_at: orderDateStr + ' 09:00:00',
+          })
+          insertSI.run({ sales_order_id: Number(soResult.lastInsertRowid), product_id: productIds[pidx], quantity: qty, unit_price: price })
+          counts.salesOrders++
+        }
+
+        // 輔助：生成單品 PO
+        const insertScenarioPO = (
+          orderNo: string,
+          supplierId: number,
+          orderDateStr: string,
+          paymentDueDate: string | null,
+          paymentStatus: string
+        ) => {
+          const pidx = randInt(0, productIds.length - 1)
+          const qty = randInt(5, 30)
+          const price = productBuyPrices[pidx]
+          const receiveDate = addDaysDate(orderDateStr, randInt(1, 5)) + ' 10:00:00'
+          const poResult = insertPO.run({
+            order_no: orderNo,
+            supplier_id: supplierId,
+            status: 'received',
+            order_date: orderDateStr + ' 09:00:00',
+            receive_date: receiveDate,
+            total_amount: qty * price,
+            payment_status: paymentStatus,
+            payment_due_date: paymentDueDate,
+            notes: null,
+            created_at: orderDateStr + ' 09:00:00',
+          })
+          insertPI.run({ purchase_order_id: Number(poResult.lastInsertRowid), product_id: productIds[pidx], quantity: qty, unit_price: price })
+          counts.purchaseOrders++
+        }
+
+        // 逾期未付（銷售）：3–5 筆
+        const overdueSOCount = randInt(3, 5)
+        for (let i = 0; i < overdueSOCount; i++) {
+          const daysOverdue = randInt(3, 45)
+          const dueDate = addDaysDate(todayStr, -daysOverdue)
+          const orderDate = addDaysDate(dueDate, -randInt(30, 60))
+          insertScenarioSO(
+            `SO-OVD-${String(i + 1).padStart(3, '0')}`,
+            customerIds[randInt(0, customerIds.length - 1)],
+            'completed',
+            orderDate,
+            dueDate,
+            'unpaid'
+          )
+        }
+
+        // 逾期未付（採購）：2–3 筆
+        const overduePoCount = randInt(2, 3)
+        for (let i = 0; i < overduePoCount; i++) {
+          const daysOverdue = randInt(3, 30)
+          const dueDate = addDaysDate(todayStr, -daysOverdue)
+          const orderDate = addDaysDate(dueDate, -randInt(30, 60))
+          insertScenarioPO(
+            `PO-OVD-${String(i + 1).padStart(3, '0')}`,
+            supplierIds[randInt(0, supplierIds.length - 1)],
+            orderDate,
+            dueDate,
+            'unpaid'
+          )
+        }
+
+        // 7天內到期（銷售）：2–3 筆
+        const dueSoonSOCount = randInt(2, 3)
+        for (let i = 0; i < dueSoonSOCount; i++) {
+          const daysSoon = randInt(1, 7)
+          const dueDate = addDaysDate(todayStr, daysSoon)
+          const orderDate = addDaysDate(dueDate, -randInt(30, 60))
+          insertScenarioSO(
+            `SO-DUE-${String(i + 1).padStart(3, '0')}`,
+            customerIds[randInt(0, customerIds.length - 1)],
+            'completed',
+            orderDate,
+            dueDate,
+            'unpaid'
+          )
+        }
+
+        // 7天內到期（採購）：1–2 筆
+        const dueSoonPoCount = randInt(1, 2)
+        for (let i = 0; i < dueSoonPoCount; i++) {
+          const daysSoon = randInt(1, 7)
+          const dueDate = addDaysDate(todayStr, daysSoon)
+          const orderDate = addDaysDate(dueDate, -randInt(30, 60))
+          insertScenarioPO(
+            `PO-DUE-${String(i + 1).padStart(3, '0')}`,
+            supplierIds[randInt(0, supplierIds.length - 1)],
+            orderDate,
+            dueDate,
+            'unpaid'
+          )
+        }
+
+        // 今日到期（銷售）：1 筆
+        {
+          const orderDate = addDaysDate(todayStr, -randInt(30, 60))
+          insertScenarioSO(
+            'SO-TODAY-001',
+            customerIds[randInt(0, customerIds.length - 1)],
+            'completed',
+            orderDate,
+            todayStr,
+            'unpaid'
+          )
+        }
+
+        // 8. 插入庫存調整記錄
         const insertAdj = db.prepare(`
           INSERT INTO inventory_adjustments (product_id, delta, reason, note, adjusted_by, adjusted_at)
           VALUES (@product_id, @delta, @reason, @note, @adjusted_by, @adjusted_at)
