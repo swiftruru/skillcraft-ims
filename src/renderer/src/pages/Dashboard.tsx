@@ -251,7 +251,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-right shrink-0 ml-4">
                         <div className="text-sm font-semibold text-red-400">{formatCurrency(order.total_amount)}</div>
-                        <div className="text-[10px] text-muted-foreground">{formatDate(order.payment_due_date)}</div>
+                        <div className="text-[10px] text-muted-foreground">{order.payment_due_date ? formatDate(order.payment_due_date) : ''}</div>
                       </div>
                     </div>
                   ))}
