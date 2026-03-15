@@ -95,6 +95,16 @@ export function registerReportsIpc(): void {
       `).get() as { cnt: number }
     ).cnt
 
+    const dueSoonCount = (
+      db.prepare(`
+        SELECT COUNT(*) as cnt FROM (
+          SELECT id FROM sales_orders WHERE status IN ('completed','partial_return') AND payment_status='unpaid' AND payment_due_date IS NOT NULL AND payment_due_date >= date('now') AND payment_due_date <= date('now','+7 days')
+          UNION ALL
+          SELECT id FROM purchase_orders WHERE status='received' AND payment_status='unpaid' AND payment_due_date IS NOT NULL AND payment_due_date >= date('now') AND payment_due_date <= date('now','+7 days')
+        )
+      `).get() as { cnt: number }
+    ).cnt
+
     return {
       totalInventoryValue: inventoryValue,
       monthlyRevenue,
@@ -107,7 +117,8 @@ export function registerReportsIpc(): void {
       pendingPurchasesCount,
       unpaidSalesTotal,
       unpaidPurchasesTotal,
-      overdueCount
+      overdueCount,
+      dueSoonCount
     }
   })
 

@@ -82,7 +82,7 @@ export default function Dashboard() {
     queryKey: ['reports', 'unpaidOrders'],
     queryFn: () => window.electronAPI.reports.getUnpaidOrders(),
     staleTime: 1000 * 30,
-    enabled: (kpis?.overdueCount ?? 0) > 0
+    enabled: (kpis?.overdueCount ?? 0) > 0 || (kpis?.dueSoonCount ?? 0) > 0
   })
 
   const { data: suggestions } = useQuery<PurchaseSuggestion[]>({
@@ -251,6 +251,57 @@ export default function Dashboard() {
                       </div>
                       <div className="text-right shrink-0 ml-4">
                         <div className="text-sm font-semibold text-red-400">{formatCurrency(order.total_amount)}</div>
+                        <div className="text-[10px] text-muted-foreground">{order.payment_due_date ? formatDate(order.payment_due_date) : ''}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        )
+      })()}
+
+      {/* Due Soon Alerts */}
+      {(kpis?.dueSoonCount ?? 0) > 0 && (() => {
+        const today = new Date().toISOString().slice(0, 10)
+        const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+        const dueSoonItems: { order: UnpaidOrder; type: 'sales' | 'purchases' }[] = [
+          ...(unpaidOrders?.sales.filter((o) => !o.overdue && !!o.payment_due_date && o.payment_due_date >= today && o.payment_due_date <= in7Days) ?? []).map((o) => ({ order: o, type: 'sales' as const })),
+          ...(unpaidOrders?.purchases.filter((o) => !o.overdue && !!o.payment_due_date && o.payment_due_date >= today && o.payment_due_date <= in7Days) ?? []).map((o) => ({ order: o, type: 'purchases' as const }))
+        ]
+        return (
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  <span className="text-amber-400">{d.dueSoonTitle}</span>
+                  <Badge className="bg-amber-500/15 text-amber-400 border-0">{kpis!.dueSoonCount}</Badge>
+                </CardTitle>
+                <button
+                  className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                  onClick={() => navigate('/receivables')}
+                >
+                  {d.viewReceivables}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">{d.dueSoonHint(kpis!.dueSoonCount)}</p>
+            </CardHeader>
+            {dueSoonItems.length > 0 && (
+              <CardContent className="pt-0">
+                <div className="space-y-1.5">
+                  {dueSoonItems.slice(0, 5).map(({ order, type }) => (
+                    <div key={`${type}-${order.id}`} className="flex items-center justify-between py-1.5 border-b border-amber-500/10 last:border-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${type === 'sales' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                          {type === 'sales' ? d.overdueTypeSales : d.overdueTypePurchases}
+                        </span>
+                        <span className="text-sm font-mono text-muted-foreground shrink-0">{order.order_no}</span>
+                        <span className="text-sm truncate">{order.party_name}</span>
+                      </div>
+                      <div className="text-right shrink-0 ml-4">
+                        <div className="text-sm font-semibold text-amber-400">{formatCurrency(order.total_amount)}</div>
                         <div className="text-[10px] text-muted-foreground">{order.payment_due_date ? formatDate(order.payment_due_date) : ''}</div>
                       </div>
                     </div>

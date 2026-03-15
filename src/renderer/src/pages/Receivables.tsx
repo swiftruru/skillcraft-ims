@@ -52,10 +52,15 @@ export default function Receivables() {
   const overdueCount = orders.filter((o) => o.overdue).length
   const totalAmount = orders.reduce((s, o) => s + o.total_amount, 0)
 
+  const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+
   const getDaysOverdue = (dueDate: string | null): number => {
     if (!dueDate) return 0
     return Math.floor((new Date(today).getTime() - new Date(dueDate).getTime()) / 86400000)
   }
+
+  const isDueSoon = (order: UnpaidOrder): boolean =>
+    !order.overdue && !!order.payment_due_date && order.payment_due_date > today && order.payment_due_date <= in7Days
 
   const agingBuckets = {
     current: orders.filter((o) => !o.overdue),
@@ -162,23 +167,27 @@ export default function Receivables() {
             <tbody>
               {orders.map((order) => {
                 const isOverdue = !!order.overdue
+                const isSoon = isDueSoon(order)
                 return (
                   <tr
                     key={order.id}
-                    className={`border-b border-border/50 last:border-0 hover:bg-muted/30 ${isOverdue ? 'bg-red-500/5' : ''}`}
+                    className={`border-b border-border/50 last:border-0 hover:bg-muted/30 ${isOverdue ? 'bg-red-500/5' : isSoon ? 'bg-amber-500/5' : ''}`}
                   >
                     <td className="px-4 py-3 font-mono text-xs">{order.order_no}</td>
                     <td className="px-4 py-3">{order.party_name}</td>
                     <td className="px-4 py-3 text-muted-foreground">{formatDate(order.order_date)}</td>
                     <td className="px-4 py-3">
                       {order.payment_due_date ? (
-                        <span className={isOverdue ? 'text-red-400 font-medium' : order.payment_due_date === today ? 'text-amber-400 font-medium' : ''}>
+                        <span className={isOverdue ? 'text-red-400 font-medium' : isSoon || order.payment_due_date === today ? 'text-amber-400 font-medium' : ''}>
                           {formatDate(order.payment_due_date)}
                           {isOverdue && (
                             <span className="ml-1.5 text-xs bg-red-500/15 text-red-400 rounded-full px-1.5 py-0.5">{r.overdue}</span>
                           )}
                           {!isOverdue && order.payment_due_date === today && (
                             <span className="ml-1.5 text-xs bg-amber-500/15 text-amber-400 rounded-full px-1.5 py-0.5">{r.dueToday}</span>
+                          )}
+                          {isSoon && order.payment_due_date !== today && (
+                            <span className="ml-1.5 text-xs bg-amber-500/15 text-amber-400 rounded-full px-1.5 py-0.5">{r.dueSoon}</span>
                           )}
                         </span>
                       ) : (

@@ -1,9 +1,12 @@
-import { useQuery } from '@tanstack/react-query'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils'
 import type { PurchaseOrder } from '@/types/schema'
-import { CheckCircle2, Circle, XCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, Circle, XCircle, AlertTriangle, BadgeCheck } from 'lucide-react'
 
 interface TimelineStep { label: string; date: string | null; done: boolean; cancelled?: boolean }
 
@@ -42,11 +45,26 @@ export function PurchaseDetail({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
+  const queryClient = useQueryClient()
+  const [confirmPaid, setConfirmPaid] = useState(false)
+
   const { data: order, isLoading } = useQuery<PurchaseOrder | null>({
     queryKey: ['purchases', id],
     queryFn: () => window.electronAPI.purchases.getById(id),
     enabled: open
   })
+
+  const markPaidMutation = useMutation({
+    mutationFn: () => window.electronAPI.purchases.markPaid(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases', id] })
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      setConfirmPaid(false)
+    }
+  })
+
+  const canMarkPaid = order && order.status === 'received' && order.payment_status === 'unpaid'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -145,7 +163,29 @@ export function PurchaseDetail({
           ]
           return <div className="border-t border-border pt-3 mt-1"><OrderTimeline steps={steps} /></div>
         })()}
+        {canMarkPaid && (
+          <DialogFooter className="border-t border-border pt-4 mt-1">
+            <Button
+              variant="outline"
+              className="gap-2 text-green-400 border-green-500/30 hover:bg-green-500/10 hover:text-green-300"
+              onClick={() => setConfirmPaid(true)}
+              disabled={markPaidMutation.isPending}
+            >
+              <BadgeCheck className="w-4 h-4" />
+              標記已付款
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
+      <ConfirmDialog
+        open={confirmPaid}
+        onOpenChange={(o) => !o && setConfirmPaid(false)}
+        title="確認標記為已付款"
+        description="確認將此採購單標記為已付款？此操作不可撤銷。"
+        onConfirm={() => markPaidMutation.mutate()}
+        confirmLabel="標記已付款"
+        variant="default"
+      />
     </Dialog>
   )
 }

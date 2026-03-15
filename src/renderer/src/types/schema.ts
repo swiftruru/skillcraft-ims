@@ -140,6 +140,7 @@ export interface DashboardKPIs {
   unpaidSalesTotal: number
   unpaidPurchasesTotal: number
   overdueCount: number
+  dueSoonCount: number
 }
 
 export interface UnpaidOrder {

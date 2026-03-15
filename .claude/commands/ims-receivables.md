@@ -27,7 +27,7 @@ interface UnpaidOrder {
   payment_due_date: string | null
   total_amount: number
   payment_status: string
-  overdue: boolean          // payment_due_date < today && payment_status = 'unpaid'
+  overdue: number           // 1 = 逾期（payment_due_date < today），0 = 未逾期
 }
 ```
 
@@ -46,7 +46,8 @@ ORDER BY so.payment_due_date ASC NULLS LAST, so.order_date DESC
 SQL（purchases）：同上，`purchase_orders` + `suppliers`，`status = 'received'`
 
 #### `reports:kpis` 擴充
-- 新增 `overdueCount`：`COUNT(*)` 從 sales_orders 和 purchase_orders 中 `payment_status='unpaid'` 且 `payment_due_date < date('now')`
+- `overdueCount`：`COUNT(*)` 從 sales_orders 和 purchase_orders 中 `payment_status='unpaid'` 且 `payment_due_date < date('now')`
+- `dueSoonCount`：7天內即將到期，`payment_due_date BETWEEN date('now') AND date('now','+7 days')` 且 `payment_status='unpaid'`
 
 ### 三層同步
 1. `src/main/ipc/reports.ipc.ts`：新增 `reports:getUnpaidOrders` handler
@@ -57,6 +58,7 @@ SQL（purchases）：同上，`purchase_orders` + `suppliers`，`status = 'recei
 
 #### 頁面佈局
 - 頂部：Tab 切換「應收帳款」/「應付帳款」
+- Tab 下方：帳款老化分析指標卡（未到期 / 逾期1–30天 / 31–60天 / >60天）
 - 各 Tab 顯示對應的 UnpaidOrder 列表
 
 #### 表格欄位
@@ -65,19 +67,36 @@ SQL（purchases）：同上，`purchase_orders` + `suppliers`，`status = 'recei
 | 訂單號 | `order_no`，monospace |
 | 客戶/供應商 | `party_name` |
 | 訂單日期 | `order_date` |
-| 付款期限 | `payment_due_date`，逾期顯示紅色 + 「逾期」badge |
+| 付款期限 | `payment_due_date`，逾期顯示紅色 + 「逾期」badge；7天內到期顯示黃色 + 「即將到期」badge |
 | 金額 | `total_amount` |
 | 操作 | 「標記已付」按鈕（BadgeCheck icon，綠色） |
 
 #### 逾期樣式
-- `overdue: true` → 整行 row `bg-red-500/5`，付款期限欄文字 `text-red-400`，Badge「逾期」紅色
+- `overdue: 1` → 整行 row `bg-red-500/5`，付款期限欄文字 `text-red-400`，Badge「逾期」紅色
+- 7天內到期（非逾期）→ `text-amber-400`，Badge「即將到期」黃色
 - `payment_due_date` 為 null → 顯示「—」（無期限設定）
 
 #### 空白狀態
 - 若列表為空，顯示「目前無未付款帳款 🎉」
 
+### 即將到期提醒（Dashboard）
+- 在 Dashboard 逾期警示卡下方，若 `dueSoonCount > 0` 顯示黃色警示卡
+- 標題：「即將到期提醒」，副標題：`共 N 筆帳款將於 7 天內到期`
+- 列出最多 5 筆即將到期帳款（來自 `unpaidOrders` 中 `!overdue && daysUntilDue <= 7`）
+
+### Detail Dialog 快速標記付款
+#### SaleDetail.tsx
+- 訂單為 `completed` 或 `partial_return` 且 `payment_status = 'unpaid'` 時，在 DialogFooter 顯示「標記已付款」按鈕（variant="outline"，BadgeCheck icon，綠色）
+- 點擊後呼叫 `window.electronAPI.sales.markPaid(order.id)`，成功後 invalidate `['sales', id]` 和 `['reports']`
+- 使用 `useMutation` + 確認彈窗（`ConfirmDialog`）
+
+#### PurchaseDetail.tsx
+- 訂單為 `received` 且 `payment_status = 'unpaid'` 時，在 DialogFooter 顯示「標記已付款」按鈕
+- 點擊後呼叫 `window.electronAPI.purchases.markPaid(order.id)`
+
 ### DashboardKPIs 型別擴充
 在 `src/renderer/src/types/schema.ts` 的 `DashboardKPIs` 加入：
 ```typescript
 overdueCount: number
+dueSoonCount: number
 ```

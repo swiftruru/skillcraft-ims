@@ -115,6 +115,8 @@ export const translations = {
       unpaidPayablesHint: '已收貨但未付款',
       overdueAlertsTitle: '逾期帳款警示',
       overdueAlertsHint: (n: number) => `共 ${n} 筆帳款已逾期，請盡快處理`,
+      dueSoonTitle: '即將到期提醒',
+      dueSoonHint: (n: number) => `共 ${n} 筆帳款將於 7 天內到期`,
       overdueTypeSales: '應收',
       overdueTypePurchases: '應付',
       viewReceivables: '查看帳款管理 →'
@@ -484,6 +486,7 @@ export const translations = {
       amount: '金額',
       overdue: '逾期',
       dueToday: '今日到期',
+      dueSoon: '即將到期',
       markPaid: '標記已付款',
       markPaidTitle: '確認標記為已付款',
       markPaidDesc: '確認將此訂單標記為已付款？此操作不可撤銷。',
@@ -640,6 +643,8 @@ export const translations = {
       unpaidPayablesHint: 'Received but unpaid',
       overdueAlertsTitle: 'Overdue Payment Alerts',
       overdueAlertsHint: (n: number) => `${n} payment(s) are overdue — please follow up`,
+      dueSoonTitle: 'Due Soon',
+      dueSoonHint: (n: number) => `${n} payment(s) due within 7 days`,
       overdueTypeSales: 'Receivable',
       overdueTypePurchases: 'Payable',
       viewReceivables: 'View Receivables →'
@@ -1009,6 +1014,7 @@ export const translations = {
       amount: 'Amount',
       overdue: 'Overdue',
       dueToday: 'Due Today',
+      dueSoon: 'Due Soon',
       markPaid: 'Mark as Paid',
       markPaidTitle: 'Confirm Mark as Paid',
       markPaidDesc: 'Are you sure you want to mark this order as paid? This action cannot be undone.',
