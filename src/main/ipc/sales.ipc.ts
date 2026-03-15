@@ -128,6 +128,37 @@ export function registerSalesIpc(): void {
     }
     return { updated }
   })
+  ipcMain.handle('sales:batchComplete', (_e, ids: number[]) => {
+    let completed = 0
+    let skipped = 0
+    for (const id of ids) {
+      try {
+        const order = SaleModel.findById(id)
+        if (!order || order.status !== 'pending') { skipped++; continue }
+        const result = SaleModel.complete(id)
+        if (result) {
+          notifyLowStockAfterSale((order.items ?? []).map((i) => i.product_id))
+          recordSaleHistory(id, order.status, 'completed')
+          completed++
+        } else { skipped++ }
+      } catch { skipped++ }
+    }
+    return { completed, skipped }
+  })
+  ipcMain.handle('sales:batchCancel', (_e, ids: number[]) => {
+    let cancelled = 0
+    let skipped = 0
+    for (const id of ids) {
+      try {
+        const order = SaleModel.findById(id)
+        if (!order || order.status !== 'pending') { skipped++; continue }
+        SaleModel.cancel(id)
+        recordSaleHistory(id, order.status, 'cancelled')
+        cancelled++
+      } catch { skipped++ }
+    }
+    return { cancelled, skipped }
+  })
   ipcMain.handle('sales:getStatusHistory', (_e, orderId: number) => {
     const db = getDb()
     return db.prepare(

@@ -102,6 +102,13 @@ export function Layout() {
       <DemoController />
       <UxTourOverlay />
       <Toaster />
+      <button
+        className="fixed bottom-5 right-5 z-40 w-8 h-8 rounded-full bg-muted border border-border text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center text-sm font-mono shadow-sm"
+        title="鍵盤快捷鍵 (?)"
+        onClick={() => setShortcutOpen((v) => !v)}
+      >
+        ?
+      </button>
     </div>
   )
 }

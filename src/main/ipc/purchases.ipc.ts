@@ -68,6 +68,20 @@ export function registerPurchasesIpc(): void {
     }
     return { updated }
   })
+  ipcMain.handle('purchases:batchCancel', (_e, ids: number[]) => {
+    let cancelled = 0
+    let skipped = 0
+    for (const id of ids) {
+      try {
+        const order = PurchaseModel.findById(id)
+        if (!order || order.status !== 'pending') { skipped++; continue }
+        PurchaseModel.cancel(id)
+        recordPurchaseHistory(id, order.status, 'cancelled')
+        cancelled++
+      } catch { skipped++ }
+    }
+    return { cancelled, skipped }
+  })
   ipcMain.handle('purchases:getStatusHistory', (_e, orderId: number) => {
     const db = getDb()
     return db.prepare(

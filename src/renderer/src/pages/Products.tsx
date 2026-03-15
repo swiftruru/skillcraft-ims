@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList } from 'lucide-react'
+import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, type LucideIcon } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DataTable, type Column } from '@/components/common/DataTable'
+import { DataTable, type Column, type ContextMenuItem } from '@/components/common/DataTable'
 import { SearchWithHistory } from '@/components/common/SearchWithHistory'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -49,7 +49,6 @@ export default function Products() {
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
   const [batchPriceOpen, setBatchPriceOpen] = useState(false)
   const [quickPurchaseProduct, setQuickPurchaseProduct] = useState<Product | null>(null)
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; product: Product } | null>(null)
   const [editingCell, setEditingCell] = useState<{ id: number; field: 'sell_price' | 'stock_qty' } | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
     return (localStorage.getItem('ims-products-view') as 'table' | 'grid') ?? 'table'
@@ -59,12 +58,6 @@ export default function Products() {
     (localStorage.getItem('ims-dt-density-products') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
   )
 
-  useEffect(() => {
-    const close = () => setContextMenu(null)
-    window.addEventListener('click', close)
-    window.addEventListener('contextmenu', close)
-    return () => { window.removeEventListener('click', close); window.removeEventListener('contextmenu', close) }
-  }, [])
 
   useEffect(() => {
     const handler = () => { setEditProduct(null); setFormOpen(true) }
@@ -504,6 +497,17 @@ export default function Products() {
             onRowFocus={(row) => setDetailProduct(row as unknown as Product)}
             flashRowId={flashId}
             density={density}
+            contextMenu={(row) => {
+              const product = row as unknown as Product
+              const items: ContextMenuItem[] = [
+                { label: p.edit ?? '編輯商品', icon: Edit2 as LucideIcon, onClick: () => { setEditProduct(product); setFormOpen(true) } },
+                { label: p.adjustInventory, icon: SlidersHorizontal as LucideIcon, onClick: () => setAdjustProduct(product) },
+                { label: p.quickPurchase, icon: ShoppingCart as LucideIcon, onClick: () => setQuickPurchaseProduct(product) },
+                { label: p.adjustHistory, icon: History as LucideIcon, onClick: () => setDetailProduct(product) },
+                { label: p.delete ?? '刪除商品', icon: Trash2 as LucideIcon, variant: 'destructive', separator: true, onClick: () => setPendingDelete({ id: product.id as number, snapshot: product }) },
+              ]
+              return items
+            }}
             emptyState={!search && !hasFilter ? (
               <EmptyState
                 icon={Package}
@@ -512,11 +516,6 @@ export default function Products() {
                 action={{ label: p.emptyAction, onClick: () => { setEditProduct(null); setFormOpen(true) } }}
               />
             ) : undefined}
-            onRowContextMenu={(row, e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              setContextMenu({ x: e.clientX, y: e.clientY, product: row as unknown as Product })
-            }}
           />
         </div>
       )}
@@ -606,45 +605,6 @@ export default function Products() {
         onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete)}
       />
 
-      {contextMenu && (
-        <div
-          className="fixed z-50 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[160px]"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left"
-            onClick={() => { setEditProduct(contextMenu.product); setFormOpen(true); setContextMenu(null) }}
-          >
-            <Edit2 className="w-3.5 h-3.5" />{t.common.edit}
-          </button>
-          <button
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left"
-            onClick={() => { setAdjustProduct(contextMenu.product); setContextMenu(null) }}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />{p.adjustInventory}
-          </button>
-          <button
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left"
-            onClick={() => { setQuickPurchaseProduct(contextMenu.product); setContextMenu(null) }}
-          >
-            <ShoppingCart className="w-3.5 h-3.5" />{p.quickPurchase}
-          </button>
-          <button
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left"
-            onClick={() => { setDetailProduct(contextMenu.product); setContextMenu(null) }}
-          >
-            <History className="w-3.5 h-3.5" />{p.adjustHistory}
-          </button>
-          <div className="border-t border-border my-1" />
-          <button
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left text-destructive"
-            onClick={() => { setPendingDelete({ id: contextMenu.product.id as number, snapshot: contextMenu.product }); setContextMenu(null) }}
-          >
-            <Trash2 className="w-3.5 h-3.5" />{t.common.delete}
-          </button>
-        </div>
-      )}
     </div>
   )
 }

@@ -15,6 +15,14 @@ export interface Column<T> {
   hideable?: boolean
 }
 
+export interface ContextMenuItem {
+  label: string
+  icon?: React.ElementType
+  variant?: 'default' | 'destructive'
+  onClick: () => void
+  separator?: boolean
+}
+
 type Density = 'compact' | 'normal' | 'relaxed'
 
 const DENSITY_CLASS: Record<Density, string> = {
@@ -35,6 +43,8 @@ interface DataTableProps<T> {
   onRowFocus?: (row: T) => void
   flashRowId?: number | string | null
   density?: Density
+  rowActions?: (row: T) => React.ReactNode
+  contextMenu?: (row: T) => ContextMenuItem[]
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -50,9 +60,25 @@ export function DataTable<T extends Record<string, unknown>>({
   onRowContextMenu,
   onRowFocus,
   flashRowId,
-  density = 'normal'
+  density = 'normal',
+  rowActions,
+  contextMenu
 }: DataTableProps<T>) {
   const t = useLang()
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+
+  // Close context menu on outside mousedown
+  useEffect(() => {
+    if (!ctxMenu) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-ctx-menu]')) setCtxMenu(null)
+    }
+    const keyHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenu(null) }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('keydown', keyHandler)
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('keydown', keyHandler) }
+  }, [ctxMenu])
 
   const loadSavedSort = () => {
     if (!storageKey) return { key: null as string | null, dir: null as SortDir }
@@ -270,6 +296,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   </div>
                 </th>
               ))}
+              {rowActions && <th className="w-1" />}
             </tr>
           </thead>
           <tbody>
@@ -283,11 +310,17 @@ export function DataTable<T extends Record<string, unknown>>({
                   ref={isFocused ? focusedRowRef : undefined}
                   data-focused={isFocused ? 'true' : undefined}
                   className={cn(
-                    'border-b border-border/50 hover:bg-muted/30 transition-colors',
+                    'group border-b border-border/50 hover:bg-muted/30 transition-colors',
                     isFocused && 'ring-1 ring-inset ring-ring bg-muted/20',
                     isFlash && 'animate-flash'
                   )}
-                  onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(row, e) : undefined}
+                  onContextMenu={contextMenu ? (e) => {
+                    e.preventDefault()
+                    const items = contextMenu(row)
+                    const x = Math.min(e.clientX, window.innerWidth - 170)
+                    const y = Math.min(e.clientY, window.innerHeight - items.length * 34 - 16)
+                    setCtxMenu({ x, y, items })
+                  } : onRowContextMenu ? (e) => onRowContextMenu(row, e) : undefined}
                   onClick={onRowFocus ? () => { setFocusedIdx(idx); onRowFocus(row) } : undefined}
                 >
                   {visibleColumns.map((col) => {
@@ -298,6 +331,13 @@ export function DataTable<T extends Record<string, unknown>>({
                       </td>
                     )
                   })}
+                  {rowActions && (
+                    <td className="sticky right-0 w-1 px-2 bg-transparent">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-0.5">
+                        {rowActions(row)}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               )
             })}
@@ -328,6 +368,30 @@ export function DataTable<T extends Record<string, unknown>>({
               <ChevronRight className="w-3.5 h-3.5" />
             </Button>
           </div>
+        </div>
+      )}
+
+      {ctxMenu && (
+        <div
+          data-ctx-menu
+          style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 50 }}
+          className="bg-card border border-border rounded-lg shadow-xl py-1 min-w-[160px]"
+        >
+          {ctxMenu.items.map((item, i) => (
+            <div key={i}>
+              {item.separator && i > 0 && <hr className="my-1 border-border" />}
+              <button
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/60 rounded-sm mx-1 w-[calc(100%-8px)] text-left',
+                  item.variant === 'destructive' && 'text-destructive'
+                )}
+                onClick={() => { item.onClick(); setCtxMenu(null) }}
+              >
+                {item.icon && <item.icon className="w-3.5 h-3.5 shrink-0" />}
+                {item.label}
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

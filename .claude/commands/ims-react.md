@@ -397,3 +397,68 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 最新狀態在頂部（DESC 排序）；第一筆永遠是「建立訂單」（`from_status: null, to_status: 'pending'`）
     - queryKey：`['purchases', 'history', id]` / `['sales', 'history', id]`，`staleTime: 1000 * 60`
 
+51. **日期範圍快選按鈕（Date Range Presets）**：
+    - 適用範圍：Purchases、Sales 頁面的日期篩選區
+    - 在現有 `dateFrom` / `dateTo` `<Input type="date">` 旁邊新增快選 Chip 列（`flex gap-1.5 flex-wrap`）
+    - 快選選項：`[{ label: '今天', days: 0 }, { label: '本週', days: 7 }, { label: '本月', days: 30 }, { label: '上月', offsetMonth: -1 }, { label: '近90天', days: 90 }]`
+    - 點擊 Chip → 計算對應 `dateFrom`/`dateTo` 並呼叫 `setSearchParams`（合併更新）
+    - Chip 樣式：`text-xs px-2.5 py-0.5 rounded-full border border-border bg-muted/40 hover:bg-muted cursor-pointer transition-colors`；目前選中的 Chip（dateFrom/dateTo 完全匹配）加上 `bg-primary/15 text-primary border-primary/30`
+    - 「本月」：`dateFrom = startOfMonth(today)`、`dateTo = today`；「上月」：前一個月 1 號到最後一天；「今天」：`dateFrom = dateTo = today`
+    - 日期格式：`YYYY-MM-DD`（ISO 字串，直接用 `new Date().toISOString().slice(0, 10)` 計算）
+    - 再次點擊已選 Chip → 清除 `dateFrom`/`dateTo`（相當於清除日期篩選）
+
+52. **資料列 Hover 快速操作按鈕（Row Hover Actions）**：
+    - 在 Products、Purchases、Sales、Customers、Suppliers 的 DataTable 資料列最後一欄，加入懸停顯示的快速操作按鈕
+    - `DataTable` 新增 `rowActions?: (row: T) => React.ReactNode` prop
+    - 列 hover 時最後多出一個 `<td className="sticky right-0 px-2">`，渲染 `rowActions(row)` 回傳的內容（透過 `group` + `opacity-0 group-hover:opacity-100` 控制顯現）
+    - 各頁面的 `rowActions` 回傳 icon 按鈕組（`flex items-center gap-1`）：
+      - Products：`Edit2`（編輯）、`SlidersHorizontal`（調整庫存）、`Trash2`（刪除，`text-destructive`）
+      - Purchases：`Eye`（查看詳情）、`CheckCircle`（收貨，僅 pending）、`XCircle`（取消，僅 pending）
+      - Sales：`Eye`（查看詳情）、`CheckCircle`（完成，僅 pending）、`XCircle`（取消，僅 pending）
+      - Customers / Suppliers：`Eye`（查看詳情）、`Edit2`（編輯）、`Trash2`（刪除）
+    - 按鈕樣式：`variant="ghost" size="icon" className="h-7 w-7"`
+    - 整欄寬度 `w-24`，不可隱藏（`hideable: false`）；欄位 `key: '__actions__'`，標頭為空字串
+
+53. **右鍵快速選單（Row Context Menu）**：
+    - `DataTable` 新增 `contextMenu?: (row: T) => { label: string; icon?: React.ElementType; variant?: 'default' | 'destructive'; onClick: () => void; separator?: boolean }[]` prop
+    - `<tr>` 加上 `onContextMenu={(e) => { e.preventDefault(); openContextMenu(e.clientX, e.clientY, row) }}`
+    - Context menu 渲染在 `fixed` position（`z-50 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[160px]`），位置夾在視窗邊界內（若游標 x + 160 > window.innerWidth 則往左對齊）
+    - State：`ctxMenu: { x: number; y: number; items: MenuItem[] } | null`（存在 DataTable 元件內部）
+    - 關閉：`useEffect` 監聽 `mousedown` 全域事件，觸發時 `setCtxMenu(null)`；按 `Escape` 也關閉
+    - 選單項目樣式：`flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/60 rounded-sm mx-1`；`separator: true` 則前一個項目後渲染 `<hr className="my-1 border-border" />`
+    - Destructive 項目文字顏色 `text-destructive`
+    - 各頁面傳入 `contextMenu` prop，項目與 Row Hover Actions 一致（但不限 pending 狀態顯示，由 onClick 自行判斷）
+
+54. **批量狀態操作（Batch Status Actions）**：
+    - Purchases 多選後，批次操作浮動列加入「批次收貨」（`CheckCircle` icon）按鈕
+    - Sales 多選後，加入「批次完成」（`BadgeCheck` icon）按鈕
+    - 兩頁面均加入「批次取消」（`XCircle` icon）按鈕
+    - IPC 實作：`purchases:batchReceive(ids[])` → 逐筆呼叫 receive 邏輯並記錄 history，回傳 `{ received: number, skipped: number }`；`sales:batchComplete(ids[])` → 同理
+    - `purchases:batchCancel(ids[])` / `sales:batchCancel(ids[])` → 逐筆取消，回傳 `{ cancelled: number, skipped: number }`
+    - 執行批量操作時顯示 loading spinner 在按鈕上（`isPending` state）；完成後 toast：`批次收貨完成：N 筆成功，M 筆跳過`
+    - global.d.ts 新增：`purchases.batchCancel`、`sales.batchComplete`、`sales.batchCancel`
+    - preload index.ts 同步新增對應 IPC invoke
+
+55. **數字欄位步進器（Number Stepper）**：
+    - 建立 `StepperInput` 元件（`src/renderer/src/components/ui/StepperInput.tsx`）
+    - Props：`value: number, onChange: (v: number) => void, min?: number, max?: number, step?: number, className?: string`
+    - 外觀：`<div className="flex items-center">` 包裹 `−` 按鈕 + `<input type="number">` + `+` 按鈕
+    - 按鈕樣式：`h-8 w-8 rounded border border-input bg-background hover:bg-muted flex items-center justify-center`；`−` / `+` 文字或 icon
+    - Input 樣式：`h-8 w-16 text-center border-y border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring`；隱藏原生 spin buttons（`[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none`）
+    - 鍵盤支援：`↑` / `↓` 增減 `step`；`Shift+↑` / `Shift+↓` 增減 `step * 10`
+    - 邊界：值不得低於 `min`（預設 0）或超過 `max`（預設無限）
+    - 整合 react-hook-form：在 PurchaseForm / SaleForm 的 items 數量欄位（`quantity`）用 `StepperInput` 取代 `<Input type="number">`；以 `Controller` 包裹或 `watch/setValue` 整合
+
+56. **快捷鍵說明面板（Keyboard Shortcuts Help Panel）**：
+    - 元件命名 `ShortcutOverlay`，位於 `src/renderer/src/components/layout/ShortcutOverlay.tsx`
+    - 掛載於 `Layout.tsx`（非個別頁面），全域生效
+    - 觸發：按 `?` 鍵開啟（target 非 input/textarea/select 時才處理）；`Escape` 關閉；open state 存於 `ui.store.ts`（`shortcutOpen: boolean`）
+    - UI：`fixed inset-0 z-50` backdrop（`bg-background/80 backdrop-blur-sm`），點擊 backdrop 關閉；中央卡片 `max-w-lg w-full bg-card border rounded-2xl shadow-2xl p-6`
+    - 標題列：「鍵盤快捷鍵」+ 右上角 `×` 關閉按鈕
+    - 快捷鍵以分組呈現，每組有標題（`text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2`）：
+      - **全域**：`⌘K` 全域搜尋、`?` 快捷鍵說明、`G+H` 首頁、`G+P` 商品、`G+B` 採購、`G+S` 銷售、`G+R` 報表
+      - **表格導航**：`↑↓` 移動列、`Enter` 開啟詳情、`Home/End` 首末列
+      - **頁面操作**：`N` 新增訂單（採購/銷售頁）、`Esc` 關閉彈窗
+    - 每項顯示格式：左側 label、右側 `<kbd>` badge（`font-mono text-xs border rounded px-1.5 py-0.5 bg-muted`）；多鍵以 `+` 或空格分隔並分別包裹 `<kbd>`
+    - 右下角常駐 `?` 浮動按鈕：`fixed bottom-4 right-4 z-40 rounded-full w-8 h-8 bg-muted/80 hover:bg-muted border flex items-center justify-center text-sm font-mono text-muted-foreground`；點擊同樣開啟 overlay
+

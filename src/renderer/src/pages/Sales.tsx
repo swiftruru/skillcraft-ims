@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt, AlignJustify, List, LayoutList } from 'lucide-react'
+import { Plus, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt, AlignJustify, List, LayoutList, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { DataTable, type Column } from '@/components/common/DataTable'
+import { DataTable, type Column, type ContextMenuItem } from '@/components/common/DataTable'
 import { SearchWithHistory } from '@/components/common/SearchWithHistory'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { TableSkeleton } from '@/components/common/TableSkeleton'
@@ -18,11 +18,35 @@ import { useLang } from '@/lib/useLang'
 import { useDemoStore } from '@/stores/demo.store'
 import { EmptyState } from '@/components/common/EmptyState'
 import { SavedFilters } from '@/components/common/SavedFilters'
+import { useToast } from '@/components/ui/use-toast'
+
+const DATE_PRESETS = [
+  { label: '今天', days: 0 },
+  { label: '本週', days: 7 },
+  { label: '本月', days: 30, offsetMonth: 0 as number | undefined },
+  { label: '上月', offsetMonth: -1 as number | undefined },
+  { label: '近90天', days: 90 }
+]
+
+function calcPreset(days?: number, offsetMonth?: number): { from: string; to: string } {
+  const today = new Date()
+  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  if (offsetMonth === -1) {
+    const first = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    const last = new Date(today.getFullYear(), today.getMonth(), 0)
+    return { from: fmt(first), to: fmt(last) }
+  }
+  if (days === 0) return { from: fmt(today), to: fmt(today) }
+  const from = new Date(today)
+  from.setDate(today.getDate() - (days ?? 30))
+  return { from: fmt(from), to: fmt(today) }
+}
 
 export default function Sales() {
   const queryClient = useQueryClient()
   const t = useLang()
   const s = t.sales
+  const { toast } = useToast()
   const spotlight = useDemoStore((st) => st.spotlight)
   const location = useLocation()
   const navigate = useNavigate()
@@ -128,6 +152,26 @@ export default function Sales() {
     }
   })
 
+  const batchCompleteMutation = useMutation({
+    mutationFn: (ids: number[]) => window.electronAPI.sales.batchComplete(ids),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      setSelectedIds(new Set())
+      toast({ title: `批次完成：${res.completed} 筆成功，${res.skipped} 筆跳過`, variant: 'success' })
+    }
+  })
+
+  const batchCancelMutation = useMutation({
+    mutationFn: (ids: number[]) => window.electronAPI.sales.batchCancel(ids),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      setSelectedIds(new Set())
+      toast({ title: `批次取消：${res.cancelled} 筆成功，${res.skipped} 筆跳過`, variant: 'success' })
+    }
+  })
+
   const allIds = (orders ?? []).map((o) => o.id as number)
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
   const toggleAll = () => { allSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(allIds)) }
@@ -200,7 +244,7 @@ export default function Sales() {
       label: '',
       className: 'w-36 text-right',
       render: (_v, row) => (
-        <div className="flex justify-end gap-1">
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailId(row.id)}>
             <Eye className="w-3.5 h-3.5" />
           </Button>
@@ -314,6 +358,27 @@ export default function Sales() {
           <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('from'); n.delete('to'); return n }, { replace: true })}>{s.clearDates}</button>
         )}
       </div>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {DATE_PRESETS.map((preset) => {
+          const { from, to } = calcPreset(preset.days, preset.offsetMonth)
+          const active = dateFrom === from && dateTo === to
+          return (
+            <button
+              key={preset.label}
+              className={`text-xs px-2.5 py-0.5 rounded-full border transition-colors ${active ? 'bg-primary/15 text-primary border-primary/30' : 'border-border bg-muted/40 hover:bg-muted text-muted-foreground'}`}
+              onClick={() => {
+                if (active) {
+                  setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('from'); n.delete('to'); return n }, { replace: true })
+                } else {
+                  setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set('from', from); n.set('to', to); return n }, { replace: true })
+                }
+              }}
+            >
+              {preset.label}
+            </button>
+          )
+        })}
+      </div>
       <SavedFilters
         storageKey="sales"
         currentFilters={{ search, dateFrom, dateTo }}
@@ -361,6 +426,22 @@ export default function Sales() {
             storageKey="sales"
             onRowFocus={(row) => setDetailId(row.id as number)}
             density={density}
+            contextMenu={(row) => {
+              const order = row as unknown as SalesOrder
+              const items: ContextMenuItem[] = [
+                { label: s.viewDetail ?? '查看詳情', icon: Eye as LucideIcon, onClick: () => setDetailId(order.id as number) },
+                { label: s.cloneOrder, icon: Copy as LucideIcon, onClick: () => handleClone(order.id as number) },
+              ]
+              if (order.status === 'pending') {
+                items.push({ label: s.completeTitle, icon: CheckCircle as LucideIcon, onClick: () => setCompleteId(order.id as number) })
+                items.push({ label: s.cancelTitle, icon: XCircle as LucideIcon, onClick: () => setCancelId(order.id as number) })
+                items.push({ label: s.deleteTitle, icon: Trash2 as LucideIcon, variant: 'destructive', separator: true, onClick: () => setDeleteId(order.id as number) })
+              }
+              if ((order.status === 'completed' || order.status === 'partial_return') && order.payment_status !== 'paid') {
+                items.push({ label: s.markPaid, icon: BadgeCheck as LucideIcon, onClick: () => setMarkPaidId(order.id as number) })
+              }
+              return items
+            }}
             emptyMessage={s.emptyMessage}
             emptyState={!search && !dateFrom && !dateTo ? (
               <EmptyState
@@ -430,11 +511,25 @@ export default function Sales() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-xl shadow-xl px-4 py-2.5 flex items-center gap-3">
           <span className="text-sm text-muted-foreground">已選 {selectedIds.size} 筆</span>
           <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-green-400 border-green-400/30 hover:text-green-400"
+            onClick={() => batchCompleteMutation.mutate(Array.from(selectedIds))}
+            disabled={batchCompleteMutation.isPending}
+          >
+            <CheckCircle className="w-3.5 h-3.5" />
+            批次完成
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-blue-400 border-blue-400/30 hover:text-blue-400"
             onClick={() => batchMarkPaidMutation.mutate(Array.from(selectedIds))}
             disabled={batchMarkPaidMutation.isPending}
           >
             <BadgeCheck className="w-3.5 h-3.5" />
             {s.batchMarkPaid ?? '批次標記付款'}
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-red-400 border-red-400/30 hover:text-red-400"
+            onClick={() => batchCancelMutation.mutate(Array.from(selectedIds))}
+            disabled={batchCancelMutation.isPending}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            批次取消
           </Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelectedIds(new Set())}>
             {t.common.cancel}

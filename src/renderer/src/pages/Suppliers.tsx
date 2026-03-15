@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, Wand2, Eye, AlignJustify, List, LayoutList } from 'lucide-react'
+import { Plus, Edit2, Trash2, Wand2, Eye, AlignJustify, List, LayoutList, type LucideIcon } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { DataTable, type Column } from '@/components/common/DataTable'
+import { DataTable, type Column, type ContextMenuItem } from '@/components/common/DataTable'
 import { SearchWithHistory } from '@/components/common/SearchWithHistory'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { TableSkeleton } from '@/components/common/TableSkeleton'
@@ -121,13 +121,6 @@ export default function Suppliers() {
     { key: 'email', label: s.email },
     { key: 'address', label: s.address },
     { key: 'credit_limit', label: '信用額度', render: (v) => (Number(v) > 0 ? formatCurrency(Number(v)) : <span className="text-muted-foreground">—</span>) },
-    { key: 'id', label: '', className: 'w-28 text-right', render: (_v, row) => (
-      <div className="flex justify-end gap-1">
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setDetailSupplier(row as unknown as Supplier)}><Eye className="w-3.5 h-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(row as unknown as Supplier)}><Edit2 className="w-3.5 h-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setPendingDelete({ id: row.id as number, snapshot: row as unknown as Supplier })}><Trash2 className="w-3.5 h-3.5" /></Button>
-      </div>
-    )}
   ]
 
   return (
@@ -157,7 +150,34 @@ export default function Suppliers() {
 
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? <TableSkeleton rows={8} cols={6} /> : (
-          <DataTable data={(suppliers ?? []) as unknown as Record<string, unknown>[]} columns={columns as unknown as Column<Record<string, unknown>>[]} keyField="id" emptyMessage={s.emptyMessage} onRowFocus={(row) => setDetailSupplier(row as unknown as Supplier)} flashRowId={flashId} density={density} />
+          <DataTable
+            data={(suppliers ?? []) as unknown as Record<string, unknown>[]}
+            columns={columns as unknown as Column<Record<string, unknown>>[]}
+            keyField="id"
+            emptyMessage={s.emptyMessage}
+            onRowFocus={(row) => setDetailSupplier(row as unknown as Supplier)}
+            flashRowId={flashId}
+            density={density}
+            rowActions={(row) => {
+              const supplier = row as unknown as Supplier
+              return (
+                <>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={(e) => { e.stopPropagation(); setDetailSupplier(supplier) }}><Eye className="w-3.5 h-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(supplier) }}><Edit2 className="w-3.5 h-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); setPendingDelete({ id: supplier.id as number, snapshot: supplier }) }}><Trash2 className="w-3.5 h-3.5" /></Button>
+                </>
+              )
+            }}
+            contextMenu={(row) => {
+              const supplier = row as unknown as Supplier
+              const items: ContextMenuItem[] = [
+                { label: '查看詳情', icon: Eye as LucideIcon, onClick: () => setDetailSupplier(supplier) },
+                { label: t.common.edit, icon: Edit2 as LucideIcon, onClick: () => openEdit(supplier) },
+                { label: t.common.delete, icon: Trash2 as LucideIcon, variant: 'destructive', separator: true, onClick: () => setPendingDelete({ id: supplier.id as number, snapshot: supplier }) },
+              ]
+              return items
+            }}
+          />
         )}
       </div>
 

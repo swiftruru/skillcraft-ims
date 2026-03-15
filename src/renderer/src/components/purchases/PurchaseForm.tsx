@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Wand2, AlertTriangle } from 'lucide-react'
+import { StepperInput } from '@/components/ui/StepperInput'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '@/components/ui/dialog'
@@ -230,7 +231,11 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input type="number" min={1} className="h-9" {...register(`items.${i}.quantity`)} />
+                  <StepperInput
+                    value={watch(`items.${i}.quantity`) || 1}
+                    onChange={(v) => setValue(`items.${i}.quantity`, v, { shouldDirty: true })}
+                    min={1}
+                  />
                   <Input type="number" min={0} className="h-9" {...register(`items.${i}.unit_price`)} />
                   <Button
                     type="button"

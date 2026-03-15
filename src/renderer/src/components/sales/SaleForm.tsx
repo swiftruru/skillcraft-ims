@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Wand2, AlertTriangle } from 'lucide-react'
+import { StepperInput } from '@/components/ui/StepperInput'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -200,10 +201,11 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input
-                      type="number" min={1}
-                      className={`h-9 ${stockWarnings[i] ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                      {...register(`items.${i}.quantity`)}
+                    <StepperInput
+                      value={watch(`items.${i}.quantity`) || 1}
+                      onChange={(v) => setValue(`items.${i}.quantity`, v, { shouldDirty: true })}
+                      min={1}
+                      className={stockWarnings[i] ? 'ring-1 ring-destructive rounded-md' : ''}
                     />
                     <Input type="number" min={0} className="h-9" {...register(`items.${i}.unit_price`)} />
                     <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive shrink-0" onClick={() => remove(i)} disabled={fields.length === 1}>

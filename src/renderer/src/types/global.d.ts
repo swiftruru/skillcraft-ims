@@ -52,6 +52,7 @@ declare global {
         markPaid(id: number): Promise<import('./schema').PurchaseOrder | null>
         setPaymentDue(id: number, dueDate: string): Promise<import('./schema').PurchaseOrder | null>
         batchReceive(ids: number[]): Promise<{ received: number; skipped: number }>
+        batchCancel(ids: number[]): Promise<{ cancelled: number; skipped: number }>
         getStatusHistory(orderId: number): Promise<{ id: number; from_status: string | null; to_status: string; changed_at: string; note: string | null }[]>
       }
       sales: {
