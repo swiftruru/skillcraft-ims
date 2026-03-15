@@ -133,18 +133,35 @@ function checkPaymentDueNotifications(): void {
 }
 
 function checkLowStockNotification(): void {
-  if (!Notification.isSupported()) return
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { ProductModel } = require('./db/models/product.model') as typeof import('./db/models/product.model')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { insertNotification } = require('./ipc/notifications.ipc') as typeof import('./ipc/notifications.ipc')
+    const { getDb } = require('./db') as typeof import('./db')
+
     const items = ProductModel.getLowStockItems() as { name: string; stock_qty: number }[]
     if (items.length === 0) return
+
     const outOfStock = items.filter((i) => i.stock_qty === 0).length
     const body =
       outOfStock > 0
         ? `${items.length} 項低庫存，其中 ${outOfStock} 項已售完`
         : `${items.length} 項商品庫存低於補貨點，請盡快補貨`
-    new Notification({ title: 'SkillCraft IMS — 庫存警示', body, silent: false }).show()
+
+    // 寫入 app_notifications（每天最多一筆，避免重複）
+    const db = getDb()
+    const alreadyToday = db
+      .prepare(`SELECT id FROM app_notifications WHERE type = 'low_stock' AND date(created_at) = date('now') LIMIT 1`)
+      .get()
+    if (!alreadyToday) {
+      insertNotification('low_stock', '庫存警示', body, '/products')
+    }
+
+    // OS 系統通知
+    if (Notification.isSupported()) {
+      new Notification({ title: 'SkillCraft IMS — 庫存警示', body, silent: false }).show()
+    }
   } catch {
     // Ignore notification errors silently
   }
