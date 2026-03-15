@@ -210,6 +210,12 @@ const electronAPI = {
     getAll: () => ipcRenderer.invoke('notifications:getAll'),
     markRead: (id: number) => ipcRenderer.invoke('notifications:markRead', id),
     markAllRead: () => ipcRenderer.invoke('notifications:markAllRead')
+  },
+
+  // A11y Rule 80: nativeTheme system preference
+  app: {
+    getNativeTheme: () => ipcRenderer.invoke('app:getNativeTheme') as Promise<'dark' | 'light'>,
+    setNativeTheme: (source: 'light' | 'dark' | 'system') => ipcRenderer.invoke('app:setNativeTheme', source)
   }
 }
 

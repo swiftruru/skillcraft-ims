@@ -17,10 +17,11 @@ import { useThemeStore } from './stores/theme.store'
 
 export default function App() {
   const applyTheme = useThemeStore((s) => s.applyTheme)
+  const initFromSystem = useThemeStore((s) => s.initFromSystem)
 
   useEffect(() => {
-    applyTheme()
-  }, [applyTheme])
+    initFromSystem().then(() => applyTheme())
+  }, [applyTheme, initFromSystem])
 
   return (
     <HashRouter>

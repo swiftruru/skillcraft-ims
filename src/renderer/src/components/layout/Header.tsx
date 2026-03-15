@@ -171,6 +171,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
           onClick={toggleTheme}
           className="h-8 w-8 text-muted-foreground hover:text-foreground"
           title={theme === 'dark' ? t.header.toLight : t.header.toDark}
+          aria-label={theme === 'dark' ? t.header.toLight : t.header.toDark}
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </Button>

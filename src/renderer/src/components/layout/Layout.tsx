@@ -103,11 +103,18 @@ export function Layout() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
+      {/* A11y Rule 79: Skip to main content link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-card focus:border focus:border-border focus:rounded-md focus:px-3 focus:py-1.5 focus:text-sm focus:shadow-lg"
+      >
+        跳至主要內容
+      </a>
       <NavProgressBar />
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0">
         <Header title={title} onSearchClick={() => setPaletteOpen(true)} />
-        <main className="flex-1 overflow-auto">
+        <main id="main-content" className="flex-1 overflow-auto">
           <Outlet />
         </main>
         <StatusBar />
@@ -117,9 +124,13 @@ export function Layout() {
       <DemoController />
       <UxTourOverlay />
       <Toaster />
+      {/* A11y Rule 77: Screen reader live regions */}
+      <div id="sr-announcer-polite" aria-live="polite" aria-atomic="true" className="sr-only" />
+      <div id="sr-announcer-assertive" aria-live="assertive" aria-atomic="true" className="sr-only" />
       <button
         className="fixed bottom-5 right-5 z-40 w-8 h-8 rounded-full bg-muted border border-border text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center text-sm font-mono shadow-sm"
         title="鍵盤快捷鍵 (?)"
+        aria-label="鍵盤快捷鍵說明"
         onClick={() => setShortcutOpen((v) => !v)}
       >
         ?

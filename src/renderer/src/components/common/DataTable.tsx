@@ -231,6 +231,7 @@ export function DataTable<T extends Record<string, unknown>>({
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
               onClick={() => setShowColMenu((v) => !v)}
+              aria-label="顯示/隱藏欄位"
             >
               <Settings2 className="w-3.5 h-3.5" />
             </Button>
@@ -358,6 +359,7 @@ export function DataTable<T extends Record<string, unknown>>({
               className="h-7 w-7 p-0"
               disabled={page === 1}
               onClick={() => setPage((p) => p - 1)}
+              aria-label="上一頁"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </Button>
@@ -367,6 +369,7 @@ export function DataTable<T extends Record<string, unknown>>({
               className="h-7 w-7 p-0"
               disabled={page === totalPages}
               onClick={() => setPage((p) => p + 1)}
+              aria-label="下一頁"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </Button>

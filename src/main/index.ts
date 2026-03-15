@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, nativeTheme, Notification } from 'electron'
+import { app, shell, BrowserWindow, nativeTheme, Notification, ipcMain } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -229,8 +229,11 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Force dark mode
-  nativeTheme.themeSource = 'dark'
+  // A11y Rule 80: IPC handlers for nativeTheme system preference
+  ipcMain.handle('app:getNativeTheme', () => nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
+  ipcMain.handle('app:setNativeTheme', (_e, source: 'light' | 'dark' | 'system') => {
+    nativeTheme.themeSource = source
+  })
 
   // Set dock icon (dev mode uses default Electron icon)
   if (process.platform === 'darwin' && app.dock) {

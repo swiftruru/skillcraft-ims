@@ -206,11 +206,13 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="order_date">{tf.orderDateLabel}</Label>
-              <Input id="order_date" type="date" {...register('order_date')} />
+              <Input id="order_date" type="date" aria-invalid={!!errors.order_date} aria-describedby={errors.order_date ? 'err-order-date' : undefined} {...register('order_date')} />
+              {errors.order_date && <p id="err-order-date" role="alert" className="text-xs text-destructive">{errors.order_date.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="payment_terms">{tf.paymentTermsLabel}</Label>
-              <Input id="payment_terms" type="number" min={0} step={15} placeholder={tf.paymentTermsPlaceholder} {...register('payment_terms')} />
+              <Input id="payment_terms" type="number" min={0} step={15} placeholder={tf.paymentTermsPlaceholder} aria-invalid={!!errors.payment_terms} aria-describedby={errors.payment_terms ? 'err-payment-terms' : undefined} {...register('payment_terms')} />
+              {errors.payment_terms && <p id="err-payment-terms" role="alert" className="text-xs text-destructive">{errors.payment_terms.message}</p>}
             </div>
           </div>
 
@@ -334,7 +336,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
                 </div>
               ))}
             </div>
-            {errors.items && <p className="text-xs text-destructive">{errors.items.message}</p>}
+            {errors.items && <p id="err-items" role="alert" className="text-xs text-destructive">{errors.items.message}</p>}
 
             <div className="text-right text-sm font-semibold pt-1 border-t border-border">
               合計：NT$ {total.toLocaleString('zh-TW')}

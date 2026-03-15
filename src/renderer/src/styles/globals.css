@@ -127,3 +127,28 @@
 .titlebar-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* A11y Rule 75: Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .animate-flash,
+  .animate-fade-in,
+  .animate-nav-progress,
+  .animate-nav-fade {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* A11y Rule 75: Focus-visible ring for non-shadcn interactive elements */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 4px;
+}

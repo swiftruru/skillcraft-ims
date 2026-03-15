@@ -655,3 +655,72 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - `animate-fade-in` 定義於全域 CSS（`@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } } .animate-fade-in { animation: fadeIn 0.3s ease-out }`）
     - DataTable 提示改由 Products 頁面控制（避免 DataTable 元件感知業務邏輯），以 `hintVisible` state 傳入 DataTable 的 `hint?: ReactNode` prop
 
+## 無障礙規範（Accessibility / A11y）
+
+75. **CSS 無障礙基礎（prefers-reduced-motion + focus-visible 強化）**：
+    - 在 `globals.css` 加入 `@media (prefers-reduced-motion: reduce)` block：停用所有自訂 CSS 動畫（`.animate-flash`, `.animate-fade-in`, `.animate-nav-progress`, `.animate-nav-fade` 等）並覆寫 Radix 的 `data-[state=open]:animate-in` 系列
+    - 加入全域 focus-visible 強化：一般 `<button>`、`<a>` 預設 outline 被移除時（`outline-none`），確保 `:focus-visible` 仍有清晰 ring（補 `focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`），適用於自訂非 shadcn 的 button/link
+    - 全域 CSS：所有可互動元素在 focus-visible 時有 `outline: 2px solid hsl(var(--ring)); outline-offset: 2px;`，透過 `:focus-visible` pseudo-class 觸發（不在 mouse click 時顯示）
+    - 受影響元素：`button:focus-visible, a:focus-visible, [role="button"]:focus-visible`
+
+76. **Icon-only 按鈕強制 aria-label**：
+    - 所有 `<Button size="icon">` 或外觀為純圖示的 `<button>` 必須有 `aria-label` 或 `title` 屬性，提供語義說明
+    - 套用範圍（優先修復這些共用元件）：
+      - `Header.tsx`：主題切換按鈕補 `aria-label`（已有 `title`，改為同時加 `aria-label`）
+      - `CopyButton.tsx`：補 `aria-label="複製"`
+      - `DataTable.tsx`：欄位顯示設定按鈕補 `aria-label="欄位顯示設定"`；分頁上下頁按鈕補 `aria-label`
+      - `Layout.tsx`：快捷鍵說明浮動按鈕補 `aria-label="鍵盤快捷鍵說明"`
+      - `NotificationBell.tsx`：鈴鐺按鈕已有 `aria-label`（保留）
+    - 規則：`title` 僅供 tooltip，螢幕閱讀器建議同時加 `aria-label`（相同文字）
+
+77. **全域螢幕閱讀器公告區（Screen Reader Announcer）**：
+    - 建立 `useAnnounce()` hook（`src/renderer/src/lib/useAnnounce.ts`）：
+      - 使用 Zustand store 管理 `message: string`
+      - `announce(msg: string)` 設定 message，200ms 後自動清空（確保相同訊息再次觸發時也能播報）
+    - 在 `Layout.tsx` 加入 `<div aria-live="polite" aria-atomic="true" className="sr-only" id="a11y-announcer">` + `<div aria-live="assertive" aria-atomic="true" className="sr-only" id="a11y-assertive">`
+    - `.sr-only` 定義（已是 Tailwind 內建 utility）：`position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;`
+    - Toast 的 `variant='success'` 操作後呼叫 `announce(toast.title)`；`variant='destructive'` 使用 assertive channel
+    - `useAnnounce` 回傳 `{ announce, announceAssertive }`；在 `useToast` 的 `toast()` 內部自動呼叫（不需每個呼叫點改動）
+
+78. **表單無障礙（aria-invalid + aria-describedby）**：
+    - 適用範圍：`PurchaseForm`, `SaleForm`, `ProductForm`（及所有用 react-hook-form 的 Dialog 表單）
+    - 實作方式：
+      - 每個 `<Input>` / `<Textarea>` / `<Select>` 加上 `aria-invalid={!!errors.fieldName}` 與 `aria-describedby="fieldName-error"`（有 error 時）
+      - 錯誤訊息 `<p>` 加上對應的 `id="fieldName-error"` 與 `role="alert"`
+    - 範例：
+      ```tsx
+      <Input
+        id="order_date"
+        aria-invalid={!!errors.order_date}
+        aria-describedby={errors.order_date ? 'order_date-error' : undefined}
+        {...register('order_date')}
+      />
+      {errors.order_date && (
+        <p id="order_date-error" role="alert" className="text-xs text-destructive">
+          {errors.order_date.message}
+        </p>
+      )}
+      ```
+    - items 區塊加上 `<fieldset>` + `<legend className="sr-only">` 語義包覆
+
+79. **跳轉主內容連結（Skip Navigation）**：
+    - 在 `Layout.tsx` 的 `<div className="flex h-screen ...">` 第一個子元素加入 skip link：
+      ```tsx
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:px-3 focus:py-1.5 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:text-sm focus:font-medium"
+      >
+        跳至主要內容
+      </a>
+      ```
+    - `<main>` 元素加上 `id="main-content"` 和 `tabIndex={-1}`（允許程式聚焦但不在 Tab 順序中）
+    - Skip link 在一般狀態不可見（`sr-only`），Tab 聚焦時才浮現在畫面左上角
+
+80. **Electron 跟隨系統深淺色主題（nativeTheme 整合）**：
+    - 移除 `src/main/index.ts` 中的 `nativeTheme.themeSource = 'dark'`（強制覆寫），改為跟隨 renderer 的使用者設定
+    - 新增 IPC handler `app:setNativeTheme(theme: 'light' | 'dark' | 'system')`：設定 `nativeTheme.themeSource`
+    - preload bridge 新增 `window.electronAPI.app.setNativeTheme(theme)`
+    - `theme.store.ts` 的 `toggleTheme()` 呼叫後，同步呼叫 `window.electronAPI.app.setNativeTheme(newTheme)`
+    - 新增第三種主題選項 `'system'`：讀取 `nativeTheme.shouldUseDarkColors` 決定 DOM class；在 Settings 頁面加入「跟隨系統」選項
+    - 系統主題偵測：`nativeTheme.on('updated', ...)` → 發送 ipc 事件到 renderer → renderer 更新 DOM class（不更新 store，避免覆蓋使用者明確設定）
+
