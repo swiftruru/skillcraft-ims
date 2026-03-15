@@ -517,9 +517,20 @@ export default function Products() {
         <div className="text-xs text-muted-foreground flex items-center gap-4 py-1 px-0.5">
           <span>共 {summary.count} 項</span>
           <span>·</span>
-          <span className={summary.lowStockCount > 0 ? 'text-yellow-500' : ''}>
-            {summary.lowStockCount} 項低庫存
-          </span>
+          {summary.lowStockCount > 0 ? (
+            <button
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer
+                ${stockFilter === 'low'
+                  ? 'bg-yellow-500/25 text-yellow-600 dark:text-yellow-400 ring-1 ring-yellow-500/40'
+                  : 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/25'}`}
+              onClick={() => setStockFilter(stockFilter === 'low' ? '__all__' : 'low')}
+              title={stockFilter === 'low' ? '點擊取消篩選' : '點擊篩選低庫存商品'}
+            >
+              {summary.lowStockCount} 項低庫存
+            </button>
+          ) : (
+            <span>{summary.lowStockCount} 項低庫存</span>
+          )}
           <span>·</span>
           <span>庫存總值 {formatCurrency(summary.totalValue)}</span>
         </div>

@@ -134,8 +134,9 @@ export default function Sales() {
   const summary = useMemo(() => {
     const list = orders ?? []
     const completedCount = list.filter((o) => o.status === 'completed').length
+    const pendingCount = list.filter((o) => o.status === 'pending').length
     const totalAmount = list.reduce((sum, o) => sum + (o.total_amount ?? 0), 0)
-    return { count: list.length, completedCount, totalAmount }
+    return { count: list.length, completedCount, pendingCount, totalAmount }
   }, [orders])
 
   const completeMutation = useMutation({
@@ -591,6 +592,21 @@ export default function Sales() {
       {!isLoading && (
         <div className="text-xs text-muted-foreground flex items-center gap-4 py-1 px-0.5">
           <span>共 {summary.count} 筆</span>
+          <span>·</span>
+          {summary.pendingCount > 0 ? (
+            <button
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer
+                ${statusFilter === 'pending'
+                  ? 'bg-primary/20 text-primary ring-1 ring-primary/40'
+                  : 'bg-primary/10 text-primary hover:bg-primary/20'}`}
+              onClick={() => setStatusFilter(statusFilter === 'pending' ? '' : 'pending')}
+              title={statusFilter === 'pending' ? '點擊取消篩選' : '點擊篩選待處理訂單'}
+            >
+              {summary.pendingCount} 筆待處理
+            </button>
+          ) : (
+            <span>{summary.pendingCount} 筆待處理</span>
+          )}
           <span>·</span>
           <span>{summary.completedCount} 筆完成</span>
           <span>·</span>

@@ -15,6 +15,7 @@ export default function Receivables() {
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<Tab>('sales')
   const [markPaid, setMarkPaid] = useState<{ id: number; type: Tab } | null>(null)
+  const [overdueFilter, setOverdueFilter] = useState(false)
 
   const { data, isLoading } = useQuery<{ sales: UnpaidOrder[]; purchases: UnpaidOrder[] }>({
     queryKey: ['reports', 'unpaidOrders'],
@@ -51,6 +52,7 @@ export default function Receivables() {
   const orders = tab === 'sales' ? (data?.sales ?? []) : (data?.purchases ?? [])
   const overdueCount = orders.filter((o) => o.overdue).length
   const totalAmount = orders.reduce((s, o) => s + o.total_amount, 0)
+  const displayedOrders = overdueFilter ? orders.filter((o) => o.overdue) : orders
 
   const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
 
@@ -83,10 +85,17 @@ export default function Receivables() {
             <p className="text-sm text-muted-foreground mt-0.5">
               {r.summary(orders.length, totalAmount)}
               {overdueCount > 0 && (
-                <span className="ml-2 text-red-400 font-medium">
-                  <AlertTriangle className="inline w-3.5 h-3.5 mr-0.5 mb-0.5" />
+                <button
+                  className={`ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer
+                    ${overdueFilter
+                      ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/40'
+                      : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'}`}
+                  onClick={() => setOverdueFilter((v) => !v)}
+                  title={overdueFilter ? '點擊顯示全部' : '點擊只顯示逾期'}
+                >
+                  <AlertTriangle className="w-3 h-3" />
                   {r.overdueCount(overdueCount)}
-                </span>
+                </button>
               )}
             </p>
           )}
@@ -98,7 +107,7 @@ export default function Receivables() {
         {tabs.map((tb) => (
           <button
             key={tb.key}
-            onClick={() => setTab(tb.key)}
+            onClick={() => { setTab(tb.key); setOverdueFilter(false) }}
             className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
               tab === tb.key
                 ? 'bg-card text-foreground font-medium shadow-sm'
@@ -147,7 +156,7 @@ export default function Receivables() {
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? (
           <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">{t.common.loading}</div>
-        ) : orders.length === 0 ? (
+        ) : displayedOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-sm text-muted-foreground gap-2">
             <span className="text-2xl">🎉</span>
             <span>{r.emptyMessage}</span>
@@ -165,7 +174,7 @@ export default function Receivables() {
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => {
+              {displayedOrders.map((order) => {
                 const isOverdue = !!order.overdue
                 const isSoon = isDueSoon(order)
                 return (

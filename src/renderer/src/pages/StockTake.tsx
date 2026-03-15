@@ -52,6 +52,13 @@ function ListView({ onSelect, autoCreate }: { onSelect: (id: number) => void; au
     }
   }, [])
 
+  // N 鍵快速新建盤點
+  useEffect(() => {
+    const handler = () => createMutation.mutate()
+    window.addEventListener('ims:new-item', handler)
+    return () => window.removeEventListener('ims:new-item', handler)
+  }, [])
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => window.electronAPI.stocktake.delete(id),
     onSuccess: () => {
