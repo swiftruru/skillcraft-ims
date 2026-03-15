@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.7.1] — 2026-03-16
+
+### 修正
+
+- **緊急修正：自動更新 owner 設定錯誤** — `electron-builder.config.ts` 的 `publish.owner` 由 `ruru-o` 更正為 `swiftruru`，修復「檢查更新」回傳 404 錯誤的問題
+
+---
+
 ## [v0.7.0] — 2026-03-16
 
 ### 新功能
