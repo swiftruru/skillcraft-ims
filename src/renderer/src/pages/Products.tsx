@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DataTable, type Column } from '@/components/common/DataTable'
+import { EmptyState } from '@/components/common/EmptyState'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ProductForm } from '@/components/products/ProductForm'
@@ -45,6 +46,14 @@ export default function Products() {
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
   const [batchPriceOpen, setBatchPriceOpen] = useState(false)
   const [quickPurchaseProduct, setQuickPurchaseProduct] = useState<Product | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; product: Product } | null>(null)
+
+  useEffect(() => {
+    const close = () => setContextMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('contextmenu', close)
+    return () => { window.removeEventListener('click', close); window.removeEventListener('contextmenu', close) }
+  }, [])
 
   useEffect(() => {
     const handler = () => { setEditProduct(null); setFormOpen(true) }
@@ -160,20 +169,22 @@ export default function Products() {
         </span>
       )
     },
-    { key: 'unit', label: p.unit, className: 'w-16 text-center' },
+    { key: 'unit', label: p.unit, className: 'w-16 text-center', hideable: true },
     {
       key: 'sell_price',
       label: p.sellPrice,
       sortable: true,
       className: 'text-right w-24',
-      render: (v) => formatCurrency(Number(v))
+      render: (v) => formatCurrency(Number(v)),
+      hideable: true
     },
     {
       key: 'buy_price',
       label: p.buyPrice,
       sortable: true,
       className: 'text-right w-24',
-      render: (v) => formatCurrency(Number(v))
+      render: (v) => formatCurrency(Number(v)),
+      hideable: true
     },
     {
       key: 'id',
@@ -309,6 +320,20 @@ export default function Products() {
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
             emptyMessage={p.emptyMessage}
+            storageKey="products"
+            emptyState={!search && !hasFilter ? (
+              <EmptyState
+                icon={Package}
+                title={p.emptyTitle}
+                description={p.emptyDesc}
+                action={{ label: p.emptyAction, onClick: () => { setEditProduct(null); setFormOpen(true) } }}
+              />
+            ) : undefined}
+            onRowContextMenu={(row, e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setContextMenu({ x: e.clientX, y: e.clientY, product: row as unknown as Product })
+            }}
           />
         )}
       </div>
@@ -396,6 +421,46 @@ export default function Products() {
         description={p.deleteDesc}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
       />
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[160px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left"
+            onClick={() => { setEditProduct(contextMenu.product); setFormOpen(true); setContextMenu(null) }}
+          >
+            <Edit2 className="w-3.5 h-3.5" />{t.common.edit}
+          </button>
+          <button
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left"
+            onClick={() => { setAdjustProduct(contextMenu.product); setContextMenu(null) }}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />{p.adjustInventory}
+          </button>
+          <button
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left"
+            onClick={() => { setQuickPurchaseProduct(contextMenu.product); setContextMenu(null) }}
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />{p.quickPurchase}
+          </button>
+          <button
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left"
+            onClick={() => { setDetailProduct(contextMenu.product); setContextMenu(null) }}
+          >
+            <History className="w-3.5 h-3.5" />{p.adjustHistory}
+          </button>
+          <div className="border-t border-border my-1" />
+          <button
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent text-left text-destructive"
+            onClick={() => { setDeleteId(contextMenu.product.id as number); setContextMenu(null) }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />{t.common.delete}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

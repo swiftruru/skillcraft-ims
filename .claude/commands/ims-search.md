@@ -60,3 +60,15 @@ description: 當使用者要求新增或修改全域搜尋、Command Palette、�
 8. **動作篩選**：輸入不以 `>` 開頭時，同時顯示搜尋結果與
    符合文字的動作指令；輸入以 `>` 開頭時，隱藏搜尋結果，
    只顯示符合 `>` 後文字的動作指令。
+
+9. **最近瀏覽（Recently Viewed）**：
+   - localStorage key：`ims-recent-items`，max 5 筆
+   - 每筆格式：`SearchResult`（`{ type, id, title, meta? }`）
+   - 觸發時機：使用者在 CommandPalette 點擊任一搜尋結果時，
+     呼叫 `addRecentItem(result)` 寫入（去重 by type+id，新的排前面）
+   - 顯示位置：query 為空時，出現在 Actions 段落上方，
+     標題「最近瀏覽」/「Recently Viewed」（Clock icon）
+   - 工具函式放在 `src/renderer/src/lib/recentItems.ts`：
+     - `getRecentItems(): SearchResult[]`
+     - `addRecentItem(item: SearchResult): void`
+   - 最近瀏覽的點擊行為與搜尋結果相同（navigate + 記錄）

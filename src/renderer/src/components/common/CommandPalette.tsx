@@ -2,12 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search, Package, Truck, Users, ShoppingCart, FileText, X,
-  Zap, Plus, ClipboardList, Palette, Languages
+  Zap, Plus, ClipboardList, Palette, Languages, Clock
 } from 'lucide-react'
 import type { SearchResult } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { useThemeStore } from '@/stores/theme.store'
 import { useLangStore } from '@/stores/lang.store'
+import { getRecentItems, addRecentItem } from '@/lib/recentItems'
 
 const TYPE_ICONS = {
   product: Package,
@@ -44,6 +45,7 @@ export function CommandPalette({ open, onClose }: Props) {
   const cp = t.commandPalette
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
+  const [recentItems, setRecentItems] = useState<SearchResult[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -93,6 +95,7 @@ export function CommandPalette({ open, onClose }: Props) {
     if (open) {
       setQuery('')
       setResults([])
+      setRecentItems(getRecentItems())
       setActiveIndex(0)
       setTimeout(() => inputRef.current?.focus(), 50)
     }
@@ -123,6 +126,7 @@ export function CommandPalette({ open, onClose }: Props) {
   }
 
   const handleSelect = (result: SearchResult) => {
+    addRecentItem(result)
     navigate(TYPE_ROUTES[result.type])
     onClose()
   }
@@ -139,7 +143,8 @@ export function CommandPalette({ open, onClose }: Props) {
   })
 
   const showResults = !query.startsWith('>') && results.length > 0
-  const totalItems = (showResults ? results.length : 0) + visibleActions.length
+  const showRecent = !query.trim() && recentItems.length > 0
+  const totalItems = (showResults ? results.length : 0) + (showRecent ? recentItems.length : 0) + visibleActions.length
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -152,9 +157,11 @@ export function CommandPalette({ open, onClose }: Props) {
       e.preventDefault()
       if (showResults && activeIndex < results.length) {
         handleSelect(results[activeIndex])
+      } else if (showRecent && activeIndex < recentItems.length) {
+        handleSelect(recentItems[activeIndex])
       } else {
-        const actionIdx = activeIndex - (showResults ? results.length : 0)
-        visibleActions[actionIdx]?.handler()
+        const offset = (showResults ? results.length : 0) + (showRecent ? recentItems.length : 0)
+        visibleActions[activeIndex - offset]?.handler()
       }
     } else if (e.key === 'Escape') {
       onClose()
@@ -229,10 +236,50 @@ export function CommandPalette({ open, onClose }: Props) {
             </ul>
           )}
 
+          {/* Recently Viewed */}
+          {showRecent && (
+            <>
+              <div className="px-4 pt-2 pb-1">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <Clock className="w-3 h-3" />{cp.recentLabel}
+                </span>
+              </div>
+              <ul className="pb-1">
+                {recentItems.map((item, i) => {
+                  const Icon = TYPE_ICONS[item.type]
+                  return (
+                    <li key={`recent-${item.type}-${item.id}`}>
+                      <button
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                          i === activeIndex ? 'bg-accent' : 'hover:bg-accent/50'
+                        }`}
+                        onClick={() => handleSelect(item)}
+                        onMouseEnter={() => setActiveIndex(i)}
+                      >
+                        <div className="flex-shrink-0 w-7 h-7 rounded-md bg-muted flex items-center justify-center">
+                          <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{item.title}</div>
+                          {item.meta && (
+                            <div className="text-xs text-muted-foreground truncate">{item.meta}</div>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0 bg-muted px-1.5 py-0.5 rounded">
+                          {cp.types[item.type as keyof typeof cp.types]}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
+
           {/* Actions section */}
           {visibleActions.length > 0 && (
             <>
-              {showResults && <div className="border-t border-border mx-3" />}
+              {(showResults || showRecent) && <div className="border-t border-border mx-3" />}
               <div className="px-4 pt-2 pb-1">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   {cp.actionsLabel}
@@ -240,7 +287,7 @@ export function CommandPalette({ open, onClose }: Props) {
               </div>
               <ul className="pb-1">
                 {visibleActions.map((action, i) => {
-                  const globalIdx = (showResults ? results.length : 0) + i
+                  const globalIdx = (showResults ? results.length : 0) + (showRecent ? recentItems.length : 0) + i
                   const Icon = action.icon
                   const label = cp.actions[action.labelKey as keyof typeof cp.actions] ?? action.labelKey
                   return (

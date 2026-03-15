@@ -119,7 +119,15 @@ export const translations = {
       dueSoonHint: (n: number) => `共 ${n} 筆帳款將於 7 天內到期`,
       overdueTypeSales: '應收',
       overdueTypePurchases: '應付',
-      viewReceivables: '查看帳款管理 →'
+      viewReceivables: '查看帳款管理 →',
+      topProducts: '熱銷商品排行',
+      topProductsDays: (n: number) => `過去 ${n} 天`,
+      noTopProductsData: '所選期間尚無銷售紀錄',
+      topProductsRevenue: '銷售金額',
+      topProductsQty: '銷售量',
+      customize: '自訂',
+      customizeHide: '隱藏',
+      customizeShow: '顯示'
     },
     products: {
       title: '商品名稱',
@@ -131,6 +139,9 @@ export const translations = {
       purchaseSuggestion: '採購建議',
       searchPlaceholder: '搜尋商品名稱或 SKU...',
       emptyMessage: '沒有商品，請新增第一個商品',
+      emptyTitle: '尚無商品',
+      emptyDesc: '新增第一項商品，開始管理庫存。',
+      emptyAction: '新增商品',
       addProduct: '新增商品',
       deleteTitle: '刪除商品',
       deleteDesc: '刪除後無法復原，相關的採購/銷售明細中的商品將無法顯示名稱。',
@@ -161,6 +172,9 @@ export const translations = {
       addOrder: '新增採購單',
       searchPlaceholder: '搜尋訂單號或供應商...',
       emptyMessage: '沒有採購訂單',
+      emptyTitle: '尚無採購單',
+      emptyDesc: '建立第一筆採購單，開始追蹤進貨。',
+      emptyAction: '新增採購單',
       deleteTitle: '刪除採購單',
       deleteDesc: '確定刪除此採購單？此操作無法復原。',
       receiveTitle: '確認收貨',
@@ -184,7 +198,8 @@ export const translations = {
       markPaidDesc: '標記此採購單為已付款？',
       paid: '已付款',
       unpaid: '未付款',
-      paymentDue: '付款截止日'
+      paymentDue: '付款截止日',
+      saveFilter: '儲存篩選'
     },
     sales: {
       customer: '客戶',
@@ -193,6 +208,9 @@ export const translations = {
       addOrder: '新增銷售單',
       searchPlaceholder: '搜尋訂單號或客戶...',
       emptyMessage: '沒有銷售訂單',
+      emptyTitle: '尚無銷售單',
+      emptyDesc: '建立第一筆銷售單，開始記錄出貨。',
+      emptyAction: '新增銷售單',
       deleteTitle: '刪除銷售單',
       deleteDesc: '確定刪除此銷售單？此操作無法復原。',
       completeTitle: '完成訂單',
@@ -217,7 +235,8 @@ export const translations = {
       paid: '已付款',
       unpaid: '未付款',
       overdue: '逾期',
-      paymentDue: '付款截止日'
+      paymentDue: '付款截止日',
+      saveFilter: '儲存篩選'
     },
     suppliers: {
       name: '名稱',
@@ -506,6 +525,7 @@ export const translations = {
       noResults: (q: string) => `找不到「${q}」相關結果`,
       hint: '↑↓ 移動  ↵ 跳轉  Esc 關閉',
       actionsLabel: '動作',
+      recentLabel: '最近瀏覽',
       types: {
         product: '商品',
         supplier: '供應商',
@@ -666,7 +686,15 @@ export const translations = {
       dueSoonHint: (n: number) => `${n} payment(s) due within 7 days`,
       overdueTypeSales: 'Receivable',
       overdueTypePurchases: 'Payable',
-      viewReceivables: 'View Receivables →'
+      viewReceivables: 'View Receivables →',
+      topProducts: 'Top Products',
+      topProductsDays: (n: number) => `Last ${n} days`,
+      noTopProductsData: 'No sales data for the selected period',
+      topProductsRevenue: 'Revenue',
+      topProductsQty: 'Qty Sold',
+      customize: 'Customize',
+      customizeHide: 'Hide',
+      customizeShow: 'Show'
     },
     products: {
       title: 'Name',
@@ -678,6 +706,9 @@ export const translations = {
       purchaseSuggestion: 'Purchase Suggestion',
       searchPlaceholder: 'Search by name or SKU...',
       emptyMessage: 'No products. Add the first one.',
+      emptyTitle: 'No Products Yet',
+      emptyDesc: 'Add your first product to start managing inventory.',
+      emptyAction: 'Add Product',
       addProduct: 'Add Product',
       deleteTitle: 'Delete Product',
       deleteDesc: 'This cannot be undone. Related purchase/sales details will lose the product name.',
@@ -708,6 +739,9 @@ export const translations = {
       addOrder: 'New Purchase Order',
       searchPlaceholder: 'Search by order no. or supplier...',
       emptyMessage: 'No purchase orders',
+      emptyTitle: 'No Purchase Orders Yet',
+      emptyDesc: 'Create your first purchase order to start tracking inventory.',
+      emptyAction: 'New Purchase Order',
       deleteTitle: 'Delete Purchase Order',
       deleteDesc: 'Delete this purchase order? This cannot be undone.',
       receiveTitle: 'Confirm Receipt',
@@ -731,7 +765,8 @@ export const translations = {
       markPaidDesc: 'Mark this purchase order as paid?',
       paid: 'Paid',
       unpaid: 'Unpaid',
-      paymentDue: 'Payment Due'
+      paymentDue: 'Payment Due',
+      saveFilter: 'Save Filter'
     },
     sales: {
       customer: 'Customer',
@@ -740,6 +775,9 @@ export const translations = {
       addOrder: 'New Sales Order',
       searchPlaceholder: 'Search by order no. or customer...',
       emptyMessage: 'No sales orders',
+      emptyTitle: 'No Sales Orders Yet',
+      emptyDesc: 'Create your first sales order to start recording shipments.',
+      emptyAction: 'New Sales Order',
       deleteTitle: 'Delete Sales Order',
       deleteDesc: 'Delete this sales order? This cannot be undone.',
       completeTitle: 'Complete Order',
@@ -764,7 +802,8 @@ export const translations = {
       paid: 'Paid',
       unpaid: 'Unpaid',
       overdue: 'Overdue',
-      paymentDue: 'Payment Due'
+      paymentDue: 'Payment Due',
+      saveFilter: 'Save Filter'
     },
     suppliers: {
       name: 'Name',
@@ -1053,6 +1092,7 @@ export const translations = {
       noResults: (q: string) => `No results for "${q}"`,
       hint: '↑↓ Navigate  ↵ Jump  Esc Close',
       actionsLabel: 'Actions',
+      recentLabel: 'Recently Viewed',
       types: {
         product: 'Product',
         supplier: 'Supplier',

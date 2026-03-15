@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
-import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import { useLang } from '@/lib/useLang'
 
@@ -11,6 +12,7 @@ export interface Column<T> {
   className?: string
   render?: (value: unknown, row: T) => React.ReactNode
   header?: () => React.ReactNode
+  hideable?: boolean
 }
 
 interface DataTableProps<T> {
@@ -18,7 +20,10 @@ interface DataTableProps<T> {
   columns: Column<T>[]
   keyField: keyof T
   emptyMessage?: string
+  emptyState?: React.ReactNode
   pageSize?: number
+  storageKey?: string
+  onRowContextMenu?: (row: T, e: React.MouseEvent) => void
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -28,12 +33,48 @@ export function DataTable<T extends Record<string, unknown>>({
   columns,
   keyField,
   emptyMessage = '沒有資料',
-  pageSize = 15
+  emptyState,
+  pageSize = 15,
+  storageKey,
+  onRowContextMenu
 }: DataTableProps<T>) {
   const t = useLang()
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>(null)
   const [page, setPage] = useState(1)
+  const [showColMenu, setShowColMenu] = useState(false)
+  const colMenuRef = useRef<HTMLDivElement>(null)
+
+  const hideableColumns = columns.filter((c) => c.hideable)
+
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
+    if (!storageKey) return new Set()
+    try {
+      const raw = localStorage.getItem(`dt-cols-${storageKey}`)
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
+
+  useEffect(() => {
+    if (!storageKey) return
+    localStorage.setItem(`dt-cols-${storageKey}`, JSON.stringify(Array.from(hiddenCols)))
+  }, [hiddenCols, storageKey])
+
+  // Close col menu on outside click
+  useEffect(() => {
+    if (!showColMenu) return
+    const handler = (e: MouseEvent) => {
+      if (colMenuRef.current && !colMenuRef.current.contains(e.target as Node)) {
+        setShowColMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showColMenu])
+
+  const visibleColumns = columns.filter((c) => !hiddenCols.has(String(c.key)))
 
   const sorted = useMemo(() => {
     if (!sortKey || !sortDir) return data
@@ -65,6 +106,7 @@ export function DataTable<T extends Record<string, unknown>>({
   }
 
   if (data.length === 0) {
+    if (emptyState) return <>{emptyState}</>
     return (
       <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
         {emptyMessage}
@@ -74,11 +116,55 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="w-full">
+      {hideableColumns.length > 0 && (
+        <div className="flex justify-end px-3 pt-2 pb-1">
+          <div className="relative" ref={colMenuRef}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowColMenu((v) => !v)}
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+            </Button>
+            {showColMenu && (
+              <div className="absolute right-0 top-8 z-20 bg-card border border-border rounded-lg shadow-lg p-2 min-w-[160px]">
+                <p className="text-xs font-medium text-muted-foreground px-2 pb-1.5">顯示欄位</p>
+                <div className="space-y-0.5">
+                  {hideableColumns.map((col) => {
+                    const key = String(col.key)
+                    return (
+                      <label
+                        key={key}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm"
+                      >
+                        <Checkbox
+                          checked={!hiddenCols.has(key)}
+                          onCheckedChange={(checked) => {
+                            setHiddenCols((prev) => {
+                              const next = new Set(prev)
+                              if (checked) next.delete(key)
+                              else next.add(key)
+                              return next
+                            })
+                          }}
+                        />
+                        {col.label}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="overflow-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              {columns.map((col) => (
+              {visibleColumns.map((col) => (
                 <th
                   key={String(col.key)}
                   className={cn(
@@ -113,8 +199,9 @@ export function DataTable<T extends Record<string, unknown>>({
               <tr
                 key={String(row[keyField])}
                 className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(row, e) : undefined}
               >
-                {columns.map((col) => {
+                {visibleColumns.map((col) => {
                   const value = row[String(col.key)]
                   return (
                     <td key={String(col.key)} className={cn('px-4 py-3', col.className)}>

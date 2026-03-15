@@ -184,3 +184,61 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - `onCreate` 期間顯示 loading spinner，禁止重複提交
     - 整合 react-hook-form：用 `watch` + `setValue` 替換原本的 `<Select>`
 
+28. **EmptyState 元件與 DataTable 整合**：
+    - 元件命名：`EmptyState`，位於 `src/renderer/src/components/common/EmptyState.tsx`
+    - Props：`{ icon: React.ElementType, title: string, description?: string, action?: { label: string, onClick: () => void } }`
+    - 樣式：`flex flex-col items-center justify-center py-16 gap-3`；icon 64×64 `text-muted-foreground/30`；title `text-base font-medium`；description `text-sm text-muted-foreground`；action Button `variant="default" size="sm" mt-1`
+    - `DataTable` 新增 `emptyState?: React.ReactNode` prop；當 `data.length === 0` 且 `emptyState` 有值時渲染 `emptyState`，否則渲染原本的 `emptyMessage` 文字
+    - 使用時機區分：
+      - 無任何篩選且資料空 → 傳 `emptyState`（含 CTA 按鈕）
+      - 有篩選但無結果 → 傳 `emptyMessage` 文字即可（不傳 `emptyState`）
+    - 各頁面 CTA 按鈕動作：Products → `setFormOpen(true)`；Purchases → `setFormOpen(true)`；Sales → `setFormOpen(true)`
+
+29. **DataTable 欄位顯示/隱藏**：
+    - `DataTable` 新增 `storageKey?: string` 與 `Column.hideable?: boolean` 欄位屬性
+    - 當 `storageKey` 有值時，右上角顯示「欄位」按鈕（`Settings2` icon，`variant="ghost" size="sm"`）；點擊開啟 Popover（`absolute right-0 top-full mt-1 z-50`）
+    - Popover 內列出所有 `hideable: true` 的欄位，以 Checkbox 切換顯示/隱藏
+    - 隱藏狀態存 `localStorage[storageKey]`（JSON string array of hidden column keys）
+    - 至少保留 1 個可見欄位（若全部打勾隱藏，最後一個不允許隱藏）
+    - `storageKey` 命名慣例：`'dt-vis-{pageName}'`，如 `'dt-vis-products'`、`'dt-vis-purchases'`
+
+30. **可儲存的篩選條件（Saved Filters）**：
+    - 適用範圍：Purchases、Sales 頁面
+    - 篩選欄位：`{ search, dateFrom, dateTo }`（與現有 state 對應）
+    - 儲存位置：`localStorage['ims-saved-filters-purchases']` / `['ims-saved-filters-sales']`，JSON array of `{ name: string, filters: object }`，上限 5 組
+    - UI：篩選列最右側加書籤 icon 按鈕（`Bookmark`），點擊後顯示 inline input 讓使用者輸入名稱，按 Enter 或點儲存確認
+    - 已存的篩選組合顯示為頁面頂部的 badge chips（`bg-muted rounded-full px-2.5 py-0.5 text-xs`），點擊 chip → 套用對應篩選值，chip 右側 `×` → 刪除
+    - 如果目前篩選條件已有同名存檔，書籤 icon 顯示 filled 狀態（`fill-current`）
+
+31. **商品銷售效能排行（Top Products）**：
+    - Dashboard 新增「銷售排行」卡片，緊接在 KPI 卡片之後
+    - IPC：`reports:topProducts(days)` 已存在，回傳 `{ product_id, sku, name, category, total_quantity, total_revenue }[]`（ORDER BY total_revenue DESC LIMIT 10）
+    - queryKey：`['reports', 'topProducts', days]`，`staleTime: 1000 * 60 * 5`
+    - 時間區間切換：3 個 Button（30天 / 90天 / 180天），state `[days, setDays] = useState(30)`；切換時 refetch
+    - 圖表：Recharts `BarChart layout="vertical"`，X 軸為金額（`formatCurrency`），Y 軸為商品名稱（`name`），最多顯示前 5 名；Bar 顏色使用 `CATEGORY_COLORS` 依 index 循環
+    - 圖表下方排名列表：依序顯示排名 badge（圓形 `bg-muted`）、商品名、銷售量、銷售金額
+    - 空白狀態（無資料）顯示「所選期間尚無銷售紀錄」
+    - i18n keys：`dashboard.topProducts`（卡片標題）、`dashboard.topProductsDays(n)`（「過去 N 天」）、`dashboard.noSalesData`（空白提示）
+
+32. **Products 列右鍵選單（Row Context Menu）**：
+    - Products 頁面表格每一列（`<tr>`）加上 `onContextMenu` 事件
+    - 右鍵後在游標位置顯示 context menu（`fixed`，`z-50`，`bg-card border border-border rounded-lg shadow-xl py-1 min-w-[160px]`）
+    - 選單項目（對應現有功能）：
+      - 「編輯商品」（`Edit2` icon） → `setEditProduct(row); setFormOpen(true)`
+      - 「調整庫存」（`SlidersHorizontal` icon） → `setAdjustProduct(row)`
+      - 「快速採購」（`ShoppingCart` icon） → `setQuickPurchaseProduct(row)`
+      - 「查看記錄」（`History` icon） → `setDetailProduct(row)`
+      - 分隔線
+      - 「刪除商品」（`Trash2` icon，`text-destructive`） → `setDeleteId(row.id)`
+    - State：`contextMenu: { x, y, product } | null`，點擊外部或選擇項目後清除
+    - 關閉邏輯：`useEffect` 監聽全域 `click` 事件，觸發時呼叫 `setContextMenu(null)`
+    - 元件不拆出，直接在 `Products.tsx` 內以 `portal` 或 `fixed` div 實作
+
+33. **Dashboard 小工具顯示/隱藏自訂**：
+    - Dashboard header 右上角新增「自訂」按鈕（`LayoutDashboard` icon，`variant="ghost" size="sm"`），點擊切換「編輯模式」
+    - 編輯模式下，每個 widget 卡片右上角顯示 Eye / EyeOff toggle 按鈕（`opacity-0 group-hover:opacity-100` + 編輯模式強制顯示）
+    - 各 widget 對應 key（用於 localStorage）：`kpis`、`quickActions`、`salesTrend`、`topProducts`、`inventoryByCategory`、`lowStock`、`pendingSales`、`unpaidOrders`、`purchaseSuggestions`、`aiInsight`
+    - 設定儲存於 `localStorage['ims-dashboard-hidden']`（JSON string array of hidden widget keys）
+    - 所有 widget 預設顯示（hidden 列表為空）；僅最後 1 個不允許隱藏（至少保留 1 個）
+    - i18n key：`dashboard.customize`（按鈕文字）、`dashboard.editingMode`（提示文字）
+

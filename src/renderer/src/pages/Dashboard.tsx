@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -18,7 +18,11 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Brain,
-  RefreshCw
+  RefreshCw,
+  LayoutDashboard,
+  Eye,
+  EyeOff,
+  Trophy
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -38,10 +42,11 @@ import {
   Bar,
   Cell
 } from 'recharts'
-import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion, AiForecastResult, UnpaidOrder } from '@/types/schema'
+import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion, AiForecastResult, UnpaidOrder, TopProduct } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
 const CATEGORY_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+const WIDGET_KEYS = ['quickActions', 'kpis', 'salesTrend', 'topProducts', 'lowStock', 'pendingSales', 'purchaseSuggestions', 'aiInsight']
 
 export default function Dashboard() {
   const t = useLang()
@@ -52,6 +57,54 @@ export default function Dashboard() {
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set())
   const [aiForecast, setAiForecast] = useState<AiForecastResult | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [topProductDays, setTopProductDays] = useState(30)
+  const [customizing, setCustomizing] = useState(false)
+  const [hiddenWidgets, setHiddenWidgets] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('ims-dashboard-hidden')
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set()
+    } catch { return new Set() }
+  })
+
+  useEffect(() => {
+    localStorage.setItem('ims-dashboard-hidden', JSON.stringify(Array.from(hiddenWidgets)))
+  }, [hiddenWidgets])
+
+  const toggleWidget = (key: string) => {
+    setHiddenWidgets((prev) => {
+      if (prev.size >= WIDGET_KEYS.length - 1 && !prev.has(key)) return prev
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+  const isVisible = (key: string) => !hiddenWidgets.has(key)
+
+  const wrap = (key: string, label: string, content: React.ReactNode) => {
+    if (!customizing && hiddenWidgets.has(key)) return null
+    if (customizing && hiddenWidgets.has(key)) {
+      return (
+        <div className="flex items-center justify-between px-4 py-2.5 rounded-lg border border-dashed border-border/50 text-sm text-muted-foreground bg-muted/10">
+          <span className="flex items-center gap-2"><EyeOff className="w-3.5 h-3.5" />{label}</span>
+          <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => toggleWidget(key)}>
+            <Eye className="w-3.5 h-3.5" />{d.customizeShow}
+          </Button>
+        </div>
+      )
+    }
+    if (!customizing) return <>{content}</>
+    return (
+      <div>
+        <div className="flex justify-end -mb-2 pr-1">
+          <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => toggleWidget(key)}>
+            <EyeOff className="w-3 h-3" />{d.customizeHide}
+          </Button>
+        </div>
+        {content}
+      </div>
+    )
+  }
 
   const { data: kpis, isLoading: kpisLoading } = useQuery<DashboardKPIs>({
     queryKey: ['reports', 'kpis'],
@@ -88,6 +141,12 @@ export default function Dashboard() {
   const { data: suggestions } = useQuery<PurchaseSuggestion[]>({
     queryKey: ['inventory', 'suggestions'],
     queryFn: () => window.electronAPI.inventory.getPurchaseSuggestions()
+  })
+
+  const { data: topProducts } = useQuery<TopProduct[]>({
+    queryKey: ['reports', 'topProducts', topProductDays],
+    queryFn: () => window.electronAPI.reports.topProducts(topProductDays),
+    staleTime: 1000 * 60 * 5
   })
 
   const createPOMutation = useMutation({
@@ -146,72 +205,89 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Quick Actions */}
-      <div className="flex gap-3 flex-wrap">
-        <Button variant="outline" size="sm" className="gap-2"
-          onClick={() => navigate('/purchases', { state: { openForm: true } })}>
-          <Plus className="w-4 h-4" />{d.addPurchase}
-        </Button>
-        <Button variant="outline" size="sm" className="gap-2"
-          onClick={() => navigate('/sales', { state: { openForm: true } })}>
-          <Plus className="w-4 h-4" />{d.addSales}
-        </Button>
-        <Button variant="outline" size="sm" className="gap-2"
-          onClick={() => navigate('/stock-take', { state: { createNew: true } })}>
-          <ClipboardList className="w-4 h-4" />{d.startStockTake}
+      {/* Header with Customize button */}
+      <div className="flex items-center justify-end">
+        <Button
+          variant={customizing ? 'secondary' : 'ghost'}
+          size="sm"
+          className="gap-1.5 text-xs"
+          onClick={() => setCustomizing((v) => !v)}
+        >
+          <LayoutDashboard className="w-3.5 h-3.5" />
+          {d.customize}
         </Button>
       </div>
+
+      {/* Quick Actions */}
+      {wrap('quickActions', d.addPurchase, (
+        <div className="flex gap-3 flex-wrap">
+          <Button variant="outline" size="sm" className="gap-2"
+            onClick={() => navigate('/purchases', { state: { openForm: true } })}>
+            <Plus className="w-4 h-4" />{d.addPurchase}
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2"
+            onClick={() => navigate('/sales', { state: { openForm: true } })}>
+            <Plus className="w-4 h-4" />{d.addSales}
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2"
+            onClick={() => navigate('/stock-take', { state: { createNew: true } })}>
+            <ClipboardList className="w-4 h-4" />{d.startStockTake}
+          </Button>
+        </div>
+      ))}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiCard
-          title={d.inventoryValue}
-          value={formatCurrency(kpis?.totalInventoryValue ?? 0)}
-          subtitle={d.totalProducts(kpis?.totalProducts ?? 0)}
-          icon={<Package className="w-4 h-4" />}
-          color="text-blue-400"
-        />
-        <KpiCard
-          title={d.monthlyRevenue}
-          value={formatCurrency(kpis?.monthlyRevenue ?? 0)}
-          subtitle={<ChangeIndicator value={revenueChange} suffix={d.vsLastMonth} />}
-          icon={<DollarSign className="w-4 h-4" />}
-          color="text-green-400"
-        />
-        <KpiCard
-          title={d.grossMargin}
-          value={`${profitMargin}%`}
-          subtitle={<ChangeIndicator value={profitChange} suffix={d.vsLastMonth} />}
-          icon={<BarChart2 className="w-4 h-4" />}
-          color="text-purple-400"
-        />
-        <KpiCard
-          title={d.lowStockAlert}
-          value={String(kpis?.lowStockCount ?? 0)}
-          subtitle={d.itemsNeedRestock}
-          icon={<AlertTriangle className="w-4 h-4" />}
-          color={kpis?.lowStockCount ? 'text-yellow-400' : 'text-muted-foreground'}
-          alert={!!kpis?.lowStockCount}
-        />
-      </div>
-
-      {/* 應收/應付 KPI */}
-      <div className="grid grid-cols-2 gap-4">
-        <KpiCard
-          title={d.unpaidReceivables}
-          value={formatCurrency(kpis?.unpaidSalesTotal ?? 0)}
-          subtitle={d.unpaidReceivablesHint}
-          icon={<ArrowDownLeft className="w-4 h-4" />}
-          color={(kpis?.unpaidSalesTotal ?? 0) > 0 ? 'text-emerald-400' : 'text-muted-foreground'}
-        />
-        <KpiCard
-          title={d.unpaidPayables}
-          value={formatCurrency(kpis?.unpaidPurchasesTotal ?? 0)}
-          subtitle={d.unpaidPayablesHint}
-          icon={<ArrowUpRight className="w-4 h-4" />}
-          color={(kpis?.unpaidPurchasesTotal ?? 0) > 0 ? 'text-rose-400' : 'text-muted-foreground'}
-        />
-      </div>
+      {wrap('kpis', d.inventoryValue, (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <KpiCard
+              title={d.inventoryValue}
+              value={formatCurrency(kpis?.totalInventoryValue ?? 0)}
+              subtitle={d.totalProducts(kpis?.totalProducts ?? 0)}
+              icon={<Package className="w-4 h-4" />}
+              color="text-blue-400"
+            />
+            <KpiCard
+              title={d.monthlyRevenue}
+              value={formatCurrency(kpis?.monthlyRevenue ?? 0)}
+              subtitle={<ChangeIndicator value={revenueChange} suffix={d.vsLastMonth} />}
+              icon={<DollarSign className="w-4 h-4" />}
+              color="text-green-400"
+            />
+            <KpiCard
+              title={d.grossMargin}
+              value={`${profitMargin}%`}
+              subtitle={<ChangeIndicator value={profitChange} suffix={d.vsLastMonth} />}
+              icon={<BarChart2 className="w-4 h-4" />}
+              color="text-purple-400"
+            />
+            <KpiCard
+              title={d.lowStockAlert}
+              value={String(kpis?.lowStockCount ?? 0)}
+              subtitle={d.itemsNeedRestock}
+              icon={<AlertTriangle className="w-4 h-4" />}
+              color={kpis?.lowStockCount ? 'text-yellow-400' : 'text-muted-foreground'}
+              alert={!!kpis?.lowStockCount}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <KpiCard
+              title={d.unpaidReceivables}
+              value={formatCurrency(kpis?.unpaidSalesTotal ?? 0)}
+              subtitle={d.unpaidReceivablesHint}
+              icon={<ArrowDownLeft className="w-4 h-4" />}
+              color={(kpis?.unpaidSalesTotal ?? 0) > 0 ? 'text-emerald-400' : 'text-muted-foreground'}
+            />
+            <KpiCard
+              title={d.unpaidPayables}
+              value={formatCurrency(kpis?.unpaidPurchasesTotal ?? 0)}
+              subtitle={d.unpaidPayablesHint}
+              icon={<ArrowUpRight className="w-4 h-4" />}
+              color={(kpis?.unpaidPurchasesTotal ?? 0) > 0 ? 'text-rose-400' : 'text-muted-foreground'}
+            />
+          </div>
+        </div>
+      ))}
 
       {/* Overdue Alerts */}
       {(kpis?.overdueCount ?? 0) > 0 && (() => {
@@ -314,7 +390,7 @@ export default function Dashboard() {
       })()}
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      {wrap('salesTrend', d.salesTrend, <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">{d.salesTrend}</CardTitle>
@@ -400,10 +476,78 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div>)}
+
+      {/* Top Products */}
+      {wrap('topProducts', d.topProducts, (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-amber-400" />
+                {d.topProducts}
+              </CardTitle>
+              <div className="flex gap-1">
+                {[30, 90, 180].map((n) => (
+                  <Button
+                    key={n}
+                    variant={topProductDays === n ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-6 text-xs px-2"
+                    onClick={() => setTopProductDays(n)}
+                  >
+                    {d.topProductsDays(n)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {topProducts && topProducts.length > 0 ? (
+              <div className="space-y-3">
+                <ResponsiveContainer width="100%" height={Math.min(topProducts.length, 5) * 40 + 20}>
+                  <BarChart layout="vertical" data={topProducts.slice(0, 5)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={90} />
+                    <Tooltip
+                      contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                      formatter={(v: number) => [formatCurrency(v), d.topProductsRevenue]}
+                    />
+                    <Bar dataKey="total_revenue" radius={[0, 4, 4, 0]}>
+                      {topProducts.slice(0, 5).map((_, i) => (
+                        <Cell key={i} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="space-y-0 border-t border-border pt-2">
+                  {topProducts.map((item, i) => (
+                    <div key={item.product_id} className="flex items-center gap-3 py-1.5 border-b border-border/40 last:border-0">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{item.name}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{item.sku}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-semibold">{formatCurrency(item.total_revenue)}</div>
+                        <div className="text-xs text-muted-foreground">{d.topProductsQty}: {item.total_quantity}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
+                {d.noTopProductsData}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      {wrap('lowStock', d.lowStockItems, <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -482,10 +626,10 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div>)}
 
       {/* Purchase Suggestions */}
-      {suggestions && suggestions.length > 0 && (
+      {wrap('purchaseSuggestions', d.restockSuggestion, suggestions && suggestions.length > 0 ? (
         <Card className="border-orange-400/20">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -557,10 +701,10 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null)}
 
       {/* AI Demand Forecast */}
-      <Card>
+      {wrap('aiInsight', 'AI 需求預測', <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -631,7 +775,7 @@ export default function Dashboard() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>)}
     </div>
   )
 }

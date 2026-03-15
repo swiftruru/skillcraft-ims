@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable, type Column } from '@/components/common/DataTable'
@@ -14,6 +14,8 @@ import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/li
 import type { SalesOrder } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { useDemoStore } from '@/stores/demo.store'
+import { EmptyState } from '@/components/common/EmptyState'
+import { SavedFilters } from '@/components/common/SavedFilters'
 
 export default function Sales() {
   const queryClient = useQueryClient()
@@ -134,6 +136,7 @@ export default function Sales() {
     {
       key: 'payment_status',
       label: s.paymentStatus,
+      hideable: true,
       render: (_v, row) => {
         if (row.status !== 'completed' && row.status !== 'partial_return') return null
         const isOverdue = row.payment_status === 'unpaid' && row.payment_due_date && row.payment_due_date < new Date().toISOString().slice(0, 10)
@@ -268,6 +271,18 @@ export default function Sales() {
         {(dateFrom || dateTo) && (
           <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => { setDateFrom(''); setDateTo('') }}>{s.clearDates}</button>
         )}
+      </div>
+      <SavedFilters
+        storageKey="sales"
+        currentFilters={{ search, dateFrom, dateTo }}
+        saveLabel={s.saveFilter}
+        onApply={({ search: q, dateFrom: df, dateTo: dt }) => {
+          setSearch(q ?? '')
+          setDateFrom(df ?? '')
+          setDateTo(dt ?? '')
+        }}
+      />
+      <div className="flex items-center gap-3 flex-wrap">
         <Button
           variant="outline" className="gap-2" disabled={exporting}
           onClick={async () => { setExporting(true); await window.electronAPI.export.sales(); setExporting(false) }}
@@ -289,7 +304,16 @@ export default function Sales() {
             data={(orders ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
+            storageKey="sales"
             emptyMessage={s.emptyMessage}
+            emptyState={!search && !dateFrom && !dateTo ? (
+              <EmptyState
+                icon={Receipt}
+                title={s.emptyTitle}
+                description={s.emptyDesc}
+                action={{ label: s.emptyAction, onClick: () => setFormOpen(true) }}
+              />
+            ) : undefined}
           />
         )}
       </div>
