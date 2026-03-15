@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Brain, AlertCircle, Settings, ShoppingCart } from 'lucide-react'
@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { AiForecastResult } from '@/types/schema'
 import { cn } from '@/lib/utils'
 
-export default function AiInsight(): JSX.Element {
+export default function AiInsight(): React.JSX.Element {
   const t = useLang()
   const { toast } = useToast()
   const navigate = useNavigate()
