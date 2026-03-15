@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Download, History, X } from 'lucide-react'
+import { Search, Download, History, X, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -15,6 +15,14 @@ function DeltaCell({ delta }: { delta: number }) {
   return <span className="text-destructive font-semibold tabular-nums">{delta}</span>
 }
 
+type HistSortKey = 'adjusted_at' | 'product_name' | 'sku' | 'category' | 'delta' | 'reason'
+type SortDir = 'asc' | 'desc'
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ChevronsUpDown className="w-3 h-3" />
+  return dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+}
+
 export default function InventoryHistory() {
   const { toast } = useToast()
   const t = useLang()
@@ -23,6 +31,13 @@ export default function InventoryHistory() {
   const [reason, setReason] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [sortKey, setSortKey] = useState<HistSortKey>('adjusted_at')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  const handleSort = (key: HistSortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   const hasDateFilter = dateFrom || dateTo
 
@@ -36,6 +51,18 @@ export default function InventoryHistory() {
         dateTo: dateTo || undefined
       })
   })
+
+  const sortedRecords = useMemo(() => {
+    if (!records) return []
+    return [...records].sort((a, b) => {
+      const av: string | number = (a[sortKey] ?? '') as string | number
+      const bv: string | number = (b[sortKey] ?? '') as string | number
+      if (typeof av === 'number' && typeof bv === 'number')
+        return sortDir === 'asc' ? av - bv : bv - av
+      const cmp = String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [records, sortKey, sortDir])
 
   const handleExport = async () => {
     const result = await window.electronAPI.export.adjustments()
@@ -112,18 +139,30 @@ export default function InventoryHistory() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{h.time}</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.products.title}</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground font-mono text-xs">SKU</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.products.category}</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground w-20">{h.delta}</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{h.reason}</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{h.note}</th>
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                {([
+                  { key: 'adjusted_at' as HistSortKey, label: h.time, align: 'left' },
+                  { key: 'product_name' as HistSortKey, label: t.products.title, align: 'left' },
+                  { key: 'sku' as HistSortKey, label: 'SKU', align: 'left' },
+                  { key: 'category' as HistSortKey, label: t.products.category, align: 'left' },
+                  { key: 'delta' as HistSortKey, label: h.delta, align: 'right' },
+                  { key: 'reason' as HistSortKey, label: h.reason, align: 'left' },
+                ] as { key: HistSortKey; label: string; align: 'left' | 'right' }[]).map((col) => (
+                  <th key={col.key} scope="col"
+                    className={`px-4 py-3 font-medium ${col.key === 'delta' ? 'w-20' : ''} ${col.align === 'right' ? 'text-right' : 'text-left'}`}
+                    aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button type="button" onClick={() => handleSort(col.key)}
+                      className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
+                      {col.label}
+                      <span className="opacity-50" aria-hidden="true"><SortIcon active={sortKey === col.key} dir={sortDir} /></span>
+                    </button>
+                  </th>
+                ))}
+                <th scope="col" className="px-4 py-3 text-left font-medium">{h.note}</th>
               </tr>
             </thead>
             <tbody>
-              {records.map((rec) => (
+              {sortedRecords.map((rec) => (
                 <tr key={rec.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                     {rec.adjusted_at.replace('T', ' ').slice(0, 16)}

@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ArrowLeft, CheckCircle2, Trash2, ClipboardCheck, Wand2 } from 'lucide-react'
+import { Plus, ArrowLeft, CheckCircle2, Trash2, ClipboardCheck, Wand2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -22,17 +22,44 @@ import { useLang } from '@/lib/useLang'
 
 // ── List view ────────────────────────────────────────────────────────────────
 
+type ListSortKey = 'take_no' | 'status' | 'created_at' | 'item_count' | 'diff_count' | 'uncounted'
+type SortDir = 'asc' | 'desc'
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ChevronsUpDown className="w-3 h-3" />
+  return dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+}
+
 function ListView({ onSelect, autoCreate }: { onSelect: (id: number) => void; autoCreate?: boolean }) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const t = useLang()
   const s = t.stockTake
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [sortKey, setSortKey] = useState<ListSortKey>('created_at')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  const handleSort = (key: ListSortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   const { data: takes, isLoading } = useQuery<StockTake[]>({
     queryKey: ['stocktakes'],
     queryFn: () => window.electronAPI.stocktake.getAll()
   })
+
+  const sortedTakes = useMemo(() => {
+    if (!takes) return []
+    return [...takes].sort((a, b) => {
+      const av: string | number = (a[sortKey] ?? '') as string | number
+      const bv: string | number = (b[sortKey] ?? '') as string | number
+      if (typeof av === 'number' && typeof bv === 'number')
+        return sortDir === 'asc' ? av - bv : bv - av
+      const cmp = String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [takes, sortKey, sortDir])
 
   const createMutation = useMutation({
     mutationFn: () => window.electronAPI.stocktake.create(),
@@ -90,18 +117,29 @@ function ListView({ onSelect, autoCreate }: { onSelect: (id: number) => void; au
         <div data-tour="stocktake-chart" className="rounded-lg border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">No.</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.common.status}</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.common.date}</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Items</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">{s.difference}</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Uncounted</th>
-                <th className="px-4 py-3 w-24"></th>
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                {([
+                  { key: 'take_no' as ListSortKey, label: 'No.', align: 'left' },
+                  { key: 'status' as ListSortKey, label: t.common.status, align: 'left' },
+                  { key: 'created_at' as ListSortKey, label: t.common.date, align: 'left' },
+                  { key: 'item_count' as ListSortKey, label: 'Items', align: 'right' },
+                  { key: 'diff_count' as ListSortKey, label: s.difference, align: 'right' },
+                  { key: 'uncounted' as ListSortKey, label: 'Uncounted', align: 'right' },
+                ] as { key: ListSortKey; label: string; align: 'left' | 'right' }[]).map((col) => (
+                  <th key={col.key} scope="col" className={`px-4 py-3 font-medium ${col.align === 'right' ? 'text-right' : 'text-left'}`}
+                    aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button type="button" onClick={() => handleSort(col.key)}
+                      className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
+                      {col.label}
+                      <span className="opacity-50" aria-hidden="true"><SortIcon active={sortKey === col.key} dir={sortDir} /></span>
+                    </button>
+                  </th>
+                ))}
+                <th scope="col" className="px-4 py-3 w-24" />
               </tr>
             </thead>
             <tbody>
-              {takes.map((take) => (
+              {sortedTakes.map((take) => (
                 <tr
                   key={take.id}
                   className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
@@ -162,12 +200,21 @@ function DiffCell({ item }: { item: StockTakeItem }) {
   return <span className="text-destructive font-semibold">{diff}</span>
 }
 
+type DetailSortKey = 'product_name' | 'sku' | 'category' | 'system_qty' | 'counted_qty' | 'diff'
+
 function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const t = useLang()
   const s = t.stockTake
   const [confirmComplete, setConfirmComplete] = useState(false)
+  const [detailSortKey, setDetailSortKey] = useState<DetailSortKey>('product_name')
+  const [detailSortDir, setDetailSortDir] = useState<SortDir>('asc')
+
+  const handleDetailSort = (key: DetailSortKey) => {
+    if (detailSortKey === key) setDetailSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setDetailSortKey(key); setDetailSortDir('asc') }
+  }
 
   const { data: take, isLoading } = useQuery<StockTakeDetail>({
     queryKey: ['stocktakes', id],
@@ -210,6 +257,27 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
   const counted = take.items.filter((i) => i.counted_qty !== null).length
   const diffs = take.items.filter((i) => i.counted_qty !== null && i.counted_qty !== i.system_qty).length
   const isDraft = take.status === 'draft'
+
+  const sortedItems = useMemo(() => {
+    return [...take.items].sort((a, b) => {
+      let av: string | number
+      let bv: string | number
+      if (detailSortKey === 'diff') {
+        av = a.counted_qty !== null ? a.counted_qty - a.system_qty : -Infinity
+        bv = b.counted_qty !== null ? b.counted_qty - b.system_qty : -Infinity
+      } else if (detailSortKey === 'counted_qty') {
+        av = a.counted_qty ?? -Infinity
+        bv = b.counted_qty ?? -Infinity
+      } else {
+        av = (a[detailSortKey] ?? '') as string | number
+        bv = (b[detailSortKey] ?? '') as string | number
+      }
+      if (typeof av === 'number' && typeof bv === 'number')
+        return detailSortDir === 'asc' ? av - bv : bv - av
+      const cmp = String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0
+      return detailSortDir === 'asc' ? cmp : -cmp
+    })
+  }, [take.items, detailSortKey, detailSortDir])
 
   return (
     <div className="p-6 space-y-4">
@@ -281,17 +349,29 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border">
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.products.title}</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground font-mono text-xs">SKU</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t.products.category}</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-24">{s.systemQty}</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-28">{s.countedQty}</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-20">{s.difference}</th>
+            <tr className="border-b border-border text-xs text-muted-foreground">
+              {([
+                { key: 'product_name' as DetailSortKey, label: t.products.title, align: 'left' },
+                { key: 'sku' as DetailSortKey, label: 'SKU', align: 'left' },
+                { key: 'category' as DetailSortKey, label: t.products.category, align: 'left' },
+                { key: 'system_qty' as DetailSortKey, label: s.systemQty, align: 'right' },
+                { key: 'counted_qty' as DetailSortKey, label: s.countedQty, align: 'right' },
+                { key: 'diff' as DetailSortKey, label: s.difference, align: 'right' },
+              ] as { key: DetailSortKey; label: string; align: 'left' | 'right' }[]).map((col) => (
+                <th key={col.key} scope="col"
+                  className={`px-4 py-3 font-medium ${col.key === 'system_qty' ? 'w-24' : col.key === 'counted_qty' ? 'w-28' : col.key === 'diff' ? 'w-20' : ''} ${col.align === 'right' ? 'text-right' : 'text-left'}`}
+                  aria-sort={detailSortKey === col.key ? (detailSortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button type="button" onClick={() => handleDetailSort(col.key)}
+                    className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
+                    {col.label}
+                    <span className="opacity-50" aria-hidden="true"><SortIcon active={detailSortKey === col.key} dir={detailSortDir} /></span>
+                  </button>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {take.items.map((item) => (
+            {sortedItems.map((item) => (
               <tr key={item.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-2">{item.product_name}</td>
                 <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{item.sku}</td>
