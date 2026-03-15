@@ -15,6 +15,8 @@ import fixReturnedStatusSql from './migrations/010_fix_returned_status.sql?raw'
 import productImagesSql from './migrations/011_product_images.sql?raw'
 import avcoCostSql from './migrations/012_avco_cost.sql?raw'
 import paymentTermsSql from './migrations/013_payment_terms.sql?raw'
+import partialReturnSql from './migrations/014_partial_return.sql?raw'
+import creditLimitSql from './migrations/015_credit_limit.sql?raw'
 
 let db: Database.Database | null = null
 
@@ -90,7 +92,9 @@ async function runMigrations(database: Database.Database): Promise<void> {
     { name: '010_fix_returned_status', sql: fixReturnedStatusSql },
     { name: '011_product_images', sql: productImagesSql },
     { name: '012_avco_cost', sql: avcoCostSql },
-    { name: '013_payment_terms', sql: paymentTermsSql }
+    { name: '013_payment_terms', sql: paymentTermsSql },
+    { name: '014_partial_return', sql: partialReturnSql },
+    { name: '015_credit_limit', sql: creditLimitSql },
   ]
 
   for (const migration of migrations) {
