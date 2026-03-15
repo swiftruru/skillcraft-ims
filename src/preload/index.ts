@@ -214,12 +214,44 @@ const electronAPI = {
 
   // A11y Rule 80+85: nativeTheme system preference
   app: {
+    getVersion: () => ipcRenderer.invoke('app:getVersion') as Promise<string>,
     getNativeTheme: () => ipcRenderer.invoke('app:getNativeTheme') as Promise<'dark' | 'light'>,
     setNativeTheme: (source: 'light' | 'dark' | 'system') => ipcRenderer.invoke('app:setNativeTheme', source),
     onNativeThemeUpdated: (callback: (theme: 'dark' | 'light') => void) => {
       const handler = (_: Electron.IpcRendererEvent, theme: 'dark' | 'light') => callback(theme)
       ipcRenderer.on('app:nativeThemeUpdated', handler)
       return () => ipcRenderer.removeListener('app:nativeThemeUpdated', handler)
+    }
+  },
+
+  // Auto-updater
+  updater: {
+    checkForUpdates: () => ipcRenderer.invoke('updater:checkForUpdates'),
+    installUpdate: () => ipcRenderer.invoke('updater:install'),
+    onUpdateAvailable: (callback: (info: { version: string }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, info: { version: string }) => callback(info)
+      ipcRenderer.on('updater:update-available', handler)
+      return () => ipcRenderer.removeListener('updater:update-available', handler)
+    },
+    onUpdateNotAvailable: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('updater:update-not-available', handler)
+      return () => ipcRenderer.removeListener('updater:update-not-available', handler)
+    },
+    onDownloadProgress: (callback: (progress: { percent: number }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, progress: { percent: number }) => callback(progress)
+      ipcRenderer.on('updater:download-progress', handler)
+      return () => ipcRenderer.removeListener('updater:download-progress', handler)
+    },
+    onUpdateDownloaded: (callback: (info: { version: string }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, info: { version: string }) => callback(info)
+      ipcRenderer.on('updater:update-downloaded', handler)
+      return () => ipcRenderer.removeListener('updater:update-downloaded', handler)
+    },
+    onError: (callback: (message: string) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, message: string) => callback(message)
+      ipcRenderer.on('updater:error', handler)
+      return () => ipcRenderer.removeListener('updater:error', handler)
     }
   }
 }

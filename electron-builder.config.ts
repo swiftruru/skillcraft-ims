@@ -38,6 +38,11 @@ const config: Configuration = {
   dmg: {
     title: 'SkillCraft IMS',
     backgroundColor: '#0f172a'
+  },
+  publish: {
+    provider: 'github',
+    owner: 'ruru-o',
+    repo: 'skillcraft-ims'
   }
 }
 

@@ -43,6 +43,42 @@ description: 當使用者要求新增或修改 Electron 主程序功能，如視
     - type：`'low_stock'`；title：`'⚠️ 庫存預警'`；body：`'${name} 庫存剩 ${stock_qty}，低於補貨點 ${reorder_pt}'`（每個品項各寫一筆）；link：`'/products'`
     - 上限：每次最多寫 5 筆，避免同一批銷售大量寫入通知
 
+11. **自動更新（Auto-Update via GitHub Releases）**：
+    - 套件：`electron-updater`（`electron-builder` 生態系），透過 GitHub Releases 作為更新來源，**不需要自建伺服器**
+    - `electron-builder.config.ts` 新增 `publish` 設定：
+      ```ts
+      publish: {
+        provider: 'github',
+        owner: '<GITHUB_OWNER>',
+        repo: '<GITHUB_REPO>'
+      }
+      ```
+    - Main process (`src/main/index.ts`)：
+      - `import { autoUpdater } from 'electron-updater'`
+      - 在 `app.whenReady()` 後呼叫 `setupAutoUpdater(mainWindow)`
+      - Dev 環境（`is.dev`）跳過更新檢查（`autoUpdater.checkForUpdatesAndNotify` 在 dev 模式下不執行）
+      - 事件監聽：`update-available`、`update-not-available`、`download-progress`、`update-downloaded`、`error`
+      - 每個事件發送對應 IPC 事件至 renderer（`mainWindow.webContents.send('updater:...')`）
+      - `update-downloaded` 後，提供 IPC handler `updater:install` 供 renderer 觸發 `autoUpdater.quitAndInstall()`
+      - 提供 IPC handler `updater:checkForUpdates` 供 renderer 手動觸發檢查
+    - Preload bridge 新增 `updater` 物件：
+      ```ts
+      updater: {
+        checkForUpdates(): Promise<void>
+        installUpdate(): Promise<void>
+        onUpdateAvailable(cb: (info: { version: string }) => void): () => void
+        onUpdateNotAvailable(cb: () => void): () => void
+        onDownloadProgress(cb: (progress: { percent: number }) => void): () => void
+        onUpdateDownloaded(cb: (info: { version: string }) => void): () => void
+        onError(cb: (message: string) => void): () => void
+      }
+      ```
+    - Renderer UI（Settings 頁面）：
+      - 「關於與更新」卡片顯示目前版本（`app.getVersion()` 透過 IPC）
+      - 「檢查更新」Button（`variant="outline"`），按下後呼叫 `window.electronAPI.updater.checkForUpdates()`
+      - 檢查中顯示 loading spinner；有更新時顯示「發現新版本 vX.X.X，正在下載...」+ 下載進度條（`<Progress>`）；下載完成後顯示「下載完成，點此立即安裝並重啟」按鈕
+      - 訂閱 `onUpdateAvailable`、`onDownloadProgress`、`onUpdateDownloaded`、`onError` 事件，元件 unmount 時清除訂閱
+
 9. **定期自動備份規範**：`SchedulerService` 新增自動備份 cron job：
    - 排程設定：`backupSchedule`（預設 `'0 2 * * *'` 每天凌晨 2 點），由 `app_settings` 中 `autoBackupEnabled`（`'true'`/`'false'`）控制是否啟動
    - 備份路徑：`app.getPath('documents')/SkillCraft IMS Backups/ims-backup-YYYY-MM-DD.db`；超過 30 天的備份自動刪除（`fs.readdirSync` 掃目錄後 `fs.unlinkSync`）

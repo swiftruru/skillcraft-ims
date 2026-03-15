@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud, Database, Shuffle, RotateCcw } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, ExternalLink, HardDrive, UploadCloud, Database, Shuffle, RotateCcw, RefreshCw, Download } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -495,6 +495,9 @@ export default function Settings() {
 
       {/* Nav Shortcuts */}
       <ShortcutsCard />
+
+      {/* About & Updates */}
+      <UpdateCard />
     </div>
   )
 }
@@ -580,6 +583,121 @@ function ShortcutsCard() {
             )
           })}
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+type UpdateStatus =
+  | { type: 'idle' }
+  | { type: 'checking' }
+  | { type: 'up-to-date' }
+  | { type: 'available'; version: string }
+  | { type: 'downloading'; percent: number }
+  | { type: 'downloaded'; version: string }
+  | { type: 'error'; message: string }
+
+function UpdateCard() {
+  const [status, setStatus] = useState<UpdateStatus>({ type: 'idle' })
+  const [currentVersion, setCurrentVersion] = useState('')
+
+  useEffect(() => {
+    window.electronAPI.app.getVersion().then(setCurrentVersion)
+  }, [])
+
+  useEffect(() => {
+    const unsubs = [
+      window.electronAPI.updater.onUpdateAvailable((info) =>
+        setStatus({ type: 'available', version: info.version })
+      ),
+      window.electronAPI.updater.onUpdateNotAvailable(() =>
+        setStatus({ type: 'up-to-date' })
+      ),
+      window.electronAPI.updater.onDownloadProgress((p) =>
+        setStatus({ type: 'downloading', percent: p.percent })
+      ),
+      window.electronAPI.updater.onUpdateDownloaded((info) =>
+        setStatus({ type: 'downloaded', version: info.version })
+      ),
+      window.electronAPI.updater.onError((msg) =>
+        setStatus({ type: 'error', message: msg })
+      ),
+    ]
+    return () => unsubs.forEach((fn) => fn())
+  }, [])
+
+  const handleCheck = async () => {
+    setStatus({ type: 'checking' })
+    try {
+      await window.electronAPI.updater.checkForUpdates()
+    } catch (e) {
+      setStatus({ type: 'error', message: (e as Error).message })
+    }
+  }
+
+  const handleInstall = () => window.electronAPI.updater.installUpdate()
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <RefreshCw className="w-4 h-4" />
+          關於與更新
+        </CardTitle>
+        <CardDescription>目前版本：<span className="font-mono">v{currentVersion}</span></CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {status.type === 'idle' || status.type === 'up-to-date' || status.type === 'error' ? (
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={handleCheck} className="gap-2">
+              <RefreshCw className="w-3.5 h-3.5" />
+              檢查更新
+            </Button>
+            {status.type === 'up-to-date' && (
+              <span className="text-xs text-green-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> 已是最新版本
+              </span>
+            )}
+            {status.type === 'error' && (
+              <span className="text-xs text-red-400 flex items-center gap-1">
+                <XCircle className="w-3 h-3" /> {status.message}
+              </span>
+            )}
+          </div>
+        ) : status.type === 'checking' ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" /> 檢查更新中…
+          </div>
+        ) : status.type === 'available' ? (
+          <div className="flex items-center gap-2 text-sm text-primary">
+            <Download className="w-4 h-4" />
+            發現新版本 <span className="font-mono font-semibold">v{status.version}</span>，正在下載…
+          </div>
+        ) : status.type === 'downloading' ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>下載中…</span>
+              <span>{status.percent}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${status.percent}%` }}
+              />
+            </div>
+          </div>
+        ) : status.type === 'downloaded' ? (
+          <div className="space-y-2">
+            <p className="text-sm text-green-400 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>v{status.version} 已下載完成，點擊安裝後將重啟應用程式</span>
+            </p>
+            <Button size="sm" onClick={handleInstall} className="gap-2">
+              <Download className="w-3.5 h-3.5" />
+              立即安裝並重啟
+            </Button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

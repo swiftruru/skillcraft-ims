@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, nativeTheme, Notification, ipcMain } from 'e
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import { initDatabase } from './db'
 import { registerAllIpcHandlers } from './ipc'
 import { SchedulerService } from './services/scheduler.service'
@@ -167,6 +168,37 @@ function checkLowStockNotification(): void {
   }
 }
 
+function setupAutoUpdater(win: BrowserWindow): void {
+  if (is.dev) return // skip updates in dev mode
+
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-available', (info) => {
+    win.webContents.send('updater:update-available', { version: info.version })
+  })
+  autoUpdater.on('update-not-available', () => {
+    win.webContents.send('updater:update-not-available')
+  })
+  autoUpdater.on('download-progress', (progress) => {
+    win.webContents.send('updater:download-progress', { percent: Math.round(progress.percent) })
+  })
+  autoUpdater.on('update-downloaded', (info) => {
+    win.webContents.send('updater:update-downloaded', { version: info.version })
+  })
+  autoUpdater.on('error', (err) => {
+    win.webContents.send('updater:error', err.message)
+  })
+
+  ipcMain.handle('updater:checkForUpdates', () => autoUpdater.checkForUpdates())
+  ipcMain.handle('updater:install', () => {
+    autoUpdater.quitAndInstall(false, true)
+  })
+
+  // Check on startup (30s delay to avoid blocking app load)
+  setTimeout(() => autoUpdater.checkForUpdates(), 30_000)
+}
+
 function createWindow(): void {
   const winState = loadWindowState()
 
@@ -229,6 +261,9 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  // App version
+  ipcMain.handle('app:getVersion', () => app.getVersion())
+
   // A11y Rule 80: IPC handlers for nativeTheme system preference
   ipcMain.handle('app:getNativeTheme', () => nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
   ipcMain.handle('app:setNativeTheme', (_e, source: 'light' | 'dark' | 'system') => {
@@ -260,6 +295,7 @@ app.whenReady().then(async () => {
   SchedulerService.getInstance().start()
 
   createWindow()
+  if (mainWindow) setupAutoUpdater(mainWindow)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

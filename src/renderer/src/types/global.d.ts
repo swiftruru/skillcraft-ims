@@ -161,9 +161,19 @@ declare global {
         markAllRead(): Promise<boolean>
       }
       app: {
+        getVersion(): Promise<string>
         getNativeTheme(): Promise<'dark' | 'light'>
         setNativeTheme(source: 'light' | 'dark' | 'system'): Promise<void>
         onNativeThemeUpdated(callback: (theme: 'dark' | 'light') => void): () => void
+      }
+      updater: {
+        checkForUpdates(): Promise<void>
+        installUpdate(): Promise<void>
+        onUpdateAvailable(cb: (info: { version: string }) => void): () => void
+        onUpdateNotAvailable(cb: () => void): () => void
+        onDownloadProgress(cb: (progress: { percent: number }) => void): () => void
+        onUpdateDownloaded(cb: (info: { version: string }) => void): () => void
+        onError(cb: (message: string) => void): () => void
       }
     }
   }
