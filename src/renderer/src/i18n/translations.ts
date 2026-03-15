@@ -505,13 +505,31 @@ export const translations = {
       placeholder: '搜尋商品、供應商、客戶、訂單...',
       noResults: (q: string) => `找不到「${q}」相關結果`,
       hint: '↑↓ 移動  ↵ 跳轉  Esc 關閉',
+      actionsLabel: '動作',
       types: {
         product: '商品',
         supplier: '供應商',
         customer: '客戶',
         purchase: '採購單',
         sale: '銷售單'
+      },
+      actions: {
+        newPurchase: '新增採購單',
+        newSale: '新增銷售單',
+        newProduct: '新增商品',
+        newStockTake: '開始盤點',
+        toggleTheme: '切換主題',
+        toggleLang: '切換語言'
       }
+    },
+    unsavedChanges: {
+      title: '確定要離開嗎？',
+      desc: '表單已有變更，離開後將會遺失。',
+      discard: '捨棄變更',
+      keepEditing: '繼續編輯'
+    },
+    creatable: {
+      createLabel: (name: string) => `新增「${name}」`
     },
     shortcuts: {
       title: '鍵盤快捷鍵',
@@ -1034,13 +1052,31 @@ export const translations = {
       placeholder: 'Search products, suppliers, customers, orders...',
       noResults: (q: string) => `No results for "${q}"`,
       hint: '↑↓ Navigate  ↵ Jump  Esc Close',
+      actionsLabel: 'Actions',
       types: {
         product: 'Product',
         supplier: 'Supplier',
         customer: 'Customer',
         purchase: 'Purchase',
         sale: 'Sale'
+      },
+      actions: {
+        newPurchase: 'New Purchase Order',
+        newSale: 'New Sale Order',
+        newProduct: 'New Product',
+        newStockTake: 'Start Stock Take',
+        toggleTheme: 'Toggle Theme',
+        toggleLang: 'Toggle Language'
       }
+    },
+    unsavedChanges: {
+      title: 'Leave without saving?',
+      desc: 'You have unsaved changes. They will be lost if you leave.',
+      discard: 'Discard Changes',
+      keepEditing: 'Keep Editing'
+    },
+    creatable: {
+      createLabel: (name: string) => `Create "${name}"`
     },
     shortcuts: {
       title: 'Keyboard Shortcuts',

@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select'
+import { CreatableSelect } from '@/components/ui/CreatableSelect'
 import type { Product, Supplier } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
@@ -36,6 +37,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
   const queryClient = useQueryClient()
   const t = useLang()
   const tf = t.forms
+  const [confirmLeave, setConfirmLeave] = useState(false)
 
   const { data: suppliers } = useQuery<Supplier[]>({
     queryKey: ['suppliers', 'all'],
@@ -51,7 +53,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
 
   const {
     register, handleSubmit, control, watch, setValue, reset,
-    formState: { errors, isSubmitting }
+    formState: { errors, isSubmitting, isDirty }
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -79,6 +81,10 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
       reset({ supplier_id: null, order_date: today, payment_terms: 0, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] })
     }
   }, [open, initialData])
+
+  const handleClose = () => {
+    if (isDirty) { setConfirmLeave(true) } else { onOpenChange(false) }
+  }
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {
@@ -133,7 +139,8 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose() }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{tf.newPurchaseOrder}</DialogTitle>
@@ -143,17 +150,20 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5 col-span-1">
               <Label>{tf.supplierLabel}</Label>
-              <Select onValueChange={(v) => setValue('supplier_id', v === 'null' ? null : parseInt(v))}>
-                <SelectTrigger>
-                  <SelectValue placeholder={tf.supplierPlaceholder} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">{tf.noSupplier}</SelectItem>
-                  {suppliers?.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CreatableSelect
+                options={(suppliers ?? []).map((s) => ({ value: String(s.id), label: s.name }))}
+                value={watch('supplier_id') != null ? String(watch('supplier_id')) : ''}
+                onValueChange={(v) => setValue('supplier_id', v ? parseInt(v) : null, { shouldDirty: true })}
+                placeholder={tf.supplierPlaceholder}
+                createLabel={(name) => t.creatable.createLabel(name)}
+                onCreate={async (name) => {
+                  const created = await window.electronAPI.suppliers.create({
+                    name, contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0
+                  }) as Supplier
+                  queryClient.invalidateQueries({ queryKey: ['suppliers', 'all'] })
+                  return String(created.id)
+                }}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="order_date">{tf.orderDateLabel}</Label>
@@ -243,11 +253,30 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
             <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
               <Wand2 className="w-3.5 h-3.5" />{t.common.mockData}
             </Button>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t.common.cancel}</Button>
+            <Button type="button" variant="outline" onClick={handleClose}>{t.common.cancel}</Button>
             <Button type="submit" disabled={isSubmitting || mutation.isPending || creditExceeded}>{tf.submitCreate}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Unsaved changes confirmation */}
+    <Dialog open={confirmLeave} onOpenChange={setConfirmLeave}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{t.unsavedChanges.title}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">{t.unsavedChanges.desc}</p>
+        <DialogFooter className="gap-2 mt-2">
+          <Button variant="outline" onClick={() => setConfirmLeave(false)}>
+            {t.unsavedChanges.keepEditing}
+          </Button>
+          <Button variant="destructive" onClick={() => { setConfirmLeave(false); reset(); onOpenChange(false) }}>
+            {t.unsavedChanges.discard}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

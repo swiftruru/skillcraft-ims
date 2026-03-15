@@ -34,3 +34,29 @@ description: 當使用者要求新增或修改全域搜尋、Command Palette、�
 4. **跳轉行為**：選取結果後使用 `react-router-dom` 的 `useNavigate` 跳轉至對應列表頁（`/products`、`/suppliers` 等），不直接開啟 detail panel，保持導航一致性。
 
 5. **空字串保護**：`search:global` IPC handler 在 `query.trim().length < 1` 時直接回傳 `[]`，不執行 SQL 查詢，防止 `LIKE '%%'` 掃全表。
+
+6. **Command Palette 動作模式（Action Mode）**：
+   - 當輸入框為空時，預設顯示靜態「動作指令」清單（不呼叫 IPC）
+   - 動作指令以 `CommandAction` 介面定義：
+     `{ id, label, icon, shortcut?, handler }`
+   - 清單分兩段：搜尋結果在上（有輸入時），動作指令在下
+     （分隔線 + 小標題「動作」/「Actions」）
+   - 動作指令使用 `Zap` icon，背景用 `bg-primary/5`
+   - 支援 `↑↓` 鍵跨越搜尋結果與動作兩段導覽
+
+7. **預設動作清單**：內建以下動作指令，純前端觸發無需 IPC：
+
+   | id | zh | en | handler |
+   | --- | --- | --- | --- |
+   | `new-purchase` | 新增採購單 | New Purchase Order | navigate + openForm |
+   | `new-sale` | 新增銷售單 | New Sale Order | navigate + openForm |
+   | `new-product` | 新增商品 | New Product | navigate + openForm |
+   | `new-stocktake` | 開始盤點 | Start Stock Take | navigate + openForm |
+   | `toggle-theme` | 切換主題 | Toggle Theme | toggleTheme() |
+   | `toggle-lang` | 切換語言 | Toggle Language | toggleLang() |
+
+   navigate 動作一律帶 `{ state: { openForm: true } }`。
+
+8. **動作篩選**：輸入不以 `>` 開頭時，同時顯示搜尋結果與
+   符合文字的動作指令；輸入以 `>` 開頭時，隱藏搜尋結果，
+   只顯示符合 `>` 後文字的動作指令。

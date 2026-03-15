@@ -137,3 +137,50 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 預覽表格：列出選中商品目前售價/進價 → 調整後預覽值；調整後 < 0 顯示 `text-destructive`
     - 確認後呼叫 `products:batchUpdatePrice(updates[])` IPC，成功後 toast 提示「已調整 N 項商品價格」，invalidate `['products']` 和 `['reports']`，清空選取集合，關閉 Dialog
     - IPC `products:batchUpdatePrice` 在單一 transaction 內逐筆 UPDATE，signature：`{ id, sell_price?, buy_price? }[]`
+
+26. **表單離開警示（Unsaved Changes Guard）**：
+    - 適用範圍：`PurchaseForm`、`SaleForm`（及所有含複雜欄位的 Dialog 表單）
+    - 判斷依據：`formState.isDirty`（react-hook-form 內建）；`isDirty` 為 `true` 表示使用者已修改過欄位
+    - 攔截時機：Dialog 的 `onOpenChange(false)` 被呼叫時（點擊關閉按鈕、點擊外部遮罩、按 Esc）
+    - 實作方式：在 `PurchaseForm` / `SaleForm` 元件內部維護 `confirmLeave` state；
+      攔截 `onOpenChange` 的關閉動作，若 `isDirty` 為 `true` 則只設 `confirmLeave = true`，
+      不直接關閉；確認對話框確認後才呼叫真正的 `onOpenChange(false)` 並 `reset()`
+    - 確認 Dialog 使用 shadcn `AlertDialog`，標題「確定要離開嗎？」，
+      描述「表單已有變更，離開後將會遺失。」，
+      取消按鈕「繼續編輯」（`variant="outline"`），確認按鈕「捨棄變更」（`variant="destructive"`）
+    - 初始開啟表單或 `reset()` 後，`isDirty` 自動歸 `false`，不觸發警示
+    - i18n keys（新增至 `translations.ts`）：
+      `unsavedChanges.title`、`unsavedChanges.desc`、
+      `unsavedChanges.discard`、`unsavedChanges.keepEditing`
+
+27. **Inline 快速新增 Combobox**：
+    - 適用範圍：`PurchaseForm` 的供應商欄位、`SaleForm` 的客戶欄位
+    - 元件命名：`CreatableSelect`，位於 `src/renderer/src/components/ui/CreatableSelect.tsx`
+    - Props 介面：
+      ```tsx
+      interface CreatableSelectProps {
+        options: { value: string; label: string }[]
+        value: string
+        onValueChange: (value: string) => void
+        placeholder?: string
+        createLabel?: (input: string) => string  // 預設: (v) => `新增「${v}」`
+        onCreate: (name: string) => Promise<string> // 回傳新建立的 id（字串）
+      }
+      ```
+    - 互動流程：
+      1. 顯示為一個 `<Input>` + 下方 dropdown（`absolute z-50 w-full`）
+      2. 聚焦時展開，顯示所有符合輸入文字的選項（`includes` 不分大小寫）
+      3. 清單最底部顯示「新增「XXX」為供應商/客戶」選項（`Plus` icon，主色文字）
+         僅在輸入文字不完全符合任一現有選項時出現
+      4. 點擊新增選項 → 呼叫 `onCreate(inputText)` → 取得新 id → 呼叫 `onValueChange(newId)`
+         → 更新顯示文字為新名稱 → 關閉 dropdown
+      5. 點擊現有選項 → `onValueChange(option.value)` → 更新顯示文字 → 關閉 dropdown
+      6. 點擊外部或按 `Esc` → 關閉 dropdown，若有已選值則復原顯示文字
+    - 建立動作呼叫對應 IPC：
+      - 供應商：`suppliers:create({ name, contact: '', phone: '', email: '', address: '' })`
+      - 客戶：`customers:create({ name, contact: '', phone: '', email: '', address: '' })`
+      建立成功後需 `queryClient.invalidateQueries({ queryKey: ['suppliers', 'all'] })`
+      / `['customers', 'all']`
+    - `onCreate` 期間顯示 loading spinner，禁止重複提交
+    - 整合 react-hook-form：用 `watch` + `setValue` 替換原本的 `<Select>`
+

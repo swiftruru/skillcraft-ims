@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { CreatableSelect } from '@/components/ui/CreatableSelect'
 import type { Product, Customer } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
@@ -31,11 +32,12 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
   const queryClient = useQueryClient()
   const t = useLang()
   const tf = t.forms
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', 'all'], queryFn: () => window.electronAPI.customers.getAll() })
   const { data: products } = useQuery<Product[]>({ queryKey: ['products', 'all'], queryFn: () => window.electronAPI.products.getAll() })
   const today = new Date().toISOString().split('T')[0]
 
-  const { register, handleSubmit, control, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, control, watch, setValue, reset, formState: { errors, isSubmitting, isDirty } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { customer_id: null, order_date: today, payment_terms: 0, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] }
   })
@@ -56,6 +58,10 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
       reset({ customer_id: null, order_date: today, payment_terms: 0, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] })
     }
   }, [open, initialData])
+
+  const handleClose = () => {
+    if (isDirty) { setConfirmLeave(true) } else { onOpenChange(false) }
+  }
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {
@@ -115,20 +121,28 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose() }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{tf.newSalesOrder}</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5 col-span-1">
               <Label>{tf.customerLabel}</Label>
-              <Select onValueChange={(v) => setValue('customer_id', v === 'null' ? null : parseInt(v))}>
-                <SelectTrigger><SelectValue placeholder={tf.customerPlaceholder} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">{tf.generalCustomer}</SelectItem>
-                  {customers?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <CreatableSelect
+                options={(customers ?? []).map((c) => ({ value: String(c.id), label: c.name }))}
+                value={watch('customer_id') != null ? String(watch('customer_id')) : ''}
+                onValueChange={(v) => setValue('customer_id', v ? parseInt(v) : null, { shouldDirty: true })}
+                placeholder={tf.customerPlaceholder}
+                createLabel={(name) => t.creatable.createLabel(name)}
+                onCreate={async (name) => {
+                  const created = await window.electronAPI.customers.create({
+                    name, contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0
+                  }) as Customer
+                  queryClient.invalidateQueries({ queryKey: ['customers', 'all'] })
+                  return String(created.id)
+                }}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="order_date">{tf.orderDateLabel}</Label>
@@ -211,7 +225,7 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
             <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
               <Wand2 className="w-3.5 h-3.5" />{t.common.mockData}
             </Button>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t.common.cancel}</Button>
+            <Button type="button" variant="outline" onClick={handleClose}>{t.common.cancel}</Button>
             <Button type="submit" disabled={isSubmitting || mutation.isPending || hasStockError || creditExceeded}>
               {tf.submitCreateSale}
             </Button>
@@ -219,5 +233,24 @@ export function SaleForm({ open, onOpenChange, initialData }: { open: boolean; o
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Unsaved changes confirmation */}
+    <Dialog open={confirmLeave} onOpenChange={setConfirmLeave}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{t.unsavedChanges.title}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">{t.unsavedChanges.desc}</p>
+        <DialogFooter className="gap-2 mt-2">
+          <Button variant="outline" onClick={() => setConfirmLeave(false)}>
+            {t.unsavedChanges.keepEditing}
+          </Button>
+          <Button variant="destructive" onClick={() => { setConfirmLeave(false); reset(); onOpenChange(false) }}>
+            {t.unsavedChanges.discard}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
