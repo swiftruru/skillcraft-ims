@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, AlertTriangle } from 'lucide-react'
+import { BadgeCheck, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -16,6 +16,20 @@ export default function Receivables() {
   const [tab, setTab] = useState<Tab>('sales')
   const [markPaid, setMarkPaid] = useState<{ id: number; type: Tab } | null>(null)
   const [overdueFilter, setOverdueFilter] = useState(false)
+
+  type SortKey = 'order_no' | 'party_name' | 'order_date' | 'payment_due_date' | 'total_amount'
+  type SortDir = 'asc' | 'desc'
+  const [sortKey, setSortKey] = useState<SortKey>('payment_due_date')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
 
   const { data, isLoading } = useQuery<{ sales: UnpaidOrder[]; purchases: UnpaidOrder[] }>({
     queryKey: ['reports', 'unpaidOrders'],
@@ -52,7 +66,26 @@ export default function Receivables() {
   const orders = tab === 'sales' ? (data?.sales ?? []) : (data?.purchases ?? [])
   const overdueCount = orders.filter((o) => o.overdue).length
   const totalAmount = orders.reduce((s, o) => s + o.total_amount, 0)
-  const displayedOrders = overdueFilter ? orders.filter((o) => o.overdue) : orders
+  const filteredOrders = overdueFilter ? orders.filter((o) => o.overdue) : orders
+
+  const displayedOrders = useMemo(() => {
+    return [...filteredOrders].sort((a, b) => {
+      let av: string | number = a[sortKey] ?? ''
+      let bv: string | number = b[sortKey] ?? ''
+      // nulls last for payment_due_date
+      if (sortKey === 'payment_due_date') {
+        if (!av && !bv) return 0
+        if (!av) return 1
+        if (!bv) return -1
+      }
+      if (typeof av === 'number' && typeof bv === 'number') {
+        return sortDir === 'asc' ? av - bv : bv - av
+      }
+      av = String(av); bv = String(bv)
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [filteredOrders, sortKey, sortDir])
 
   const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
 
@@ -165,12 +198,39 @@ export default function Receivables() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-muted-foreground border-b border-border">
-                <th className="text-left px-4 py-3 font-medium">{r.orderNo}</th>
-                <th className="text-left px-4 py-3 font-medium">{tab === 'sales' ? r.customer : r.supplier}</th>
-                <th className="text-left px-4 py-3 font-medium">{r.orderDate}</th>
-                <th className="text-left px-4 py-3 font-medium">{r.paymentDue}</th>
-                <th className="text-right px-4 py-3 font-medium">{r.amount}</th>
-                <th className="px-4 py-3 w-20"></th>
+                {(
+                  [
+                    { key: 'order_no' as SortKey, label: r.orderNo, align: 'left' },
+                    { key: 'party_name' as SortKey, label: tab === 'sales' ? r.customer : r.supplier, align: 'left' },
+                    { key: 'order_date' as SortKey, label: r.orderDate, align: 'left' },
+                    { key: 'payment_due_date' as SortKey, label: r.paymentDue, align: 'left' },
+                    { key: 'total_amount' as SortKey, label: r.amount, align: 'right' },
+                  ] as { key: SortKey; label: string; align: 'left' | 'right' }[]
+                ).map((col) => (
+                  <th
+                    key={col.key}
+                    scope="col"
+                    aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    className={`px-4 py-3 font-medium ${col.align === 'right' ? 'text-right' : 'text-left'}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSort(col.key)}
+                      className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${col.align === 'right' ? 'flex-row-reverse' : ''}`}
+                    >
+                      {col.label}
+                      <span className="opacity-50" aria-hidden="true">
+                        {sortKey === col.key
+                          ? sortDir === 'asc'
+                            ? <ChevronUp className="w-3 h-3" />
+                            : <ChevronDown className="w-3 h-3" />
+                          : <ChevronsUpDown className="w-3 h-3" />
+                        }
+                      </span>
+                    </button>
+                  </th>
+                ))}
+                <th scope="col" className="px-4 py-3 w-20" aria-label="操作" />
               </tr>
             </thead>
             <tbody>
