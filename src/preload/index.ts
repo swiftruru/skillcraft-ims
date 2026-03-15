@@ -62,7 +62,8 @@ const electronAPI = {
     delete: (id: number) => ipcRenderer.invoke('purchases:delete', id),
     markPaid: (id: number) => ipcRenderer.invoke('purchases:markPaid', id),
     setPaymentDue: (id: number, dueDate: string) => ipcRenderer.invoke('purchases:setPaymentDue', id, dueDate),
-    batchReceive: (ids: number[]) => ipcRenderer.invoke('purchases:batchReceive', ids)
+    batchReceive: (ids: number[]) => ipcRenderer.invoke('purchases:batchReceive', ids),
+    getStatusHistory: (orderId: number) => ipcRenderer.invoke('purchases:getStatusHistory', orderId)
   },
 
   // Sales
@@ -79,7 +80,8 @@ const electronAPI = {
     delete: (id: number) => ipcRenderer.invoke('sales:delete', id),
     markPaid: (id: number) => ipcRenderer.invoke('sales:markPaid', id),
     setPaymentDue: (id: number, dueDate: string) => ipcRenderer.invoke('sales:setPaymentDue', id, dueDate),
-    batchMarkPaid: (ids: number[]) => ipcRenderer.invoke('sales:batchMarkPaid', ids)
+    batchMarkPaid: (ids: number[]) => ipcRenderer.invoke('sales:batchMarkPaid', ids),
+    getStatusHistory: (orderId: number) => ipcRenderer.invoke('sales:getStatusHistory', orderId)
   },
 
   // Reports

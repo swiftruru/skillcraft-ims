@@ -2,15 +2,38 @@ import { ipcMain } from 'electron'
 import { PurchaseModel } from '../db/models/purchase.model'
 import { getDb } from '../db'
 
+function recordPurchaseHistory(orderId: number, fromStatus: string | null, toStatus: string, note?: string) {
+  const db = getDb()
+  db.prepare(
+    `INSERT INTO purchase_status_history (order_id, from_status, to_status, note) VALUES (?, ?, ?, ?)`
+  ).run(orderId, fromStatus, toStatus, note ?? null)
+}
+
 export function registerPurchasesIpc(): void {
   ipcMain.handle('purchases:getAll', (_e, filters) => PurchaseModel.findAll(filters))
   ipcMain.handle('purchases:getById', (_e, id: number) => PurchaseModel.findById(id))
-  ipcMain.handle('purchases:create', (_e, data) => PurchaseModel.create(data))
-  ipcMain.handle('purchases:receive', (_e, id: number) => PurchaseModel.receive(id))
-  ipcMain.handle('purchases:cancel', (_e, id: number) => PurchaseModel.cancel(id))
+  ipcMain.handle('purchases:create', (_e, data) => {
+    const order = PurchaseModel.create(data)
+    recordPurchaseHistory(order.id, null, 'pending')
+    return order
+  })
+  ipcMain.handle('purchases:receive', (_e, id: number) => {
+    const order = PurchaseModel.findById(id)
+    const result = PurchaseModel.receive(id)
+    if (order) recordPurchaseHistory(id, order.status, 'received')
+    return result
+  })
+  ipcMain.handle('purchases:cancel', (_e, id: number) => {
+    const order = PurchaseModel.findById(id)
+    const result = PurchaseModel.cancel(id)
+    if (order) recordPurchaseHistory(id, order.status, 'cancelled')
+    return result
+  })
   ipcMain.handle('purchases:return', (_e, id: number) => {
     try {
+      const order = PurchaseModel.findById(id)
       const data = PurchaseModel.return(id)
+      if (order) recordPurchaseHistory(id, order.status, 'returned')
       return { success: true, data }
     } catch (e) {
       return { success: false, error: (e as Error).message }
@@ -36,8 +59,19 @@ export function registerPurchasesIpc(): void {
   ipcMain.handle('purchases:batchReceive', (_e, ids: number[]) => {
     let updated = 0
     for (const id of ids) {
-      try { PurchaseModel.receive(id); updated++ } catch { /* skip invalid */ }
+      try {
+        const order = PurchaseModel.findById(id)
+        PurchaseModel.receive(id)
+        if (order) recordPurchaseHistory(id, order.status, 'received')
+        updated++
+      } catch { /* skip invalid */ }
     }
     return { updated }
+  })
+  ipcMain.handle('purchases:getStatusHistory', (_e, orderId: number) => {
+    const db = getDb()
+    return db.prepare(
+      `SELECT id, order_id, from_status, to_status, changed_at, note FROM purchase_status_history WHERE order_id = ? ORDER BY changed_at DESC`
+    ).all(orderId)
   })
 }

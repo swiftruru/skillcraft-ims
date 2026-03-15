@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, ShoppingCart, AlignJustify, List, LayoutList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable, type Column } from '@/components/common/DataTable'
+import { SearchWithHistory } from '@/components/common/SearchWithHistory'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
-import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { TableSkeleton } from '@/components/common/TableSkeleton'
 import { PurchaseForm } from '@/components/purchases/PurchaseForm'
 import { PurchaseDetail } from '@/components/purchases/PurchaseDetail'
 import { ReceivePurchaseDialog } from '@/components/purchases/ReceivePurchaseDialog'
@@ -35,6 +36,9 @@ export default function Purchases() {
   const setDateTo = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('to', v); else n.delete('to'); return n }, { replace: true })
 
   const [formOpen, setFormOpen] = useState(false)
+  const [density, setDensity] = useState<'compact' | 'normal' | 'relaxed'>(() =>
+    (localStorage.getItem('ims-dt-density-purchases') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
+  )
 
   useEffect(() => {
     if ((location.state as { openForm?: boolean } | null)?.openForm) {
@@ -290,10 +294,13 @@ export default function Purchases() {
         </div>
       )}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder={p.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
+        <SearchWithHistory
+          className="flex-1 max-w-sm"
+          placeholder={p.searchPlaceholder}
+          value={search}
+          onChange={setSearch}
+          storageKey="ims-recent-search-purchases"
+        />
         <Input data-tour="date-filter" type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title={p.dateFrom} />
         <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title={p.dateTo} />
         {(dateFrom || dateTo) && (
@@ -324,17 +331,29 @@ export default function Purchases() {
           <Plus className="w-4 h-4" />
           {p.addOrder}
         </Button>
+        <div className="flex items-center rounded-md border border-border overflow-hidden ml-auto">
+          {(['compact', 'normal', 'relaxed'] as const).map((d, i) => {
+            const Icon = [AlignJustify, List, LayoutList][i]
+            return (
+              <button key={d} title={d} className={`h-9 px-2.5 transition-colors ${density === d ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`} onClick={() => { setDensity(d); localStorage.setItem('ims-dt-density-purchases', d) }}>
+                <Icon className="w-4 h-4" />
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? (
-          <LoadingSpinner />
+          <TableSkeleton rows={8} cols={7} />
         ) : (
           <DataTable
             data={(orders ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
             storageKey="purchases"
+            onRowFocus={(row) => setDetailId(row.id as number)}
+            density={density}
             emptyMessage={p.emptyMessage}
             emptyState={!search && !dateFrom && !dateTo ? (
               <EmptyState

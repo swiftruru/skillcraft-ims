@@ -46,6 +46,14 @@ export function SaleDetail({ id, open, onOpenChange }: { id: number; open: boole
     enabled: open
   })
 
+  type HistoryEntry = { id: number; from_status: string | null; to_status: string; changed_at: string; note: string | null }
+  const { data: history } = useQuery<HistoryEntry[]>({
+    queryKey: ['sales', 'history', id],
+    queryFn: () => window.electronAPI.sales.getStatusHistory(id),
+    enabled: open,
+    staleTime: 1000 * 60
+  })
+
   const markPaidMutation = useMutation({
     mutationFn: () => window.electronAPI.sales.markPaid(id),
     onSuccess: () => {
@@ -132,6 +140,23 @@ export function SaleDetail({ id, open, onOpenChange }: { id: number; open: boole
                 </tfoot>
               </table>
             </div>
+            {history && history.length > 0 && (
+              <div className="pt-2">
+                <p className="text-xs font-medium text-muted-foreground mb-2">狀態紀錄</p>
+                <div className="relative pl-7 before:absolute before:left-3 before:top-1 before:bottom-1 before:w-px before:bg-border space-y-3">
+                  {history.map((h) => (
+                    <div key={h.id} className="relative">
+                      <span className="absolute -left-4 top-0.5 w-2 h-2 rounded-full bg-border border-2 border-background" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusColor(h.to_status)}`}>{getStatusLabel(h.to_status)}</span>
+                        <span className="text-xs text-muted-foreground">{h.changed_at.replace('T', ' ').slice(0, 16)}</span>
+                      </div>
+                      {h.note && <p className="text-xs text-muted-foreground mt-0.5">{h.note}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : <p className="text-center text-muted-foreground py-8">找不到此銷售單</p>}
         {order && (() => {

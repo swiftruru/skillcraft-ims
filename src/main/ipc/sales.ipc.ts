@@ -48,10 +48,21 @@ function notifyLowStockAfterSale(soldProductIds: number[]): void {
   }
 }
 
+function recordSaleHistory(orderId: number, fromStatus: string | null, toStatus: string, note?: string) {
+  const db = getDb()
+  db.prepare(
+    `INSERT INTO sale_status_history (order_id, from_status, to_status, note) VALUES (?, ?, ?, ?)`
+  ).run(orderId, fromStatus, toStatus, note ?? null)
+}
+
 export function registerSalesIpc(): void {
   ipcMain.handle('sales:getAll', (_e, filters) => SaleModel.findAll(filters))
   ipcMain.handle('sales:getById', (_e, id: number) => SaleModel.findById(id))
-  ipcMain.handle('sales:create', (_e, data) => SaleModel.create(data))
+  ipcMain.handle('sales:create', (_e, data) => {
+    const order = SaleModel.create(data)
+    recordSaleHistory(order.id, null, 'pending')
+    return order
+  })
   ipcMain.handle('sales:complete', (_e, id: number) => {
     try {
       // 取得售出的商品 ID，用於完成後檢查庫存
@@ -61,16 +72,24 @@ export function registerSalesIpc(): void {
       const result = SaleModel.complete(id)
       if (result) {
         notifyLowStockAfterSale(soldProductIds)
+        if (order) recordSaleHistory(id, order.status, 'completed')
       }
       return { success: true, data: result }
     } catch (err: unknown) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
-  ipcMain.handle('sales:cancel', (_e, id: number) => SaleModel.cancel(id))
+  ipcMain.handle('sales:cancel', (_e, id: number) => {
+    const order = SaleModel.findById(id)
+    const result = SaleModel.cancel(id)
+    if (order) recordSaleHistory(id, order.status, 'cancelled')
+    return result
+  })
   ipcMain.handle('sales:return', (_e, id: number) => {
     try {
+      const order = SaleModel.findById(id)
       const result = SaleModel.return(id)
+      if (order) recordSaleHistory(id, order.status, 'returned')
       return { success: true, data: result }
     } catch (err: unknown) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -108,5 +127,11 @@ export function registerSalesIpc(): void {
       } catch { /* skip */ }
     }
     return { updated }
+  })
+  ipcMain.handle('sales:getStatusHistory', (_e, orderId: number) => {
+    const db = getDb()
+    return db.prepare(
+      `SELECT id, order_id, from_status, to_status, changed_at, note FROM sale_status_history WHERE order_id = ? ORDER BY changed_at DESC`
+    ).all(orderId)
   })
 }

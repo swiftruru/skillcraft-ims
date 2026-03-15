@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt, AlignJustify, List, LayoutList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable, type Column } from '@/components/common/DataTable'
+import { SearchWithHistory } from '@/components/common/SearchWithHistory'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
-import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { TableSkeleton } from '@/components/common/TableSkeleton'
 import { SaleForm } from '@/components/sales/SaleForm'
 import { SaleDetail } from '@/components/sales/SaleDetail'
 import { PartialReturnDialog } from '@/components/sales/PartialReturnDialog'
@@ -35,6 +36,9 @@ export default function Sales() {
   const setDateTo = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('to', v); else n.delete('to'); return n }, { replace: true })
 
   const [formOpen, setFormOpen] = useState(false)
+  const [density, setDensity] = useState<'compact' | 'normal' | 'relaxed'>(() =>
+    (localStorage.getItem('ims-dt-density-sales') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
+  )
 
   useEffect(() => {
     if ((location.state as { openForm?: boolean } | null)?.openForm) {
@@ -297,10 +301,13 @@ export default function Sales() {
       )}
 
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder={s.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
+        <SearchWithHistory
+          className="flex-1 max-w-sm"
+          placeholder={s.searchPlaceholder}
+          value={search}
+          onChange={setSearch}
+          storageKey="ims-recent-search-sales"
+        />
         <Input type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title={s.dateFrom} />
         <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title={s.dateTo} />
         {(dateFrom || dateTo) && (
@@ -331,17 +338,29 @@ export default function Sales() {
           <Plus className="w-4 h-4" />
           {s.addOrder}
         </Button>
+        <div className="flex items-center rounded-md border border-border overflow-hidden ml-auto">
+          {(['compact', 'normal', 'relaxed'] as const).map((d, i) => {
+            const Icon = [AlignJustify, List, LayoutList][i]
+            return (
+              <button key={d} title={d} className={`h-9 px-2.5 transition-colors ${density === d ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`} onClick={() => { setDensity(d); localStorage.setItem('ims-dt-density-sales', d) }}>
+                <Icon className="w-4 h-4" />
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? (
-          <LoadingSpinner />
+          <TableSkeleton rows={8} cols={7} />
         ) : (
           <DataTable
             data={(orders ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
             storageKey="sales"
+            onRowFocus={(row) => setDetailId(row.id as number)}
+            density={density}
             emptyMessage={s.emptyMessage}
             emptyState={!search && !dateFrom && !dateTo ? (
               <EmptyState

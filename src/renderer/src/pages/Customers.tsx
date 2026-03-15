@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, Wand2, Eye } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Wand2, Eye, AlignJustify, List, LayoutList } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,11 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DataTable, type Column } from '@/components/common/DataTable'
+import { SearchWithHistory } from '@/components/common/SearchWithHistory'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
-import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { TableSkeleton } from '@/components/common/TableSkeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import type { Customer, CustomerCreate } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
+import { useSuccessFlash } from '@/lib/useSuccessFlash'
 import { formatCurrency } from '@/lib/utils'
 import { CustomerDetailDialog } from '@/components/customers/CustomerDetailDialog'
 import { useToast } from '@/components/ui/use-toast'
@@ -38,6 +40,10 @@ export default function Customers() {
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{ id: number; snapshot: Customer } | null>(null)
+  const { flashId, triggerFlash } = useSuccessFlash()
+  const [density, setDensity] = useState<'compact' | 'normal' | 'relaxed'>(() =>
+    (localStorage.getItem('ims-dt-density-customers') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
+  )
 
   useEffect(() => {
     const handler = () => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0 }); setFormOpen(true) }
@@ -54,11 +60,11 @@ export default function Customers() {
 
   const createMutation = useMutation({
     mutationFn: (data: CustomerCreate) => window.electronAPI.customers.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['customers'] }); setFormOpen(false); reset() }
+    onSuccess: (result) => { queryClient.invalidateQueries({ queryKey: ['customers'] }); setFormOpen(false); reset(); if (result && typeof result === 'object' && 'id' in result) triggerFlash((result as { id: number }).id) }
   })
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<CustomerCreate> }) => window.electronAPI.customers.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['customers'] }); setFormOpen(false); setEditCustomer(null); reset() }
+    onSuccess: (_r, { id }) => { queryClient.invalidateQueries({ queryKey: ['customers'] }); setFormOpen(false); setEditCustomer(null); reset(); triggerFlash(id) }
   })
   const deleteMutation = useMutation({
     mutationFn: ({ id }: { id: number; snapshot: Customer }) => window.electronAPI.customers.delete(id),
@@ -125,17 +131,30 @@ export default function Customers() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder={c.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
+        <SearchWithHistory
+          className="flex-1 max-w-sm"
+          placeholder={c.searchPlaceholder}
+          value={search}
+          onChange={setSearch}
+          storageKey="ims-recent-search-customers"
+        />
         <Button onClick={() => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0 }); setFormOpen(true) }} className="gap-2">
           <Plus className="w-4 h-4" />{c.addCustomer}
         </Button>
+        <div className="flex items-center rounded-md border border-border overflow-hidden">
+          {(['compact', 'normal', 'relaxed'] as const).map((d, i) => {
+            const Icon = [AlignJustify, List, LayoutList][i]
+            return (
+              <button key={d} title={d} className={`h-9 px-2.5 transition-colors ${density === d ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`} onClick={() => { setDensity(d); localStorage.setItem('ims-dt-density-customers', d) }}>
+                <Icon className="w-4 h-4" />
+              </button>
+            )
+          })}
+        </div>
       </div>
       <div className="rounded-lg border border-border bg-card">
-        {isLoading ? <LoadingSpinner /> : (
-          <DataTable data={(customers ?? []) as unknown as Record<string, unknown>[]} columns={columns as unknown as Column<Record<string, unknown>>[]} keyField="id" emptyMessage={c.emptyMessage} />
+        {isLoading ? <TableSkeleton rows={8} cols={6} /> : (
+          <DataTable data={(customers ?? []) as unknown as Record<string, unknown>[]} columns={columns as unknown as Column<Record<string, unknown>>[]} keyField="id" emptyMessage={c.emptyMessage} onRowFocus={(row) => setDetailCustomer(row as unknown as Customer)} flashRowId={flashId} density={density} />
         )}
       </div>
       <Dialog open={formOpen} onOpenChange={setFormOpen}>

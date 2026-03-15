@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2 } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DataTable, type Column } from '@/components/common/DataTable'
+import { SearchWithHistory } from '@/components/common/SearchWithHistory'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
-import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { TableSkeleton } from '@/components/common/TableSkeleton'
 import { ProductForm } from '@/components/products/ProductForm'
 import { AdjustInventoryDialog } from '@/components/products/AdjustInventoryDialog'
 import { ProductDetailDialog } from '@/components/products/ProductDetailDialog'
@@ -22,6 +23,7 @@ import { formatCurrency, formatNumber } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
 import type { Product } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
+import { useSuccessFlash } from '@/lib/useSuccessFlash'
 
 export default function Products() {
   const queryClient = useQueryClient()
@@ -53,6 +55,10 @@ export default function Products() {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
     return (localStorage.getItem('ims-products-view') as 'table' | 'grid') ?? 'table'
   })
+  const { flashId, triggerFlash } = useSuccessFlash()
+  const [density, setDensity] = useState<'compact' | 'normal' | 'relaxed'>(() =>
+    (localStorage.getItem('ims-dt-density-products') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
+  )
 
   useEffect(() => {
     const close = () => setContextMenu(null)
@@ -343,15 +349,13 @@ export default function Products() {
     <div className="p-6 space-y-4">
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder={p.searchPlaceholder}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <SearchWithHistory
+          className="flex-1 max-w-sm"
+          placeholder={p.searchPlaceholder}
+          value={search}
+          onChange={setSearch}
+          storageKey="ims-recent-search-products"
+        />
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-32 h-9 text-sm">
             <SelectValue placeholder={p.allCategories} />
@@ -420,11 +424,26 @@ export default function Products() {
             <LayoutGrid className="w-4 h-4" />
           </button>
         </div>
+        <div className="flex items-center rounded-md border border-border overflow-hidden">
+          {(['compact', 'normal', 'relaxed'] as const).map((d, i) => {
+            const Icon = [AlignJustify, List, LayoutList][i]
+            return (
+              <button
+                key={d}
+                title={d}
+                className={`h-9 px-2.5 transition-colors ${density === d ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => { setDensity(d); localStorage.setItem('ims-dt-density-products', d) }}
+              >
+                <Icon className="w-4 h-4" />
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Table / Grid */}
       {isLoading ? (
-        <LoadingSpinner />
+        <div className="rounded-lg border border-border bg-card"><TableSkeleton rows={8} cols={6} /></div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {(products ?? []).length === 0 ? (
@@ -483,6 +502,9 @@ export default function Products() {
             keyField="id"
             emptyMessage={p.emptyMessage}
             storageKey="products"
+            onRowFocus={(row) => setDetailProduct(row as unknown as Product)}
+            flashRowId={flashId}
+            density={density}
             emptyState={!search && !hasFilter ? (
               <EmptyState
                 icon={Package}
@@ -513,6 +535,7 @@ export default function Products() {
         open={formOpen}
         onOpenChange={(open) => { setFormOpen(open); if (!open) setEditProduct(null) }}
         product={editProduct}
+        onSaved={triggerFlash}
       />
       <ProductDetailDialog
         open={detailProduct !== null}

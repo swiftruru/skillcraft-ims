@@ -336,3 +336,64 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 複用現有 `electronAPI.export.*` 模式：ipc handler 在 `reports.ipc.ts`，export helper 在 `src/main/export/`
     - 匯出完成後顯示 toast success（`已匯出報表`）
 
+45. **Skeleton Loading UI**：
+    - 建立 `Skeleton` 基礎元件（`src/renderer/src/components/ui/skeleton.tsx`）：`<div className={cn("animate-pulse rounded-md bg-muted", className)} />`
+    - 建立頁面專用 Skeleton 元件：
+      - `TableSkeleton`（`src/renderer/src/components/common/TableSkeleton.tsx`）：rows prop（預設 8），每行顯示 `cols` 個 `<Skeleton>`，模擬表格外觀；第一欄較寬（`w-40`），其餘欄位隨機寬度（`w-24`/`w-32`），列高 `h-4`
+      - `CardSkeleton`（`src/renderer/src/components/common/CardSkeleton.tsx`）：模擬 KPI 卡片，包含標題骨架（`h-4 w-24`）+ 數值骨架（`h-8 w-32`）+ 趨勢骨架（`h-3 w-16`）
+    - 套用範圍：Products、Purchases、Sales、Customers、Suppliers 的主資料表格，以 `TableSkeleton` 取代現有 `<LoadingSpinner />`；Dashboard KPI 卡片以 `CardSkeleton` 取代
+    - `TableSkeleton` props：`rows?: number`（預設 8）、`cols?: number`（預設 5）
+
+46. **DataTable 鍵盤導航**：
+    - `DataTable` 新增 `onRowFocus?: (row: T) => void` prop
+    - 表格容器加上 `tabIndex={0}` + `onKeyDown` handler
+    - 維護 `focusedIdx: number` state（-1 表示未聚焦）
+    - Arrow Up/Down：移動 focusedIdx（不超出邊界）；捲動確保 focused 列可見（`scrollIntoView({ block: 'nearest' })`）
+    - Enter：呼叫 `onRowFocus(rows[focusedIdx])`；Space：若有 checkbox 欄則切換選取狀態（呼叫現有 onCheck 邏輯）
+    - 聚焦列以 `ring-1 ring-ring` 高亮（使用 `data-focused` attribute + CSS）
+    - Home/End：跳到第一/最後列
+    - 套用範圍：Products、Purchases、Sales、Customers、Suppliers 的 DataTable，`onRowFocus` 分別對應各頁面的 setDetailProduct / setDetailOrder 等 detail dialog
+
+47. **搜尋框最近搜尋記錄**：
+    - 建立 `RecentSearches` hook（`src/renderer/src/lib/useRecentSearches.ts`）：
+      - `storageKey` 參數，localStorage 存 JSON string array，最多 8 筆，最新的放最前
+      - 回傳 `{ recentSearches: string[], addSearch: (q: string) => void, clearAll: () => void, removeOne: (q: string) => void }`
+      - `addSearch`：trim 後若非空且不重複則 unshift，超過 8 筆 pop 最舊
+    - 在 Products、Purchases、Sales、Customers、Suppliers 的搜尋框加入下拉提示：
+      - 搜尋框聚焦（`onFocus`）且搜尋值為空時，顯示最近搜尋 dropdown（`absolute z-20 mt-1 w-full bg-popover border border-border rounded-lg shadow-lg py-1`）
+      - 每筆顯示 `History` icon + 文字 + `×` 刪除按鈕；右上角「清除全部」連結
+      - 點擊某筆 → 填入搜尋框並觸發搜尋
+      - 用戶按 Enter 提交搜尋時呼叫 `addSearch(search)`；搜尋值為空時不記錄
+      - 點擊外部（`onBlur` with delay 150ms）關閉 dropdown
+    - Command Palette 最近動作：搜尋框為空時，顯示最近 5 筆操作記錄（`localStorage['ims-recent-actions']`），格式 `{ title, subtitle, icon, action }`；執行任何 Palette 動作時記錄到此 list
+
+48. **成功操作動畫回饋**：
+    - 建立 `useSuccessFlash` hook（`src/renderer/src/lib/useSuccessFlash.ts`）：
+      - 回傳 `{ flashId: number | null, triggerFlash: (id: number) => void }`
+      - `triggerFlash(id)` 設定 `flashId = id`，500ms 後自動清除
+    - `DataTable` 新增 `flashRowId?: number | string | null` prop
+    - 當某列的 key 值 === `flashRowId` 時，該列加上 `animate-flash` CSS 動畫（`bg-green-500/10 → transparent`，duration 500ms）
+    - 在 `index.css`（或 global CSS）加入 keyframes：
+      ```css
+      @keyframes flash { 0% { background-color: hsl(var(--success)/0.2); } 100% { background-color: transparent; } }
+      .animate-flash { animation: flash 0.5s ease-out forwards; }
+      ```
+    - 套用範圍：Products（create/update 成功後 flash 對應列）、Customers、Suppliers（同上）
+    - Mutation `onSuccess` 中取得新建/更新的 `id` → 呼叫 `triggerFlash(id)`
+
+49. **DataTable 密度切換**：
+    - `DataTable` 新增 `density?: 'compact' | 'normal' | 'relaxed'` prop（預設 `'normal'`）
+    - 行高對應：compact → `py-1 text-xs`、normal → `py-2.5 text-sm`、relaxed → `py-4 text-sm`
+    - 各頁面在篩選列右側加入密度切換按鈕組（3 個小圖示按鈕，`AlignJustify` / `List` / `LayoutList` icon，`variant="ghost" size="icon"`，active 狀態 `bg-muted`）
+    - 密度偏好存 `localStorage['ims-dt-density-{page}']`，讀取初始值；各頁面獨立設定
+    - 切換密度時同步更新 DataTable props；不影響現有功能
+
+50. **訂單狀態變更時間軸**：
+    - 適用範圍：採購單詳情（`PurchaseDetailDialog`）與銷售單詳情（`SaleDetailDialog`）
+    - IPC：`purchases:getStatusHistory(orderId)` / `sales:getStatusHistory(orderId)` → 回傳 `{ id, order_id, from_status, to_status, changed_at, note }[]`
+    - DB：新增 `purchase_status_history` / `sale_status_history` 資料表（`id INTEGER PK, order_id INTEGER, from_status TEXT, to_status TEXT, changed_at DATETIME DEFAULT CURRENT_TIMESTAMP, note TEXT`）；在現有 IPC 的 updateStatus 呼叫後 INSERT 一筆紀錄（使用 DB transaction）
+    - UI：在 DetailDialog 下方新增「狀態紀錄」區塊，使用垂直時間軸（`relative before:absolute before:left-3 before:top-0 before:bottom-0 before:w-px before:bg-border`）
+    - 每個時間點顯示：狀態 badge（沿用現有 `getStatusBadge` / `getPaymentBadge`）、日期時間（`text-xs text-muted-foreground`）、備註（若有）
+    - 最新狀態在頂部（DESC 排序）；第一筆永遠是「建立訂單」（`from_status: null, to_status: 'pending'`）
+    - queryKey：`['purchases', 'history', id]` / `['sales', 'history', id]`，`staleTime: 1000 * 60`
+

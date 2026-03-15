@@ -52,9 +52,10 @@ interface ProductFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   product?: Product | null
+  onSaved?: (id: number) => void
 }
 
-export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
+export function ProductForm({ open, onOpenChange, product, onSaved }: ProductFormProps) {
   const queryClient = useQueryClient()
   const t = useLang()
   const tf = t.forms
@@ -180,10 +181,13 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
       isEdit
         ? window.electronAPI.products.update(product!.id, data)
         : window.electronAPI.products.create(data),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       onOpenChange(false)
+      if (result && typeof result === 'object' && 'id' in result) {
+        onSaved?.((result as { id: number }).id)
+      }
     }
   })
 

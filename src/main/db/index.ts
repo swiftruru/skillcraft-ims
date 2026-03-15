@@ -18,6 +18,7 @@ import paymentTermsSql from './migrations/013_payment_terms.sql?raw'
 import partialReturnSql from './migrations/014_partial_return.sql?raw'
 import creditLimitSql from './migrations/015_credit_limit.sql?raw'
 import salesPartialReturnSql from './migrations/016_sales_partial_return_status.sql?raw'
+import statusHistorySql from './migrations/017_status_history.sql?raw'
 
 let db: Database.Database | null = null
 
@@ -97,6 +98,7 @@ async function runMigrations(database: Database.Database): Promise<void> {
     { name: '014_partial_return', sql: partialReturnSql },
     { name: '015_credit_limit', sql: creditLimitSql },
     { name: '016_sales_partial_return_status', sql: salesPartialReturnSql },
+    { name: '017_status_history', sql: statusHistorySql },
   ]
 
   for (const migration of migrations) {

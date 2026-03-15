@@ -15,6 +15,14 @@ export interface Column<T> {
   hideable?: boolean
 }
 
+type Density = 'compact' | 'normal' | 'relaxed'
+
+const DENSITY_CLASS: Record<Density, string> = {
+  compact: 'py-1 text-xs',
+  normal: 'py-2.5 text-sm',
+  relaxed: 'py-4 text-sm'
+}
+
 interface DataTableProps<T> {
   data: T[]
   columns: Column<T>[]
@@ -24,6 +32,9 @@ interface DataTableProps<T> {
   pageSize?: number
   storageKey?: string
   onRowContextMenu?: (row: T, e: React.MouseEvent) => void
+  onRowFocus?: (row: T) => void
+  flashRowId?: number | string | null
+  density?: Density
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -36,7 +47,10 @@ export function DataTable<T extends Record<string, unknown>>({
   emptyState,
   pageSize = 15,
   storageKey,
-  onRowContextMenu
+  onRowContextMenu,
+  onRowFocus,
+  flashRowId,
+  density = 'normal'
 }: DataTableProps<T>) {
   const t = useLang()
   const validColKeys = useMemo(() => new Set(columns.map((c) => String(c.key))), [columns])
@@ -61,6 +75,9 @@ export function DataTable<T extends Record<string, unknown>>({
   const [page, setPage] = useState(1)
   const [showColMenu, setShowColMenu] = useState(false)
   const colMenuRef = useRef<HTMLDivElement>(null)
+  const [focusedIdx, setFocusedIdx] = useState(-1)
+  const focusedRowRef = useRef<HTMLTableRowElement | null>(null)
+  const tableContainerRef = useRef<HTMLDivElement>(null)
 
   const hideableColumns = columns.filter((c) => c.hideable)
 
@@ -100,6 +117,13 @@ export function DataTable<T extends Record<string, unknown>>({
     return () => document.removeEventListener('mousedown', handler)
   }, [showColMenu])
 
+  // Scroll focused row into view
+  useEffect(() => {
+    if (focusedIdx >= 0 && focusedRowRef.current) {
+      focusedRowRef.current.scrollIntoView({ block: 'nearest' })
+    }
+  }, [focusedIdx])
+
   const visibleColumns = columns.filter((c) => !hiddenCols.has(String(c.key)))
 
   const sorted = useMemo(() => {
@@ -131,6 +155,29 @@ export function DataTable<T extends Record<string, unknown>>({
     setPage(1)
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!onRowFocus) return
+    const len = paginated.length
+    if (len === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setFocusedIdx((i) => Math.min(i + 1, len - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setFocusedIdx((i) => Math.max(i - 1, 0))
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setFocusedIdx(0)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setFocusedIdx(len - 1)
+    } else if (e.key === 'Enter' && focusedIdx >= 0) {
+      e.preventDefault()
+      onRowFocus(paginated[focusedIdx])
+    }
+  }
+
   if (data.length === 0) {
     if (emptyState) return <>{emptyState}</>
     return (
@@ -141,7 +188,13 @@ export function DataTable<T extends Record<string, unknown>>({
   }
 
   return (
-    <div className="w-full">
+    <div
+      className="w-full outline-none"
+      tabIndex={onRowFocus ? 0 : undefined}
+      onKeyDown={onRowFocus ? handleKeyDown : undefined}
+      onBlur={() => setFocusedIdx(-1)}
+      ref={tableContainerRef}
+    >
       {hideableColumns.length > 0 && (
         <div className="flex justify-end px-3 pt-2 pb-1">
           <div className="relative" ref={colMenuRef}>
@@ -221,22 +274,34 @@ export function DataTable<T extends Record<string, unknown>>({
             </tr>
           </thead>
           <tbody>
-            {paginated.map((row) => (
-              <tr
-                key={String(row[keyField])}
-                className="border-b border-border/50 hover:bg-muted/30 transition-colors"
-                onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(row, e) : undefined}
-              >
-                {visibleColumns.map((col) => {
-                  const value = row[String(col.key)]
-                  return (
-                    <td key={String(col.key)} className={cn('px-4 py-3', col.className)}>
-                      {col.render ? col.render(value, row) : String(value ?? '-')}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
+            {paginated.map((row, idx) => {
+              const rowKey = String(row[keyField])
+              const isFocused = focusedIdx === idx
+              const isFlash = flashRowId != null && String(flashRowId) === rowKey
+              return (
+                <tr
+                  key={rowKey}
+                  ref={isFocused ? focusedRowRef : undefined}
+                  data-focused={isFocused ? 'true' : undefined}
+                  className={cn(
+                    'border-b border-border/50 hover:bg-muted/30 transition-colors',
+                    isFocused && 'ring-1 ring-inset ring-ring bg-muted/20',
+                    isFlash && 'animate-flash'
+                  )}
+                  onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(row, e) : undefined}
+                  onClick={onRowFocus ? () => { setFocusedIdx(idx); onRowFocus(row) } : undefined}
+                >
+                  {visibleColumns.map((col) => {
+                    const value = row[String(col.key)]
+                    return (
+                      <td key={String(col.key)} className={cn('px-4', DENSITY_CLASS[density], col.className)}>
+                        {col.render ? col.render(value, row) : String(value ?? '-')}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
