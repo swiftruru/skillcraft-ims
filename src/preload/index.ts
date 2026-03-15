@@ -138,7 +138,8 @@ const electronAPI = {
     products: () => ipcRenderer.invoke('export:products'),
     purchases: () => ipcRenderer.invoke('export:purchases'),
     sales: () => ipcRenderer.invoke('export:sales'),
-    adjustments: () => ipcRenderer.invoke('export:adjustments')
+    adjustments: () => ipcRenderer.invoke('export:adjustments'),
+    report: (days?: number) => ipcRenderer.invoke('export:report', days)
   },
 
   // Inventory utilities

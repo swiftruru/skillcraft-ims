@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Eye, CheckCircle, XCircle, Trash2, Printer, Download, Undo2, Copy, BadgeCheck, SplitSquareVertical, Receipt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,15 @@ export default function Sales() {
   const spotlight = useDemoStore((st) => st.spotlight)
   const location = useLocation()
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const search = searchParams.get('q') ?? ''
+  const dateFrom = searchParams.get('from') ?? ''
+  const dateTo = searchParams.get('to') ?? ''
+
+  const setSearch = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('q', v); else n.delete('q'); return n }, { replace: true })
+  const setDateFrom = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('from', v); else n.delete('from'); return n }, { replace: true })
+  const setDateTo = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('to', v); else n.delete('to'); return n }, { replace: true })
+
   const [formOpen, setFormOpen] = useState(false)
 
   useEffect(() => {
@@ -49,8 +57,6 @@ export default function Sales() {
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [cloneData, setCloneData] = useState<Record<string, unknown> | null>(null)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
   const [markPaidId, setMarkPaidId] = useState<number | null>(null)
   const [partialReturnOrder, setPartialReturnOrder] = useState<SalesOrder | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -298,18 +304,20 @@ export default function Sales() {
         <Input type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title={s.dateFrom} />
         <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title={s.dateTo} />
         {(dateFrom || dateTo) && (
-          <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => { setDateFrom(''); setDateTo('') }}>{s.clearDates}</button>
+          <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('from'); n.delete('to'); return n }, { replace: true })}>{s.clearDates}</button>
         )}
       </div>
       <SavedFilters
         storageKey="sales"
         currentFilters={{ search, dateFrom, dateTo }}
         saveLabel={s.saveFilter}
-        onApply={({ search: q, dateFrom: df, dateTo: dt }) => {
-          setSearch(q ?? '')
-          setDateFrom(df ?? '')
-          setDateTo(dt ?? '')
-        }}
+        onApply={(filters) => setSearchParams(() => {
+          const n = new URLSearchParams()
+          if (filters.search) n.set('q', filters.search)
+          if (filters.dateFrom) n.set('from', filters.dateFrom)
+          if (filters.dateTo) n.set('to', filters.dateTo)
+          return n
+        }, { replace: true })}
       />
       <div className="flex items-center gap-3 flex-wrap">
         <Button

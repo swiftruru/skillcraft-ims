@@ -37,6 +37,7 @@ export default function Reports() {
   const [slowDays, setSlowDays] = useState(60)
   const [turnoverDays, setTurnoverDays] = useState(30)
   const [pdfExporting, setPdfExporting] = useState(false)
+  const [csvExporting, setCsvExporting] = useState(false)
   const now = new Date()
   const [pdfYear, setPdfYear] = useState(now.getFullYear())
   const [pdfMonth, setPdfMonth] = useState(now.getMonth() + 1)
@@ -145,6 +146,20 @@ export default function Reports() {
             </select>
             <span>{r.month}</span>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1.5"
+            disabled={csvExporting}
+            onClick={async () => {
+              setCsvExporting(true)
+              await window.electronAPI.export.report(trendDays)
+              setCsvExporting(false)
+            }}
+          >
+            <FileDown className="w-3 h-3" />
+            {csvExporting ? r.exporting : (r.exportReportCsv ?? '匯出報表 CSV')}
+          </Button>
           <Button
             variant="outline"
             size="sm"

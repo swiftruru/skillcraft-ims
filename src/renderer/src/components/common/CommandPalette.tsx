@@ -10,6 +10,20 @@ import { useThemeStore } from '@/stores/theme.store'
 import { useLangStore } from '@/stores/lang.store'
 import { getRecentItems, addRecentItem } from '@/lib/recentItems'
 
+function highlight(text: string, query: string): React.ReactNode {
+  const q = query.trim()
+  if (!q) return text
+  const idx = text.toLowerCase().indexOf(q.toLowerCase())
+  if (idx === -1) return text
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-primary/20 text-foreground rounded-sm not-italic">{text.slice(idx, idx + q.length)}</mark>
+      {text.slice(idx + q.length)}
+    </>
+  )
+}
+
 const TYPE_ICONS = {
   product: Package,
   supplier: Truck,
@@ -221,7 +235,7 @@ export function CommandPalette({ open, onClose }: Props) {
                         <Icon className="w-3.5 h-3.5 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{result.title}</div>
+                        <div className="text-sm font-medium truncate">{highlight(result.title, query)}</div>
                         {result.meta && (
                           <div className="text-xs text-muted-foreground truncate">{result.meta}</div>
                         )}

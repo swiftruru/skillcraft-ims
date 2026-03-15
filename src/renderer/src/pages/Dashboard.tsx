@@ -70,6 +70,35 @@ export default function Dashboard() {
     localStorage.setItem('ims-dashboard-hidden', JSON.stringify(Array.from(hiddenWidgets)))
   }, [hiddenWidgets])
 
+  const [widgetOrder, setWidgetOrder] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ims-dashboard-order') ?? 'null') as string[] | null
+      if (saved && Array.isArray(saved) && saved.length > 0) return saved
+    } catch {}
+    return WIDGET_KEYS.filter((k) => k !== 'pendingSales')
+  })
+  const [dragKey, setDragKey] = useState<string | null>(null)
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    localStorage.setItem('ims-dashboard-order', JSON.stringify(widgetOrder))
+  }, [widgetOrder])
+
+  const handleWidgetDrop = (targetKey: string) => {
+    if (!dragKey || dragKey === targetKey) { setDragKey(null); setDragOverKey(null); return }
+    setWidgetOrder((prev) => {
+      const next = [...prev]
+      const fromIdx = next.indexOf(dragKey)
+      const toIdx = next.indexOf(targetKey)
+      if (fromIdx === -1 || toIdx === -1) return prev
+      next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, dragKey)
+      return next
+    })
+    setDragKey(null)
+    setDragOverKey(null)
+  }
+
   const toggleWidget = (key: string) => {
     setHiddenWidgets((prev) => {
       if (prev.size >= WIDGET_KEYS.length - 1 && !prev.has(key)) return prev
@@ -81,10 +110,24 @@ export default function Dashboard() {
   const isVisible = (key: string) => !hiddenWidgets.has(key)
 
   const wrap = (key: string, label: string, content: React.ReactNode) => {
+    const order = widgetOrder.indexOf(key)
+    const orderStyle = order !== -1 ? { order } : {}
+    const isDragTarget = customizing && dragOverKey === key && dragKey !== key
+    const dragProps = customizing ? {
+      draggable: true,
+      onDragStart: () => setDragKey(key),
+      onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOverKey(key) },
+      onDrop: () => handleWidgetDrop(key),
+      onDragEnd: () => { setDragKey(null); setDragOverKey(null) }
+    } : {}
     if (!customizing && hiddenWidgets.has(key)) return null
     if (customizing && hiddenWidgets.has(key)) {
       return (
-        <div className="flex items-center justify-between px-4 py-2.5 rounded-lg border border-dashed border-border/50 text-sm text-muted-foreground bg-muted/10">
+        <div
+          style={orderStyle}
+          {...dragProps}
+          className={`flex items-center justify-between px-4 py-2.5 rounded-lg border border-dashed border-border/50 text-sm text-muted-foreground bg-muted/10 cursor-grab${isDragTarget ? ' ring-2 ring-primary/40' : ''}`}
+        >
           <span className="flex items-center gap-2"><EyeOff className="w-3.5 h-3.5" />{label}</span>
           <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => toggleWidget(key)}>
             <Eye className="w-3.5 h-3.5" />{d.customizeShow}
@@ -92,16 +135,22 @@ export default function Dashboard() {
         </div>
       )
     }
-    if (!customizing) return <>{content}</>
+    if (!customizing) return <div style={orderStyle}>{content}</div>
     return (
-      <div>
-        <div className="flex justify-end -mb-2 pr-1">
-          <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => toggleWidget(key)}>
-            <EyeOff className="w-3 h-3" />{d.customizeHide}
-          </Button>
+      <div
+        style={orderStyle}
+        {...dragProps}
+        className={`cursor-grab${isDragTarget ? ' ring-2 ring-primary/40 rounded-xl' : ''}`}
+      >
+        <div>
+          <div className="flex justify-end -mb-2 pr-1">
+            <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => toggleWidget(key)}>
+              <EyeOff className="w-3 h-3" />{d.customizeHide}
+            </Button>
+          </div>
+          {content}
         </div>
-        {content}
       </div>
     )
   }
@@ -218,6 +267,7 @@ export default function Dashboard() {
         </Button>
       </div>
 
+      <div className="flex flex-col gap-6" onDragLeave={() => setDragOverKey(null)}>
       {/* Quick Actions */}
       {wrap('quickActions', d.addPurchase, (
         <div className="flex gap-3 flex-wrap">
@@ -289,7 +339,8 @@ export default function Dashboard() {
         </div>
       ))}
 
-      {/* Overdue Alerts */}
+      {/* Overdue Alerts - fixed order */}
+      <div style={{ order: -2 }}>
       {(kpis?.overdueCount ?? 0) > 0 && (() => {
         const overdueItems: { order: UnpaidOrder; type: 'sales' | 'purchases' }[] = [
           ...(unpaidOrders?.sales.filter((o) => o.overdue) ?? []).map((o) => ({ order: o, type: 'sales' as const })),
@@ -337,8 +388,10 @@ export default function Dashboard() {
           </Card>
         )
       })()}
+      </div>
 
-      {/* Due Soon Alerts */}
+      {/* Due Soon Alerts - fixed order */}
+      <div style={{ order: -1 }}>
       {(kpis?.dueSoonCount ?? 0) > 0 && (() => {
         const today = new Date().toISOString().slice(0, 10)
         const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
@@ -388,6 +441,7 @@ export default function Dashboard() {
           </Card>
         )
       })()}
+      </div>
 
       {/* Charts Row */}
       {wrap('salesTrend', d.salesTrend, <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -776,6 +830,8 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>)}
+
+      </div>
     </div>
   )
 }

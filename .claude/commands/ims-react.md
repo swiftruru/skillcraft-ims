@@ -290,3 +290,49 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     - 合法性：值 < 0 時不允許（input `min="0"`）；空白視為取消（不送出）
     - 欄位 hover 時顯示 `Pencil` icon 提示（`opacity-0 group-hover:opacity-60`）
 
+39. **Command Palette 搜尋結果文字高亮**：
+    - 搜尋結果列表中，將符合 `query` 字串的文字片段以 `<mark>` 標籤包裹，樣式 `bg-primary/20 text-foreground rounded-sm not-italic`
+    - 實作：建立 `highlight(text: string, query: string): React.ReactNode` 純函式（位於 CommandPalette 元件內或 `src/renderer/src/lib/highlight.ts`）
+      - 用 `query.trim()` 比對，不分大小寫（`toLowerCase()`）
+      - 找到所有匹配位置，切成 `before / match / after` 片段，map 成 `[text, <mark>match</mark>, text, ...]`
+      - 無匹配時直接回傳原字串（不需 `<mark>`）
+    - 套用範圍：搜尋結果的 `title`（商品名 / 訂單號 / 客戶名）；`subtitle` 不高亮
+    - 只在 `query.trim()` 非空時啟用高亮；結果為空（`results.length === 0`）時不需高亮
+
+40. **Customers / Suppliers 刪除 Undo**：
+    - 與 Products 相同的 Undo Toast 模式（Rule 34）：刪除後顯示含「復原」按鈕的 5 秒 Toast
+    - Customers：`pendingDelete: { id: number; snapshot: Customer } | null` state；復原呼叫 `customers:create(snapshot)` + invalidate `['customers']`
+    - Suppliers：`pendingDelete: { id: number; snapshot: Supplier } | null` state；復原呼叫 `suppliers:create(snapshot)` + invalidate `['suppliers']`
+    - Toast title：`已刪除「{name}」`；action label：`復原`；duration：5000ms
+    - 刪除 mutation 的 `mutationFn` 改為接受 `{ id, snapshot }` 物件，`onSuccess` 中呼叫 toast + dismiss pattern
+
+41. **URL 篩選條件同步（URL Search Params）**：
+    - 適用範圍：Products、Purchases、Sales 頁面的篩選 state（Products: `search`, `categoryFilter`, `stockFilter`；Purchases/Sales: `search`, `dateFrom`, `dateTo`）
+    - 使用 `useSearchParams` hook（React Router v6）讀寫 URL query string
+    - 初始化：從 `searchParams.get('search')` 等讀取初始值，`useState` 的 initializer 改為從 URL 讀取（fallback 到預設值）
+    - 更新：每次 state 變更後呼叫 `setSearchParams`（合併更新），空值用 `searchParams.delete(key)` 移除
+    - 清除篩選時同步清除 URL params；使用 `replace: true` 避免堆疊 history
+
+42. **表單草稿自動儲存（Auto-save Draft）**：
+    - 適用範圍：`PurchaseForm`、`SaleForm`
+    - localStorage key：`'ims-draft-purchase'`、`'ims-draft-sale'`
+    - 存檔時機：`watch()` 監聽整個表單，`useEffect` 在值變更時（debounce 500ms）寫入 localStorage；表單 `isDirty` 為 true 且有至少一個 item 才存草稿
+    - 恢復時機：Dialog 開啟（`open = true`）且不是編輯模式（無 initialData）時，若 localStorage 有草稿，顯示 inline banner（`bg-muted/50 rounded-lg p-2 text-xs flex items-center gap-2`）提示「找到未送出草稿」，附「恢復」和「忽略」按鈕
+    - 恢復：點擊「恢復」呼叫 `reset(savedDraft)`；忽略：刪除 localStorage key
+    - 清除：表單成功送出（`onSuccess`）後刪除 localStorage key；關閉 Dialog 且 `isDirty = false` 時也清除
+
+43. **Dashboard 小工具拖曳排序**：
+    - 使用 HTML5 原生 drag & drop API（`draggable`、`onDragStart`、`onDragOver`、`onDrop`），不引入額外套件
+    - `widgetOrder: string[]` state（`WIDGET_KEYS` 順序的陣列），初始從 `localStorage['ims-dashboard-order']` 讀取，fallback 為 `WIDGET_KEYS` 預設順序
+    - 編輯模式（`customizing = true`）下，每個 widget 左側顯示 `GripVertical` icon（`cursor-grab`）
+    - `dragOver` 時計算目標位置，重新排列 `widgetOrder`（immutable swap）；`onDrop` 結束後寫入 localStorage
+    - Widget 渲染改為依 `widgetOrder` 迭代，`wrap()` 函式不變；隱藏的 widget 在排序陣列中保留位置（只是不顯示）
+
+44. **報表頁面數據匯出**：
+    - Reports 頁面右上角加入「匯出報表」Button（`Download` icon，`variant="outline" size="sm"`）
+    - IPC：`reports:exportSummary(params)` → 回傳 CSV 檔案路徑或觸發下載
+    - 匯出內容：目前 KPI 卡片數值（本月營收、採購、毛利、訂單數等）+ Top Products 列表（10 筆）+ 銷售趨勢（30 天）
+    - IPC 實作：組合 SQL 查詢結果，以 `\n` 分隔不同區塊，複用現有 `export.ts` 的 `writeCsv` helper
+    - 複用現有 `electronAPI.export.*` 模式：ipc handler 在 `reports.ipc.ts`，export helper 在 `src/main/export/`
+    - 匯出完成後顯示 toast success（`已匯出報表`）
+

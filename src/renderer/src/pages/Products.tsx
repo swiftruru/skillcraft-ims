@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2 } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -28,12 +28,14 @@ export default function Products() {
   const { toast } = useToast()
   const t = useLang()
   const p = t.products
-  const location = useLocation()
-  const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('__all__')
-  const [stockFilter, setStockFilter] = useState<string>(
-    (location.state as { stockFilter?: string } | null)?.stockFilter ?? '__all__'
-  )
+  const [searchParams, setSearchParams] = useSearchParams()
+  const search = searchParams.get('q') ?? ''
+  const categoryFilter = searchParams.get('cat') ?? '__all__'
+  const stockFilter = searchParams.get('sf') ?? '__all__'
+
+  const setSearch = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v) n.set('q', v); else n.delete('q'); return n }, { replace: true })
+  const setCategoryFilter = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v !== '__all__') n.set('cat', v); else n.delete('cat'); return n }, { replace: true })
+  const setStockFilter = (v: string) => setSearchParams((prev) => { const n = new URLSearchParams(prev); if (v !== '__all__') n.set('sf', v); else n.delete('sf'); return n }, { replace: true })
   const [formOpen, setFormOpen] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{ id: number; snapshot: Product } | null>(null)
@@ -374,7 +376,7 @@ export default function Products() {
         {hasFilter && (
           <button
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => { setCategoryFilter('__all__'); setStockFilter('__all__') }}
+            onClick={() => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('cat'); n.delete('sf'); return n }, { replace: true })}
           >
             {p.clearFilter}
           </button>

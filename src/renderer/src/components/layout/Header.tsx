@@ -95,8 +95,7 @@ export function Header({ title, onSearchClick }: { title: string; onSearchClick?
         {lowStockCount > 0 && (
           <Link
             data-tour="low-stock-header"
-            to="/products"
-            state={{ stockFilter: 'low' }}
+            to="/products?sf=low"
             className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 px-2.5 py-1 rounded-full hover:bg-yellow-400/20 transition-colors"
           >
             <AlertTriangle className="w-3 h-3" />

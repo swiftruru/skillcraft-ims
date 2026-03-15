@@ -15,6 +15,7 @@ import type { Supplier, SupplierCreate } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { formatCurrency } from '@/lib/utils'
 import { SupplierDetailDialog } from '@/components/suppliers/SupplierDetailDialog'
+import { useToast } from '@/components/ui/use-toast'
 
 const schema = z.object({
   name: z.string().min(1, '供應商名稱必填'),
@@ -31,11 +32,12 @@ export default function Suppliers() {
   const queryClient = useQueryClient()
   const t = useLang()
   const s = t.suppliers
+  const { toast } = useToast()
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null)
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null)
-  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; snapshot: Supplier } | null>(null)
 
   useEffect(() => {
     const handler = () => { setEditSupplier(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0 }); setFormOpen(true) }
@@ -61,8 +63,22 @@ export default function Suppliers() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['suppliers'] }); setFormOpen(false); setEditSupplier(null); reset() }
   })
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => window.electronAPI.suppliers.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+    mutationFn: ({ id }: { id: number; snapshot: Supplier }) => window.electronAPI.suppliers.delete(id),
+    onSuccess: (_data, { snapshot }) => {
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+      const { dismiss } = toast({
+        title: `已刪除「${snapshot.name}」`,
+        duration: 5000,
+        action: {
+          label: '復原',
+          onClick: async () => {
+            dismiss()
+            await window.electronAPI.suppliers.create({ name: snapshot.name, contact: snapshot.contact, phone: snapshot.phone, email: snapshot.email, address: snapshot.address, notes: snapshot.notes, credit_limit: snapshot.credit_limit })
+            queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+          }
+        }
+      })
+    }
   })
 
   const MOCK_SUPPLIERS = [
@@ -103,7 +119,7 @@ export default function Suppliers() {
       <div className="flex justify-end gap-1">
         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setDetailSupplier(row as unknown as Supplier)}><Eye className="w-3.5 h-3.5" /></Button>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(row as unknown as Supplier)}><Edit2 className="w-3.5 h-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(row.id as number)}><Trash2 className="w-3.5 h-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setPendingDelete({ id: row.id as number, snapshot: row as unknown as Supplier })}><Trash2 className="w-3.5 h-3.5" /></Button>
       </div>
     )}
   ]
@@ -158,7 +174,7 @@ export default function Suppliers() {
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)} title={s.deleteTitle} description={s.deleteDesc} onConfirm={() => deleteId && deleteMutation.mutate(deleteId)} />
+      <ConfirmDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)} title={s.deleteTitle} description={s.deleteDesc} onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete)} />
       <SupplierDetailDialog supplier={detailSupplier} open={detailSupplier !== null} onOpenChange={(open) => !open && setDetailSupplier(null)} />
     </div>
   )

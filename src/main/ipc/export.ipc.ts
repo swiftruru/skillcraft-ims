@@ -108,4 +108,53 @@ export function registerExportIpc(): void {
     writeFileSync(filePath, toCsv(headers, data), 'utf-8')
     return { success: true, filePath }
   })
+
+  ipcMain.handle('export:report', async (_e, days: number = 30) => {
+    const { filePath } = await dialog.showSaveDialog({
+      defaultPath: `skillcraft-report-${new Date().toISOString().slice(0, 10)}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    })
+    if (!filePath) return { success: false }
+
+    const db = getDb()
+    const dateFrom = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+
+    const topProducts = db.prepare(`
+      SELECT p.sku, p.name, p.category, SUM(si.quantity) as total_qty, SUM(si.quantity * si.unit_price) as total_revenue
+      FROM sale_items si JOIN products p ON si.product_id = p.id
+      JOIN sales_orders so ON si.sales_order_id = so.id
+      WHERE so.status IN ('completed','partial_return') AND so.order_date >= ?
+      GROUP BY p.id ORDER BY total_revenue DESC LIMIT 20
+    `).all(dateFrom) as Record<string, unknown>[]
+
+    const lowStock = db.prepare(`
+      SELECT sku, name, category, stock_qty, reorder_pt, (reorder_pt - stock_qty) as gap
+      FROM products WHERE stock_qty <= reorder_pt AND reorder_pt > 0 ORDER BY gap DESC
+    `).all() as Record<string, unknown>[]
+
+    const margins = db.prepare(`
+      SELECT sku, name, category, sell_price, buy_price,
+             (sell_price - buy_price) as margin,
+             CASE WHEN sell_price > 0 THEN ROUND((sell_price - buy_price) * 100.0 / sell_price, 1) ELSE NULL END as margin_pct
+      FROM products WHERE sell_price > 0 ORDER BY margin_pct DESC
+    `).all() as Record<string, unknown>[]
+
+    const sections: string[] = []
+    sections.push(BOM + `=== 銷售報表摘要 (最近 ${days} 天) ===\r\n生成時間：${new Date().toLocaleString('zh-TW')}`)
+    sections.push('')
+    sections.push(`=== 熱銷商品 TOP 20 (${dateFrom} ~ ${new Date().toISOString().slice(0, 10)}) ===`)
+    sections.push(toCsv(['SKU', '商品名稱', '類別', '銷售數量', '銷售金額'],
+      topProducts.map(r => [r.sku, r.name, r.category, r.total_qty, r.total_revenue])).replace(BOM, ''))
+    sections.push('')
+    sections.push(`=== 低庫存警示 (${lowStock.length} 項) ===`)
+    sections.push(toCsv(['SKU', '商品名稱', '類別', '現有庫存', '補貨點', '缺口'],
+      lowStock.map(r => [r.sku, r.name, r.category, r.stock_qty, r.reorder_pt, r.gap])).replace(BOM, ''))
+    sections.push('')
+    sections.push('=== 毛利分析 ===')
+    sections.push(toCsv(['SKU', '商品名稱', '類別', '售價', '進價', '毛利', '毛利率(%)'],
+      margins.map(r => [r.sku, r.name, r.category, r.sell_price, r.buy_price, r.margin, r.margin_pct])).replace(BOM, ''))
+
+    writeFileSync(filePath, sections.join('\r\n'), 'utf-8')
+    return { success: true, filePath }
+  })
 }

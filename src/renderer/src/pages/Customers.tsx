@@ -15,6 +15,7 @@ import type { Customer, CustomerCreate } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { formatCurrency } from '@/lib/utils'
 import { CustomerDetailDialog } from '@/components/customers/CustomerDetailDialog'
+import { useToast } from '@/components/ui/use-toast'
 
 const schema = z.object({
   name: z.string().min(1, '客戶名稱必填'),
@@ -31,11 +32,12 @@ export default function Customers() {
   const queryClient = useQueryClient()
   const t = useLang()
   const c = t.customers
+  const { toast } = useToast()
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null)
-  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; snapshot: Customer } | null>(null)
 
   useEffect(() => {
     const handler = () => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0 }); setFormOpen(true) }
@@ -59,8 +61,22 @@ export default function Customers() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['customers'] }); setFormOpen(false); setEditCustomer(null); reset() }
   })
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => window.electronAPI.customers.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] })
+    mutationFn: ({ id }: { id: number; snapshot: Customer }) => window.electronAPI.customers.delete(id),
+    onSuccess: (_data, { snapshot }) => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
+      const { dismiss } = toast({
+        title: `已刪除「${snapshot.name}」`,
+        duration: 5000,
+        action: {
+          label: '復原',
+          onClick: async () => {
+            dismiss()
+            await window.electronAPI.customers.create({ name: snapshot.name, contact: snapshot.contact, phone: snapshot.phone, email: snapshot.email, address: snapshot.address, notes: snapshot.notes, credit_limit: snapshot.credit_limit })
+            queryClient.invalidateQueries({ queryKey: ['customers'] })
+          }
+        }
+      })
+    }
   })
 
   const MOCK_CUSTOMERS = [
@@ -101,7 +117,7 @@ export default function Customers() {
       <div className="flex justify-end gap-1">
         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setDetailCustomer(row as unknown as Customer)}><Eye className="w-3.5 h-3.5" /></Button>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(row as unknown as Customer)}><Edit2 className="w-3.5 h-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(row.id as number)}><Trash2 className="w-3.5 h-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setPendingDelete({ id: row.id as number, snapshot: row as unknown as Customer })}><Trash2 className="w-3.5 h-3.5" /></Button>
       </div>
     )}
   ]
@@ -149,7 +165,7 @@ export default function Customers() {
           </form>
         </DialogContent>
       </Dialog>
-      <ConfirmDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)} title={c.deleteTitle} description={c.deleteDesc} onConfirm={() => deleteId && deleteMutation.mutate(deleteId)} />
+      <ConfirmDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)} title={c.deleteTitle} description={c.deleteDesc} onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete)} />
       <CustomerDetailDialog customer={detailCustomer} open={detailCustomer !== null} onOpenChange={(open) => !open && setDetailCustomer(null)} />
     </div>
   )

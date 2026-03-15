@@ -33,11 +33,14 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
+const DRAFT_KEY = 'ims-draft-purchase'
+
 export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolean; onOpenChange: (v: boolean) => void; initialData?: Partial<FormValues> }) {
   const queryClient = useQueryClient()
   const t = useLang()
   const tf = t.forms
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
 
   const { data: suppliers } = useQuery<Supplier[]>({
     queryKey: ['suppliers', 'all'],
@@ -67,7 +70,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
 
-  // Pre-fill when cloning
+  // Pre-fill when cloning, or restore draft
   useEffect(() => {
     if (open && initialData) {
       reset({
@@ -77,10 +80,24 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
         notes: initialData.notes ?? '',
         items: initialData.items?.length ? initialData.items : [{ product_id: 0, quantity: 1, unit_price: 0 }]
       })
+      setDraftRestored(false)
+    } else if (open && !initialData) {
+      try {
+        const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as FormValues | null
+        if (draft) { reset(draft); setDraftRestored(true) }
+      } catch { /* ignore */ }
     } else if (!open) {
       reset({ supplier_id: null, order_date: today, payment_terms: 0, notes: '', items: [{ product_id: 0, quantity: 1, unit_price: 0 }] })
+      setDraftRestored(false)
     }
   }, [open, initialData])
+
+  // Auto-save draft
+  useEffect(() => {
+    if (!open || initialData) return
+    const subscription = watch((values) => { localStorage.setItem(DRAFT_KEY, JSON.stringify(values)) })
+    return () => subscription.unsubscribe()
+  }, [open, initialData, watch])
 
   const handleClose = () => {
     if (isDirty) { setConfirmLeave(true) } else { onOpenChange(false) }
@@ -94,6 +111,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
       return window.electronAPI.purchases.create({ ...data, payment_due_date })
     },
     onSuccess: () => {
+      localStorage.removeItem(DRAFT_KEY)
       queryClient.invalidateQueries({ queryKey: ['purchases'] })
       reset()
       onOpenChange(false)
@@ -143,7 +161,10 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose() }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{tf.newPurchaseOrder}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>{tf.newPurchaseOrder}</DialogTitle>
+            {draftRestored && <span className="text-xs text-muted-foreground">{tf.draftRestored ?? '草稿已還原'}</span>}
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
