@@ -71,6 +71,7 @@ export interface PurchaseItem {
   product_sku?: string
   quantity: number
   unit_price: number
+  discount_pct: number
   subtotal?: number
 }
 
@@ -78,6 +79,7 @@ export type PurchaseItemInput = {
   product_id: number
   quantity: number
   unit_price: number
+  discount_pct?: number
 }
 
 export type PurchaseOrderCreate = {
@@ -111,6 +113,7 @@ export interface SaleItem {
   product_sku?: string
   quantity: number
   unit_price: number
+  discount_pct: number
   return_qty?: number
   subtotal?: number
 }
@@ -119,6 +122,7 @@ export type SaleItemInput = {
   product_id: number
   quantity: number
   unit_price: number
+  discount_pct?: number
 }
 
 export type SalesOrderCreate = {

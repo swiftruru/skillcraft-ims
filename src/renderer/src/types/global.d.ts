@@ -16,7 +16,8 @@ declare global {
         getAdjustmentHistory(productId: number): Promise<import('./schema').InventoryAdjustment[]>
         getAllAdjustments(filters?: { search?: string; reason?: string; dateFrom?: string; dateTo?: string; limit?: number }): Promise<import('./schema').InventoryAdjustment[]>
         batchDelete(ids: number[]): Promise<{ deleted: number; skipped: number }>
-        batchUpdate(ids: number[], data: { category?: string }): Promise<{ updated: number }>
+        batchUpdate(ids: number[], data: { category?: string; reorder_pt?: number }): Promise<{ updated: number }>
+        batchUpdateReorderPt(updates: { id: number; reorder_pt: number }[]): Promise<{ updated: number }>
         batchUpdatePrice(ids: number[], mode: 'set' | 'increase' | 'decrease', target: 'sell_price' | 'buy_price' | 'both', amount: number, amountType: 'fixed' | 'percent'): Promise<{ updated: number }>
         getPriceHistory(productId: number): Promise<import('./schema').PriceHistoryItem[]>
         nextSku(category: string): Promise<string>
@@ -31,6 +32,7 @@ declare global {
         delete(id: number): Promise<boolean>
         getOrders(supplierId: number): Promise<import('./schema').PurchaseOrder[]>
         getOutstanding(supplierId: number): Promise<{ outstanding: number }>
+        getStatement(supplierId: number, dateFrom: string, dateTo: string): Promise<{ orders: import('./schema').PurchaseOrder[]; totalAmount: number; paidAmount: number; balance: number }>
       }
       customers: {
         getAll(search?: string): Promise<import('./schema').Customer[]>
@@ -40,6 +42,7 @@ declare global {
         delete(id: number): Promise<boolean>
         getOrders(customerId: number): Promise<import('./schema').SalesOrder[]>
         getOutstanding(customerId: number): Promise<{ outstanding: number }>
+        getStatement(customerId: number, dateFrom: string, dateTo: string): Promise<{ orders: import('./schema').SalesOrder[]; totalAmount: number; paidAmount: number; balance: number }>
       }
       purchases: {
         getAll(filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }): Promise<import('./schema').PurchaseOrder[]>
@@ -114,6 +117,7 @@ declare global {
         sales(): Promise<{ success: boolean; filePath?: string; error?: string }>
         adjustments(): Promise<{ success: boolean; filePath?: string; error?: string }>
         report(days?: number): Promise<{ success: boolean; filePath?: string; error?: string }>
+        aiReport(): Promise<{ success: boolean; filePath?: string; error?: string }>
       }
       inventory: {
         getPurchaseSuggestions(): Promise<import('./schema').PurchaseSuggestion[]>
@@ -153,8 +157,10 @@ declare global {
         }>
       }
       ai: {
-        forecast(): Promise<import('./schema').AiForecastResult>
-        getLatest(): Promise<import('./schema').AiForecastResult | null>
+        forecast(params: import('./schema').AiForecastParams): Promise<import('./schema').AiForecastResult>
+        getLatest(): Promise<import('./schema').AiForecastLatest | null>
+        checkFreshness(): Promise<{ hoursSince: number; newSalesCount: number }>
+        previewScope(params: import('./schema').AiForecastParams): Promise<{ count: number }>
       }
       notifications: {
         getAll(): Promise<import('./schema').AppNotification[]>

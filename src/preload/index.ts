@@ -19,7 +19,8 @@ const electronAPI = {
     getAllAdjustments: (filters?: { search?: string; reason?: string; dateFrom?: string; dateTo?: string; limit?: number }) =>
       ipcRenderer.invoke('products:getAllAdjustments', filters),
     batchDelete: (ids: number[]) => ipcRenderer.invoke('products:batchDelete', ids),
-    batchUpdate: (ids: number[], data: { category?: string }) => ipcRenderer.invoke('products:batchUpdate', ids, data),
+    batchUpdate: (ids: number[], data: { category?: string; reorder_pt?: number }) => ipcRenderer.invoke('products:batchUpdate', ids, data),
+    batchUpdateReorderPt: (updates: { id: number; reorder_pt: number }[]) => ipcRenderer.invoke('products:batchUpdateReorderPt', updates),
     batchUpdatePrice: (ids: number[], mode: 'set' | 'increase' | 'decrease', target: 'sell_price' | 'buy_price' | 'both', amount: number, amountType: 'fixed' | 'percent') =>
       ipcRenderer.invoke('products:batchUpdatePrice', ids, mode, target, amount, amountType),
     getPriceHistory: (productId: number) => ipcRenderer.invoke('products:getPriceHistory', productId),
@@ -36,7 +37,8 @@ const electronAPI = {
     update: (id: number, data: unknown) => ipcRenderer.invoke('suppliers:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('suppliers:delete', id),
     getOrders: (supplierId: number) => ipcRenderer.invoke('suppliers:getOrders', supplierId),
-    getOutstanding: (supplierId: number) => ipcRenderer.invoke('suppliers:getOutstanding', supplierId)
+    getOutstanding: (supplierId: number) => ipcRenderer.invoke('suppliers:getOutstanding', supplierId),
+    getStatement: (supplierId: number, dateFrom: string, dateTo: string) => ipcRenderer.invoke('suppliers:getStatement', supplierId, dateFrom, dateTo)
   },
 
   // Customers
@@ -47,7 +49,8 @@ const electronAPI = {
     update: (id: number, data: unknown) => ipcRenderer.invoke('customers:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('customers:delete', id),
     getOrders: (customerId: number) => ipcRenderer.invoke('customers:getOrders', customerId),
-    getOutstanding: (customerId: number) => ipcRenderer.invoke('customers:getOutstanding', customerId)
+    getOutstanding: (customerId: number) => ipcRenderer.invoke('customers:getOutstanding', customerId),
+    getStatement: (customerId: number, dateFrom: string, dateTo: string) => ipcRenderer.invoke('customers:getStatement', customerId, dateFrom, dateTo)
   },
 
   // Purchases
@@ -146,7 +149,8 @@ const electronAPI = {
     purchases: () => ipcRenderer.invoke('export:purchases'),
     sales: () => ipcRenderer.invoke('export:sales'),
     adjustments: () => ipcRenderer.invoke('export:adjustments'),
-    report: (days?: number) => ipcRenderer.invoke('export:report', days)
+    report: (days?: number) => ipcRenderer.invoke('export:report', days),
+    aiReport: () => ipcRenderer.invoke('export:aiReport')
   },
 
   // Inventory utilities
@@ -202,8 +206,12 @@ const electronAPI = {
 
   // AI
   ai: {
-    forecast: () => ipcRenderer.invoke('ai:forecast'),
-    getLatest: () => ipcRenderer.invoke('ai:getLatest')
+    forecast: (params: { scope?: string; productIds?: number[] }) =>
+      ipcRenderer.invoke('ai:forecast', params),
+    getLatest: () => ipcRenderer.invoke('ai:getLatest'),
+    checkFreshness: () => ipcRenderer.invoke('ai:checkFreshness'),
+    previewScope: (params: { scope?: string; productIds?: number[] }) =>
+      ipcRenderer.invoke('ai:previewScope', params)
   },
 
   // Notifications

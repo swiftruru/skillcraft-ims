@@ -55,7 +55,7 @@ export const PurchaseModel = {
     order.items = db
       .prepare(
         `SELECT pi.*, p.name as product_name, p.sku as product_sku,
-                (pi.quantity * pi.unit_price) as subtotal
+                ROUND(pi.quantity * pi.unit_price * (1 - pi.discount_pct / 100.0), 2) as subtotal
          FROM purchase_items pi
          JOIN products p ON pi.product_id = p.id
          WHERE pi.purchase_order_id = ?`
@@ -68,15 +68,18 @@ export const PurchaseModel = {
   create(data: PurchaseOrderCreate): PurchaseOrder {
     const db = getDb()
     const orderNo = generateOrderNo()
-    const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0)
+    const totalAmount = data.items.reduce(
+      (sum, item) => sum + item.quantity * item.unit_price * (1 - (item.discount_pct ?? 0) / 100),
+      0
+    )
 
     const insertOrder = db.prepare(
       `INSERT INTO purchase_orders (order_no, supplier_id, order_date, total_amount, notes, payment_due_date)
        VALUES (@order_no, @supplier_id, @order_date, @total_amount, @notes, @payment_due_date)`
     )
     const insertItem = db.prepare(
-      `INSERT INTO purchase_items (purchase_order_id, product_id, quantity, unit_price)
-       VALUES (@purchase_order_id, @product_id, @quantity, @unit_price)`
+      `INSERT INTO purchase_items (purchase_order_id, product_id, quantity, unit_price, discount_pct)
+       VALUES (@purchase_order_id, @product_id, @quantity, @unit_price, @discount_pct)`
     )
 
     const createTransaction = db.transaction(() => {
@@ -90,7 +93,7 @@ export const PurchaseModel = {
       })
       const orderId = result.lastInsertRowid as number
       for (const item of data.items) {
-        insertItem.run({ purchase_order_id: orderId, ...item })
+        insertItem.run({ purchase_order_id: orderId, ...item, discount_pct: item.discount_pct ?? 0 })
       }
       return orderId
     })

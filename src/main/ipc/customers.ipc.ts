@@ -28,4 +28,17 @@ export function registerCustomersIpc(): void {
        LIMIT 20`
     ).all(customerId)
   })
+  ipcMain.handle('customers:getStatement', (_e, customerId: number, dateFrom: string, dateTo: string) => {
+    const db = getDb()
+    const orders = db.prepare(
+      `SELECT so.*, c.name as customer_name
+       FROM sales_orders so
+       LEFT JOIN customers c ON so.customer_id = c.id
+       WHERE so.customer_id = ? AND so.order_date BETWEEN ? AND ?
+       ORDER BY so.order_date DESC`
+    ).all(customerId, dateFrom, dateTo) as { total_amount: number; payment_status: string }[]
+    const totalAmount = orders.reduce((sum, o) => sum + o.total_amount, 0)
+    const paidAmount = orders.filter((o) => o.payment_status === 'paid').reduce((sum, o) => sum + o.total_amount, 0)
+    return { orders, totalAmount, paidAmount, balance: totalAmount - paidAmount }
+  })
 }

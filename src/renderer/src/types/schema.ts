@@ -72,10 +72,11 @@ export interface PurchaseItem {
   product_sku?: string
   quantity: number
   unit_price: number
+  discount_pct: number
   subtotal?: number
 }
 
-export type PurchaseItemInput = { product_id: number; quantity: number; unit_price: number }
+export type PurchaseItemInput = { product_id: number; quantity: number; unit_price: number; discount_pct?: number }
 export type PurchaseOrderCreate = {
   supplier_id: number | null
   order_date: string
@@ -106,11 +107,12 @@ export interface SaleItem {
   product_sku?: string
   quantity: number
   unit_price: number
+  discount_pct: number
   subtotal?: number
   return_qty: number
 }
 
-export type SaleItemInput = { product_id: number; quantity: number; unit_price: number }
+export type SaleItemInput = { product_id: number; quantity: number; unit_price: number; discount_pct?: number }
 export type SalesOrderCreate = {
   customer_id: number | null
   order_date: string
@@ -200,20 +202,35 @@ export interface AppSettings {
   claudeApiKey: string
 }
 
+export type AiForecastScope = 'smart' | 'low_stock' | 'top_sales' | 'custom'
+
+export interface AiForecastParams {
+  scope?: AiForecastScope
+  productIds?: number[]
+}
+
+export interface AiForecastItem {
+  product_id: number
+  sku: string
+  name: string
+  category: string
+  avg_daily_sales: number
+  stock_qty: number
+  days_remaining: number | null
+  suggested_reorder_qty: number
+  confidence: 'high' | 'medium' | 'low'
+  reasoning: string
+}
+
 export interface AiForecastResult {
   summary: string
-  items: {
-    product_id: number
-    sku: string
-    name: string
-    category: string
-    avg_daily_sales: number
-    stock_qty: number
-    days_remaining: number | null
-    suggested_reorder_qty: number
-    reasoning: string
-  }[]
+  items: AiForecastItem[]
   generatedAt: string
+}
+
+export interface AiForecastLatest {
+  current: AiForecastResult
+  previous: AiForecastResult | null
 }
 
 export interface InventoryAdjustment {

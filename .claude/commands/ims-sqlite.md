@@ -37,3 +37,14 @@ description: 當使用者要求新增或修改資料庫操作、Model 函式、M
    - `purchases:markPaid(id)` / `sales:markPaid(id)` IPC：更新 `payment_status = 'paid'`，僅限 `received` / `completed` 狀態的訂單
    - `reports:kpis` 新增 `unpaidPurchases`（應付）與 `unpaidSales`（應收）兩個 KPI：SQL 使用 `SUM(total_amount) WHERE payment_status = 'unpaid' AND status IN ('received'/'completed')`
    - 逾期判斷：`payment_due_date < date('now') AND payment_status = 'unpaid'`，UI 顯示紅色 `逾期` Badge，不自動更新 DB 欄位
+
+10. **訂單折扣欄位 Migration（014_discount.sql）**：
+    - 建立 `src/main/db/migrations/014_discount.sql`，內容：
+      ```sql
+      ALTER TABLE purchase_items ADD COLUMN discount_pct REAL NOT NULL DEFAULT 0;
+      ALTER TABLE sale_items ADD COLUMN discount_pct REAL NOT NULL DEFAULT 0;
+      ```
+    - migration runner 在 `src/main/db/migrate.ts` 以 `CREATE TABLE IF NOT EXISTS migrations` + 逐一執行未執行的 `.sql` 檔案；新增 `014_discount.sql` 後 runner 自動執行
+    - Model 層（`purchase.ts` / `sale.ts`）的 INSERT items SQL 需在 `discount_pct` 欄加入佔位符；SELECT items SQL 需 `SELECT ..., discount_pct FROM purchase_items/sale_items`
+    - `total_amount` 計算改為：`SUM(unit_price * quantity * (1 - discount_pct / 100.0))` 作為訂單總額（可在 INSERT 時由前端計算好傳入，或在 DB 觸發）；實務上由前端計算後寫入 `total_amount`
+    - 現有資料：`discount_pct DEFAULT 0` 確保歷史資料不受影響

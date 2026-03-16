@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -48,6 +48,9 @@ interface DataTableProps<T> {
   hint?: React.ReactNode
   /** A11y Rule 90: Label for the table (e.g. "商品列表") */
   tableLabel?: string
+  /** Rule 100: Expandable rows */
+  expandable?: boolean
+  renderExpanded?: (row: T) => React.ReactNode
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -67,10 +70,22 @@ export function DataTable<T extends Record<string, unknown>>({
   rowActions,
   contextMenu,
   hint,
-  tableLabel
+  tableLabel,
+  expandable,
+  renderExpanded
 }: DataTableProps<T>) {
   const t = useLang()
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  const toggleExpand = (key: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   // Close context menu on outside mousedown
   useEffect(() => {
@@ -292,6 +307,7 @@ export function DataTable<T extends Record<string, unknown>>({
         <table className="w-full text-sm" role="grid" aria-rowcount={sorted.length} aria-label={tableLabel}>
           <thead>
             <tr className="border-b border-border" role="row">
+              {expandable && <th scope="col" role="columnheader" className="w-8 px-2" aria-label="展開" />}
               {visibleColumns.map((col) => {
                 const colKey = String(col.key)
                 const ariaSortValue = col.sortable
@@ -346,43 +362,67 @@ export function DataTable<T extends Record<string, unknown>>({
               const isFocused = focusedIdx === idx
               const isFlash = flashRowId != null && String(flashRowId) === rowKey
               const rowIndex = (page - 1) * pageSize + idx + 1
+              const isExpanded = expandable && expandedIds.has(rowKey)
+              const colSpan = visibleColumns.length + (expandable ? 1 : 0) + (rowActions ? 1 : 0)
               return (
-                <tr
-                  key={rowKey}
-                  role="row"
-                  aria-rowindex={rowIndex}
-                  ref={isFocused ? focusedRowRef : undefined}
-                  data-focused={isFocused ? 'true' : undefined}
-                  className={cn(
-                    'group border-b border-border/50 hover:bg-muted/30 transition-colors',
-                    isFocused && 'ring-1 ring-inset ring-ring bg-muted/20',
-                    isFlash && 'animate-flash'
-                  )}
-                  onContextMenu={contextMenu ? (e) => {
-                    e.preventDefault()
-                    const items = contextMenu(row)
-                    const x = Math.min(e.clientX, window.innerWidth - 170)
-                    const y = Math.min(e.clientY, window.innerHeight - items.length * 34 - 16)
-                    setCtxMenu({ x, y, items })
-                  } : onRowContextMenu ? (e) => onRowContextMenu(row, e) : undefined}
-                  onClick={onRowFocus ? () => { setFocusedIdx(idx); onRowFocus(row) } : undefined}
-                >
-                  {visibleColumns.map((col) => {
-                    const value = row[String(col.key)]
-                    return (
-                      <td key={String(col.key)} role="gridcell" className={cn('px-4', DENSITY_CLASS[density], col.className)}>
-                        {col.render ? col.render(value, row) : String(value ?? '-')}
+                <React.Fragment key={rowKey}>
+                  <tr
+                    role="row"
+                    aria-rowindex={rowIndex}
+                    ref={isFocused ? focusedRowRef : undefined}
+                    data-focused={isFocused ? 'true' : undefined}
+                    className={cn(
+                      'group border-b border-border/50 hover:bg-muted/30 transition-colors',
+                      isFocused && 'ring-1 ring-inset ring-ring bg-muted/20',
+                      isFlash && 'animate-flash'
+                    )}
+                    onContextMenu={contextMenu ? (e) => {
+                      e.preventDefault()
+                      const items = contextMenu(row)
+                      const x = Math.min(e.clientX, window.innerWidth - 170)
+                      const y = Math.min(e.clientY, window.innerHeight - items.length * 34 - 16)
+                      setCtxMenu({ x, y, items })
+                    } : onRowContextMenu ? (e) => onRowContextMenu(row, e) : undefined}
+                    onClick={onRowFocus ? () => { setFocusedIdx(idx); onRowFocus(row) } : undefined}
+                  >
+                    {expandable && (
+                      <td role="gridcell" className="w-8 px-2 py-2">
+                        <button
+                          type="button"
+                          aria-label={isExpanded ? '收合' : '展開'}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={(e) => { e.stopPropagation(); toggleExpand(rowKey) }}
+                        >
+                          {isExpanded
+                            ? <ChevronDown className="w-4 h-4" />
+                            : <ChevronRight className="w-4 h-4" />}
+                        </button>
                       </td>
-                    )
-                  })}
-                  {rowActions && (
-                    <td role="gridcell" className="sticky right-0 w-1 px-2 bg-transparent">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-0.5">
-                        {rowActions(row)}
-                      </div>
-                    </td>
+                    )}
+                    {visibleColumns.map((col) => {
+                      const value = row[String(col.key)]
+                      return (
+                        <td key={String(col.key)} role="gridcell" className={cn('px-4', DENSITY_CLASS[density], col.className)}>
+                          {col.render ? col.render(value, row) : String(value ?? '-')}
+                        </td>
+                      )
+                    })}
+                    {rowActions && (
+                      <td role="gridcell" className="sticky right-0 w-1 px-2 bg-transparent">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-0.5">
+                          {rowActions(row)}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                  {isExpanded && renderExpanded && (
+                    <tr role="row" className="bg-muted/20 border-b border-border/50">
+                      <td colSpan={colSpan} role="gridcell" className="px-4 py-3">
+                        {renderExpanded(row)}
+                      </td>
+                    </tr>
                   )}
-                </tr>
+                </React.Fragment>
               )
             })}
           </tbody>

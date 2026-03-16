@@ -28,4 +28,17 @@ export function registerSuppliersIpc(): void {
        LIMIT 20`
     ).all(supplierId)
   })
+  ipcMain.handle('suppliers:getStatement', (_e, supplierId: number, dateFrom: string, dateTo: string) => {
+    const db = getDb()
+    const orders = db.prepare(
+      `SELECT po.*, s.name as supplier_name
+       FROM purchase_orders po
+       LEFT JOIN suppliers s ON po.supplier_id = s.id
+       WHERE po.supplier_id = ? AND po.order_date BETWEEN ? AND ?
+       ORDER BY po.order_date DESC`
+    ).all(supplierId, dateFrom, dateTo) as { total_amount: number; payment_status: string }[]
+    const totalAmount = orders.reduce((sum, o) => sum + o.total_amount, 0)
+    const paidAmount = orders.filter((o) => o.payment_status === 'paid').reduce((sum, o) => sum + o.total_amount, 0)
+    return { orders, totalAmount, paidAmount, balance: totalAmount - paidAmount }
+  })
 }

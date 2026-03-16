@@ -89,7 +89,7 @@ export function registerProductsIpc(): void {
     return { success: true }
   })
 
-  ipcMain.handle('products:batchUpdate', (_e, ids: number[], data: { category?: string }) => {
+  ipcMain.handle('products:batchUpdate', (_e, ids: number[], data: { category?: string; reorder_pt?: number }) => {
     const db = getDb()
     if (!ids.length) return { updated: 0 }
     const placeholders = ids.map(() => '?').join(', ')
@@ -100,6 +100,26 @@ export function registerProductsIpc(): void {
         .run(data.category, ...ids)
       updated = result.changes
     }
+    if (data.reorder_pt !== undefined) {
+      const result = db
+        .prepare(`UPDATE products SET reorder_pt = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`)
+        .run(data.reorder_pt, ...ids)
+      updated = result.changes
+    }
+    return { updated }
+  })
+
+  ipcMain.handle('products:batchUpdateReorderPt', (_e, updates: { id: number; reorder_pt: number }[]) => {
+    const db = getDb()
+    if (!updates.length) return { updated: 0 }
+    const stmt = db.prepare(`UPDATE products SET reorder_pt = ?, updated_at = datetime('now') WHERE id = ?`)
+    let updated = 0
+    db.transaction(() => {
+      for (const u of updates) {
+        const res = stmt.run(u.reorder_pt, u.id)
+        updated += res.changes
+      }
+    })()
     return { updated }
   })
 

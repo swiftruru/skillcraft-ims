@@ -132,6 +132,7 @@ export function PurchaseDetail({
                     <th className="text-left px-4 py-2 font-medium text-muted-foreground">商品</th>
                     <th className="text-right px-4 py-2 font-medium text-muted-foreground">數量</th>
                     <th className="text-right px-4 py-2 font-medium text-muted-foreground">單價</th>
+                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">折扣</th>
                     <th className="text-right px-4 py-2 font-medium text-muted-foreground">小計</th>
                   </tr>
                 </thead>
@@ -144,13 +145,14 @@ export function PurchaseDetail({
                       </td>
                       <td className="text-right px-4 py-2">{item.quantity}</td>
                       <td className="text-right px-4 py-2">{formatCurrency(item.unit_price)}</td>
-                      <td className="text-right px-4 py-2">{formatCurrency(item.quantity * item.unit_price)}</td>
+                      <td className="text-right px-4 py-2">{item.discount_pct > 0 ? `${item.discount_pct}%` : '—'}</td>
+                      <td className="text-right px-4 py-2">{formatCurrency(item.subtotal ?? item.quantity * item.unit_price * (1 - item.discount_pct / 100))}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-border font-semibold">
-                    <td colSpan={3} className="text-right px-4 py-2 text-muted-foreground">合計</td>
+                    <td colSpan={4} className="text-right px-4 py-2 text-muted-foreground">合計</td>
                     <td className="text-right px-4 py-2">{formatCurrency(order.total_amount)}</td>
                   </tr>
                 </tfoot>

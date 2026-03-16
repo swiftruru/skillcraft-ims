@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useFocusReturn } from '@/lib/useFocusReturn'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, FileDown, type LucideIcon } from 'lucide-react'
+import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, FileDown, Target, type LucideIcon } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -51,6 +51,8 @@ export default function Products() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
   const [batchPriceOpen, setBatchPriceOpen] = useState(false)
+  const [batchReorderOpen, setBatchReorderOpen] = useState(false)
+  const [batchReorderValue, setBatchReorderValue] = useState('')
   const [quickPurchaseProduct, setQuickPurchaseProduct] = useState<Product | null>(null)
   const [editingCell, setEditingCell] = useState<{ id: number; field: 'sell_price' | 'stock_qty' } | null>(null)
   const [generatingMock, setGeneratingMock] = useState(false)
@@ -169,6 +171,19 @@ export default function Products() {
     onError: () => toast({ title: '更新失敗', variant: 'destructive' })
   })
 
+  const batchReorderMutation = useMutation({
+    mutationFn: ({ ids, reorder_pt }: { ids: number[]; reorder_pt: number }) =>
+      window.electronAPI.products.batchUpdate(ids, { reorder_pt }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      setSelectedIds(new Set())
+      setBatchReorderOpen(false)
+      setBatchReorderValue('')
+      toast({ title: `已更新 ${res.updated} 項補貨點`, variant: 'success' })
+    },
+    onError: () => toast({ title: '更新失敗', variant: 'destructive' })
+  })
+
   const allIds = (products ?? []).map((p) => p.id)
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
   const toggleAll = () => {
@@ -279,18 +294,29 @@ export default function Products() {
             />
           )
         }
+        const ratio = product.reorder_pt > 0 ? product.stock_qty / product.reorder_pt : null
         return (
           <div
-            className="group flex items-center justify-end gap-1 cursor-pointer"
+            className="group flex flex-col gap-0.5 cursor-pointer"
             onClick={() => setEditingCell({ id: product.id as number, field: 'stock_qty' })}
           >
-            <span className={product.stock_qty <= product.reorder_pt ? 'text-yellow-400 font-semibold' : ''}>
-              {formatNumber(Number(v))}
-              {product.stock_qty <= product.reorder_pt && (
-                <AlertTriangle className="inline ml-1 w-3 h-3" />
-              )}
-            </span>
-            <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-60 shrink-0" />
+            <div className="flex items-center justify-end gap-1">
+              <span className={product.stock_qty <= product.reorder_pt ? 'text-yellow-400 font-semibold' : ''}>
+                {formatNumber(Number(v))}
+                {product.stock_qty <= product.reorder_pt && (
+                  <AlertTriangle className="inline ml-1 w-3 h-3" />
+                )}
+              </span>
+              <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-60 shrink-0" />
+            </div>
+            {ratio !== null && ratio < 1.0 && (
+              <div className="w-full bg-muted/30 rounded-full h-1">
+                <div
+                  className={`h-1 rounded-full ${ratio < 0.5 ? 'bg-red-400' : 'bg-orange-400'}`}
+                  style={{ width: `${Math.min(ratio * 100, 100)}%` }}
+                />
+              </div>
+            )}
           </div>
         )
       }
@@ -683,6 +709,52 @@ export default function Products() {
           >
             {p.adjustPrice}
           </Button>
+          {batchReorderOpen ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min="0"
+                value={batchReorderValue}
+                onChange={(e) => setBatchReorderValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = parseInt(batchReorderValue)
+                    if (!isNaN(val) && val >= 0)
+                      batchReorderMutation.mutate({ ids: Array.from(selectedIds), reorder_pt: val })
+                  }
+                  if (e.key === 'Escape') { setBatchReorderOpen(false); setBatchReorderValue('') }
+                }}
+                placeholder="補貨點"
+                className="h-8 w-20 text-sm px-2 border rounded border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                autoFocus
+              />
+              <Button
+                size="sm"
+                className="h-8 text-xs"
+                disabled={batchReorderMutation.isPending || !batchReorderValue}
+                onClick={() => {
+                  const val = parseInt(batchReorderValue)
+                  if (!isNaN(val) && val >= 0)
+                    batchReorderMutation.mutate({ ids: Array.from(selectedIds), reorder_pt: val })
+                }}
+              >
+                確認
+              </Button>
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setBatchReorderOpen(false); setBatchReorderValue('') }}>
+                取消
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs h-8"
+              onClick={() => setBatchReorderOpen(true)}
+            >
+              <Target className="w-3.5 h-3.5" />
+              設定補貨點
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

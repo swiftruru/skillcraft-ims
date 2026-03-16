@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.8.0] — 2026-03-16
+
+### 新功能
+
+- **訂單品項折扣（Order Line Discount）**：採購單與銷售單的每個明細行新增「折扣 %」欄位（0–100%），小計自動以 `unit_price × quantity × (1 - discount_pct / 100)` 計算；詳情 Dialog 新增「折扣」欄顯示折扣率與折後小計；DB migration `019_order_line_discount.sql` 加入 `discount_pct REAL NOT NULL DEFAULT 0`
+- **對帳單 Tab（Account Statement）**：客戶詳情與供應商詳情 Dialog 新增「對帳單」Tab；可設定日期區間（預設本月），列出期間內所有訂單（含狀態與付款狀態 badge），底部統計「共 N 筆 · 總金額 · 已付 · 未付」；IPC `customers:getStatement` / `suppliers:getStatement`
+- **批次補貨點設定（Bulk Reorder Point）**：商品管理多選後，批次操作浮動列新增「設定補貨點」按鈕（`Target` icon）；點擊顯示 inline 數字輸入框，確認後以單一 SQL UPDATE 批次套用，成功後清空選取並顯示 toast
+- **AI 套用建議補貨點（Apply AI Reorder Points）**：AI 需求預測頁面結果卡片新增「套用建議補貨點」按鈕，觸發 AlertDialog 確認後，將各商品 AI 預測 30 天需求量 × 50% 批次寫入 `reorder_pt`，呼叫 `products:batchUpdateReorderPt` IPC
+
+### 技術細節
+
+- `products:batchUpdate` IPC 擴充支援 `reorder_pt?: number` 參數
+- 新增 `products:batchUpdateReorderPt(updates: { id, reorder_pt }[])` IPC handler，以 `db.transaction()` 批次執行
+- `PurchaseForm` / `SaleForm` items grid 由 6 欄擴為 7 欄（加入折扣欄）；`append` 預設值加入 `discount_pct: 0`；Tab 鍵自動新增列邏輯移至折扣欄
+- Preload bridge、`global.d.ts` 同步新增 `getStatement`、`batchUpdateReorderPt` 型別宣告
+
+---
+
 ## [v0.7.1] — 2026-03-16
 
 ### 修正

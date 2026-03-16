@@ -28,7 +28,8 @@ const schema = z.object({
   items: z.array(z.object({
     product_id: z.coerce.number().min(1, '請選擇商品'),
     quantity: z.coerce.number().int().min(1, '數量至少 1'),
-    unit_price: z.coerce.number().min(0, '單價不能為負')
+    unit_price: z.coerce.number().min(0, '單價不能為負'),
+    discount_pct: z.coerce.number().min(0).max(100).optional().default(0)
   })).min(1, '至少需要一項商品')
 })
 
@@ -138,7 +139,10 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
 
   const supplierId = watch('supplier_id')
   const items = watch('items')
-  const total = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0), 0)
+  const total = items.reduce(
+    (sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0) * (1 - (item.discount_pct || 0) / 100),
+    0
+  )
 
   const selectedSupplier = suppliers?.find((s) => s.id === Number(supplierId))
   const { data: outstandingData } = useQuery<{ outstanding: number }>({
@@ -283,13 +287,13 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
             </div>
 
             <div className="space-y-2">
-              <div className="grid grid-cols-[16px_2fr_1fr_1fr_auto_auto] gap-2 text-xs text-muted-foreground px-1">
-                <span></span><span>{tf.productCol}</span><span>{tf.qtyCol}</span><span>{tf.purchasePriceCol}</span><span></span><span></span>
+              <div className="grid grid-cols-[16px_2fr_1fr_1fr_0.6fr_auto_auto] gap-2 text-xs text-muted-foreground px-1">
+                <span></span><span>{tf.productCol}</span><span>{tf.qtyCol}</span><span>{tf.purchasePriceCol}</span><span>折扣 %</span><span></span><span></span>
               </div>
               {fields.map((field, i) => (
                 <div
                   key={field.id}
-                  className={`grid grid-cols-[16px_2fr_1fr_1fr_auto_auto] gap-2 items-center transition-opacity ${dragOverIdx === i && dragIdx !== i ? 'ring-1 ring-primary/50 rounded-md' : ''}`}
+                  className={`grid grid-cols-[16px_2fr_1fr_1fr_0.6fr_auto_auto] gap-2 items-center transition-opacity ${dragOverIdx === i && dragIdx !== i ? 'ring-1 ring-primary/50 rounded-md' : ''}`}
                   draggable
                   onDragStart={() => setDragIdx(i)}
                   onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i) }}
@@ -333,14 +337,26 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
                     min={0}
                     className="h-9"
                     {...register(`items.${i}.unit_price`)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Tab' && !e.shiftKey && i === fields.length - 1) {
-                        e.preventDefault()
-                        append({ product_id: 0, quantity: 1, unit_price: 0 })
-                        pendingFocusRow.current = fields.length
-                      }
-                    }}
                   />
+                  <div className="relative flex items-center">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      className="h-9 pr-5 text-right"
+                      placeholder="0"
+                      {...register(`items.${i}.discount_pct`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab' && !e.shiftKey && i === fields.length - 1) {
+                          e.preventDefault()
+                          append({ product_id: 0, quantity: 1, unit_price: 0, discount_pct: 0 })
+                          pendingFocusRow.current = fields.length
+                        }
+                      }}
+                    />
+                    <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
