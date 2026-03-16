@@ -125,14 +125,14 @@ export default function AiInsight(): React.JSX.Element {
   })
 
   const applyableItems = useMemo(
-    () => (forecast?.items ?? []).filter((i) => i.predicted_demand_30d > 0),
+    () => (forecast?.items ?? []).filter((i) => i.avg_daily_sales > 0),
     [forecast]
   )
 
   const handleApplyReorderPts = (): void => {
     const updates = applyableItems.map((i) => ({
       id: i.product_id,
-      reorder_pt: Math.ceil(i.predicted_demand_30d * 0.5)
+      reorder_pt: Math.ceil(i.avg_daily_sales * 30 * 0.5)
     }))
     applyReorderMutation.mutate(updates)
   }

@@ -246,7 +246,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ product_id: 0, quantity: 1, unit_price: 0 })}
+                onClick={() => append({ product_id: 0, quantity: 1, unit_price: 0, discount_pct: 0 })}
                 className="gap-1 h-7 text-xs"
               >
                 <Plus className="w-3 h-3" />
@@ -267,7 +267,7 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
                       e.preventDefault()
                       const match = products?.find((p) => p.sku.toLowerCase() === skuInput.trim().toLowerCase())
                       if (match) {
-                        append({ product_id: match.id, quantity: 1, unit_price: match.buy_price })
+                        append({ product_id: match.id, quantity: 1, unit_price: match.buy_price, discount_pct: 0 })
                         setSkuInput('')
                         setSkuError('')
                         setTimeout(() => setSkuError(`✓ 已新增 ${match.name}`), 0)
