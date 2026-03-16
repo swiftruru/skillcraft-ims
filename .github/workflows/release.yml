@@ -31,11 +31,25 @@ jobs:
       - name: Build & Package
         run: npm run build && npx electron-builder --mac --arm64 --publish never --config electron-builder.config.ts
 
-      - name: Upload macOS DMG
+      - name: Generate latest-mac.yml
+        run: |
+          cd release
+          DMG=$(ls *.dmg | head -1)
+          SIZE=$(stat -f%z "$DMG")
+          SHA512_HEX=$(shasum -a 512 "$DMG" | awk '{print $1}')
+          SHA512_B64=$(echo "$SHA512_HEX" | xxd -r -p | base64)
+          VERSION=$(node -p "require('../package.json').version")
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+          printf "version: %s\nfiles:\n  - url: %s\n    sha512: %s\n    size: %s\npath: %s\nsha512: %s\nreleaseDate: '%s'\n" \
+            "$VERSION" "$DMG" "$SHA512_B64" "$SIZE" "$DMG" "$SHA512_B64" "$DATE" > latest-mac.yml
+
+      - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
-          path: release/*.dmg
+          path: |
+            release/*.dmg
+            release/latest-mac.yml
 
   build-windows:
     name: Build Windows (x64)
@@ -59,11 +73,31 @@ jobs:
       - name: Build & Package
         run: npm run build && npx electron-builder --win --x64 --publish never --config electron-builder.config.ts
 
-      - name: Upload Windows EXE
+      - name: Generate latest.yml
+        shell: pwsh
+        run: |
+          Set-Location release
+          $setup = Get-ChildItem *.exe | Where-Object { $_.Name -like "*Setup*" } | Select-Object -First 1
+          $portable = Get-ChildItem *.exe | Where-Object { $_.Name -notlike "*Setup*" } | Select-Object -First 1
+          function Get-SHA512Base64($file) {
+            $hash = (Get-FileHash $file -Algorithm SHA512).Hash
+            $bytes = [System.Convert]::FromHexString($hash)
+            return [System.Convert]::ToBase64String($bytes)
+          }
+          $setupSha = Get-SHA512Base64 $setup.FullName
+          $portableSha = Get-SHA512Base64 $portable.FullName
+          $version = (Get-Content ../package.json | ConvertFrom-Json).version
+          $date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+          $yaml = "version: $version`nfiles:`n  - url: $($setup.Name)`n    sha512: $setupSha`n    size: $($setup.Length)`n  - url: $($portable.Name)`n    sha512: $portableSha`n    size: $($portable.Length)`npath: $($setup.Name)`nsha512: $setupSha`nreleaseDate: '$date'"
+          [System.IO.File]::WriteAllText("$PWD/latest.yml", $yaml, [System.Text.UTF8Encoding]::new($false))
+
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/latest.yml
 
   publish-release:
     name: Publish GitHub Release

@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.8.2] — 2026-03-16
+
+### 修正
+
+- **Auto-updater 修復**：Release workflow 改為在 build 後手動產生 `latest-mac.yml`（macOS）與 `latest.yml`（Windows）並上傳至 GitHub Release，解決舊版本自動更新時出現 `Cannot find latest-mac.yml` 404 錯誤的問題
+
+---
+
 ## [v0.8.1] — 2026-03-16
 
 ### 修正
