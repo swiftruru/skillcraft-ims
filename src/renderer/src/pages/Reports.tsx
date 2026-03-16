@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency, formatNumber } from '@/lib/utils'
-import { FileDown, Printer } from 'lucide-react'
+import { FileDown, Printer, Download } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
@@ -13,6 +13,21 @@ import type { SalesTrendPoint, InventoryByCategory, TopProduct, LowStockItem, Ma
 import { useLang } from '@/lib/useLang'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+
+function downloadSectionCsv(filename: string, headers: string[], rows: (string | number | null | undefined)[][]) {
+  const BOM = '\uFEFF'
+  const escape = (v: unknown) => {
+    const s = v === null || v === undefined ? '' : String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const lines = [headers.map(escape).join(','), ...rows.map((r) => r.map(escape).join(','))]
+  const csv = BOM + lines.join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
 
 function getDaysForPeriod(period: string): number {
   const now = new Date()
@@ -339,9 +354,20 @@ export default function Reports() {
       {/* Low Stock Table */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-yellow-400">
-            {r.lowStockItems} {lowStock && lowStock.length > 0 && `(${lowStock.length})`}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-yellow-400">
+              {r.lowStockItems} {lowStock && lowStock.length > 0 && `(${lowStock.length})`}
+            </CardTitle>
+            {lowStock && lowStock.length > 0 && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="匯出低庫存 CSV"
+                onClick={() => downloadSectionCsv(`skillcraft-report-lowstock-${new Date().toISOString().slice(0, 10)}.csv`,
+                  ['SKU', '商品名稱', '分類', '庫存', '補貨點', '缺口', '建議補貨量'],
+                  lowStock.map((i) => [i.sku, i.name, i.category, i.stock_qty, i.reorder_pt, i.reorder_pt - i.stock_qty, Math.max(i.reorder_pt - i.stock_qty, i.reorder_pt)])
+                )}>
+                <Download className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {lowStock && lowStock.length > 0 ? (
@@ -382,7 +408,18 @@ export default function Reports() {
       {/* Margin Analysis */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">{r.grossMargin}</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">{r.grossMargin}</CardTitle>
+            {marginItems && marginItems.length > 0 && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="匯出毛利分析 CSV"
+                onClick={() => downloadSectionCsv(`skillcraft-report-margin-${new Date().toISOString().slice(0, 10)}.csv`,
+                  ['SKU', '商品名稱', '分類', '售價', '進價', '毛利', '毛利率(%)'],
+                  marginItems.map((i) => [i.sku, i.name, i.category, i.sell_price, i.buy_price, i.margin, i.margin_pct ?? ''])
+                )}>
+                <Download className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {marginItems && marginItems.length > 0 ? (
@@ -424,7 +461,18 @@ export default function Reports() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">{r.supplierStats}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">{r.supplierStats}</CardTitle>
+              {supplierStats && supplierStats.length > 0 && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="匯出供應商統計 CSV"
+                  onClick={() => downloadSectionCsv(`skillcraft-report-suppliers-${new Date().toISOString().slice(0, 10)}.csv`,
+                    ['供應商', '訂單數', '已收貨金額', '總採購金額'],
+                    supplierStats.map((s) => [s.name, s.order_count, s.total_received, s.total_ordered])
+                  )}>
+                  <Download className="w-3.5 h-3.5" />
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {supplierStats && supplierStats.length > 0 ? (
@@ -457,7 +505,18 @@ export default function Reports() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">{r.customerStats}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">{r.customerStats}</CardTitle>
+              {customerStats && customerStats.length > 0 && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="匯出客戶統計 CSV"
+                  onClick={() => downloadSectionCsv(`skillcraft-report-customers-${new Date().toISOString().slice(0, 10)}.csv`,
+                    ['客戶', '訂單數', '已完成銷售金額', '總銷售金額'],
+                    customerStats.map((c) => [c.name, c.order_count, c.total_spent, c.total_ordered])
+                  )}>
+                  <Download className="w-3.5 h-3.5" />
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {customerStats && customerStats.length > 0 ? (
@@ -548,7 +607,7 @@ export default function Reports() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">{r.turnoverTitle}</CardTitle>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
               {[7, 30, 90].map((d) => (
                 <Button
                   key={d}
@@ -560,6 +619,15 @@ export default function Reports() {
                   {r.daysLabel(d)}
                 </Button>
               ))}
+              {turnover && turnover.length > 0 && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" aria-label="匯出存貨周轉 CSV"
+                  onClick={() => downloadSectionCsv(`skillcraft-report-turnover-${new Date().toISOString().slice(0, 10)}.csv`,
+                    ['SKU', '商品名稱', '分類', '目前庫存', '售出數量', '周轉率', '估計售完天數'],
+                    turnover.map((i) => [i.sku, i.name, i.category, i.stock_qty, i.sold_qty, i.turnover_rate ?? '', i.days_to_sell ?? ''])
+                  )}>
+                  <Download className="w-3.5 h-3.5" />
+                </Button>
+              )}
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -727,6 +795,15 @@ export default function Reports() {
               <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> A 類：貢獻 70% 營收</span>
               <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" /> B 類：貢獻 20%</span>
               <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-muted-foreground/50 inline-block" /> C 類：其餘 10%</span>
+              {abcData && abcData.length > 0 && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="匯出 ABC 分析 CSV"
+                  onClick={() => downloadSectionCsv(`skillcraft-report-abc-${new Date().toISOString().slice(0, 10)}.csv`,
+                    ['商品名稱', 'SKU', '分類', '銷售額', '佔比(%)', '累計(%)', 'ABC等級'],
+                    abcData.map((i) => [i.name, i.sku, i.category, i.revenue, i.revenue_pct.toFixed(2), i.cumulative_pct.toFixed(2), i.abc_class])
+                  )}>
+                  <Download className="w-3.5 h-3.5" />
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>

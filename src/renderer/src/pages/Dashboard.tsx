@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -43,11 +43,97 @@ import {
   Bar,
   Cell
 } from 'recharts'
-import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion, UnpaidOrder, TopProduct } from '@/types/schema'
+import type { DashboardKPIs, SalesTrendPoint, InventoryByCategory, SalesOrder, LowStockItem, PurchaseSuggestion, UnpaidOrder, TopProduct, AiForecastResult } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 import { useCountUp } from '@/lib/useCountUp'
 import { categoryHex } from '@/lib/categoryColor'
 const WIDGET_KEYS = ['overdueAlerts', 'dueSoonAlerts', 'quickActions', 'kpis', 'salesTrend', 'topProducts', 'lowStock', 'pendingSales', 'purchaseSuggestions', 'aiInsight']
+
+function AiInsightWidget(): React.JSX.Element {
+  const navigate = useNavigate()
+  const cached = useMemo((): AiForecastResult | null => {
+    try {
+      return JSON.parse(localStorage.getItem('ims-ai-last-result') ?? 'null')
+    } catch {
+      return null
+    }
+  }, [])
+
+  const needReorder = cached?.items.filter((i) => i.suggested_reorder_qty > 0) ?? []
+  const stockOk = (cached?.items.length ?? 0) - needReorder.length
+  const topItems = [...needReorder].sort((a, b) => b.suggested_reorder_qty - a.suggested_reorder_qty).slice(0, 3)
+
+  const relativeTime = (iso: string): string => {
+    const diff = Date.now() - new Date(iso).getTime()
+    const h = Math.floor(diff / 3600000)
+    return h < 24 ? `${h} 小時前` : `${Math.floor(h / 24)} 天前`
+  }
+
+  const CONF_COLORS: Record<string, string> = {
+    high: 'bg-green-500/15 text-green-600 dark:text-green-400',
+    medium: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400',
+    low: 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-violet-400" />
+            AI 需求預測
+          </span>
+          <button
+            onClick={() => navigate('/ai')}
+            className="text-xs text-primary hover:underline font-normal"
+          >
+            前往完整分析 →
+          </button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        {!cached ? (
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <p className="text-sm text-muted-foreground">前往 AI 需求預測頁面，取得補貨建議</p>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate('/ai')}>
+              <Brain className="w-3.5 h-3.5" />
+              前往 AI 需求預測
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="text-xs text-muted-foreground">
+              上次分析：{relativeTime(cached.generatedAt)}
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              {needReorder.length > 0 && (
+                <span className="text-orange-500 font-medium">⚠ {needReorder.length} 項需補貨</span>
+              )}
+              {stockOk > 0 && (
+                <span className="text-green-500">✓ {stockOk} 項庫存充足</span>
+              )}
+            </div>
+            {topItems.length > 0 && (
+              <div className="border rounded-lg divide-y divide-border text-xs">
+                {topItems.map((item) => (
+                  <div key={item.product_id} className="flex items-center justify-between px-2.5 py-1.5 gap-2">
+                    <span className="truncate text-muted-foreground">{item.name}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-medium tabular-nums">補 {item.suggested_reorder_qty}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${CONF_COLORS[item.confidence] ?? CONF_COLORS.medium}`}>
+                        {item.confidence === 'high' ? '高' : item.confidence === 'low' ? '低' : '中'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function Dashboard() {
   const t = useLang()
@@ -134,7 +220,7 @@ export default function Dashboard() {
         </div>
       )
     }
-    if (!customizing) return <div style={orderStyle}>{content}</div>
+    if (!customizing) return content ? <div style={orderStyle}>{content}</div> : null
     return (
       <div
         style={orderStyle}
@@ -312,6 +398,7 @@ export default function Dashboard() {
               icon={<AlertTriangle className="w-4 h-4" />}
               color={kpis?.lowStockCount ? 'text-yellow-400' : 'text-muted-foreground'}
               alert={!!kpis?.lowStockCount}
+              onClick={kpis?.lowStockCount ? () => navigate('/products?stockFilter=low_stock') : undefined}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -321,6 +408,7 @@ export default function Dashboard() {
               subtitle={d.unpaidReceivablesHint}
               icon={<ArrowDownLeft className="w-4 h-4" />}
               color={(kpis?.unpaidSalesTotal ?? 0) > 0 ? 'text-emerald-400' : 'text-muted-foreground'}
+              onClick={(kpis?.unpaidSalesTotal ?? 0) > 0 ? () => navigate('/receivables') : undefined}
             />
             <KpiCard
               title={d.unpaidPayables}
@@ -328,6 +416,7 @@ export default function Dashboard() {
               subtitle={d.unpaidPayablesHint}
               icon={<ArrowUpRight className="w-4 h-4" />}
               color={(kpis?.unpaidPurchasesTotal ?? 0) > 0 ? 'text-rose-400' : 'text-muted-foreground'}
+              onClick={(kpis?.unpaidPurchasesTotal ?? 0) > 0 ? () => navigate('/receivables') : undefined}
             />
           </div>
         </div>
@@ -769,30 +858,7 @@ export default function Dashboard() {
       ) : null)}
 
       {/* AI Demand Forecast — lightweight summary card */}
-      {wrap('aiInsight', 'AI 需求預測', <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Brain className="w-4 h-4 text-violet-400" />
-            AI 需求預測
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center gap-3 py-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              前往 AI 需求預測頁面，取得 Claude AI 分析補貨建議
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate('/ai')}
-            >
-              <Brain className="w-3.5 h-3.5" />
-              前往 AI 需求預測
-            </Button>
-          </div>
-        </CardContent>
-      </Card>)}
+      {wrap('aiInsight', 'AI 需求預測', <AiInsightWidget />)}
 
       </div>
     </div>
@@ -805,7 +871,8 @@ function KpiCard({
   subtitle,
   icon,
   color,
-  alert
+  alert,
+  onClick
 }: {
   title: string
   value: string
@@ -813,9 +880,13 @@ function KpiCard({
   icon: React.ReactNode
   color: string
   alert?: boolean
+  onClick?: () => void
 }) {
   return (
-    <Card className={alert ? 'border-yellow-400/30' : ''}>
+    <Card
+      className={`${alert ? 'border-yellow-400/30' : ''} ${onClick ? 'cursor-pointer hover:ring-2 ring-primary/20 transition-shadow' : ''}`}
+      onClick={onClick}
+    >
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div className="space-y-1">

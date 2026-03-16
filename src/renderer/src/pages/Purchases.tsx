@@ -48,6 +48,40 @@ function calcPreset(days?: number, offsetMonth?: number): { from: string; to: st
   return { from: fmt(from), to: fmt(today) }
 }
 
+function PurchaseExpandedRow({ orderId }: { orderId: number }) {
+  const { data: order, isLoading } = useQuery({
+    queryKey: ['purchases', 'items', orderId],
+    queryFn: () => window.electronAPI.purchases.getById(orderId),
+    staleTime: 1000 * 60
+  })
+  if (isLoading) return <div className="text-xs text-muted-foreground py-1">載入中...</div>
+  if (!order?.items?.length) return <div className="text-xs text-muted-foreground py-1">無明細資料</div>
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="text-muted-foreground border-b border-border/50">
+          <th className="text-left pb-1.5 pr-4 font-medium">商品名稱</th>
+          <th className="text-left pb-1.5 pr-4 font-medium">SKU</th>
+          <th className="text-right pb-1.5 pr-4 font-medium">數量</th>
+          <th className="text-right pb-1.5 pr-4 font-medium">單價</th>
+          <th className="text-right pb-1.5 font-medium">小計</th>
+        </tr>
+      </thead>
+      <tbody>
+        {order.items.map((item) => (
+          <tr key={item.id} className="border-b border-border/20 last:border-0">
+            <td className="py-1 pr-4">{item.product_name}</td>
+            <td className="py-1 pr-4 text-muted-foreground">{item.product_sku}</td>
+            <td className="py-1 pr-4 text-right">{item.quantity}</td>
+            <td className="py-1 pr-4 text-right">{formatCurrency(item.unit_price)}</td>
+            <td className="py-1 text-right font-medium">{formatCurrency(item.quantity * item.unit_price)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 export default function Purchases() {
   const queryClient = useQueryClient()
   const t = useLang()
@@ -616,6 +650,8 @@ export default function Purchases() {
                 action={{ label: p.emptyAction, onClick: () => setFormOpen(true) }}
               />
             ) : undefined}
+            expandable
+            renderExpanded={(row) => <PurchaseExpandedRow orderId={row.id as number} />}
           />
         )}
       </div>

@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAnnounce } from '@/lib/useAnnounce'
 import {
   LayoutDashboard,
@@ -52,6 +52,18 @@ export function Sidebar() {
     prevSales.current = sal
   }, [kpis?.lowStockCount, kpis?.pendingPurchasesCount, kpis?.pendingSalesOrders])
 
+  const [aiNeedReorder, setAiNeedReorder] = useState<number>(0)
+  useEffect(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem('ims-ai-last-result') ?? 'null')
+      if (cached?.items) {
+        setAiNeedReorder(cached.items.filter((i: { suggested_reorder_qty: number }) => i.suggested_reorder_qty > 0).length)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: t.nav.dashboard, end: true },
     { to: '/products', icon: Package, label: t.nav.products, badge: kpis?.lowStockCount, badgeStyle: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400' },
@@ -60,7 +72,7 @@ export function Sidebar() {
     { to: '/suppliers', icon: Truck, label: t.nav.suppliers },
     { to: '/customers', icon: Users, label: t.nav.customers },
     { to: '/receivables', icon: Wallet, label: t.nav.receivables, badge: kpis?.overdueCount, badgeStyle: 'bg-red-500/20 text-red-500' },
-    { to: '/ai', icon: Brain, label: t.nav.ai },
+    { to: '/ai', icon: Brain, label: t.nav.ai, badge: aiNeedReorder || undefined, badgeStyle: 'bg-orange-500/20 text-orange-600 dark:text-orange-400' },
     { to: '/reports', icon: BarChart3, label: t.nav.reports },
     { to: '/stock-take', icon: ClipboardList, label: t.nav.stockTake },
     { to: '/inventory-history', icon: History, label: t.nav.inventoryHistory }

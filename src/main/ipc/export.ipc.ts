@@ -157,4 +157,75 @@ export function registerExportIpc(): void {
     writeFileSync(filePath, sections.join('\r\n'), 'utf-8')
     return { success: true, filePath }
   })
+
+  ipcMain.handle('export:aiReport', async () => {
+    type AiItem = {
+      product_id: number; sku: string; name: string; category: string
+      avg_daily_sales: number; stock_qty: number; days_remaining: number | null
+      suggested_reorder_qty: number; confidence: string; reasoning: string
+    }
+
+    const db = getDb()
+    const rows = db
+      .prepare('SELECT summary, items_json, generated_at FROM ai_forecasts ORDER BY id DESC LIMIT 2')
+      .all() as { summary: string; items_json: string; generated_at: string }[]
+    if (!rows[0]) throw new Error('尚無 AI 分析結果，請先執行分析')
+
+    const current = {
+      summary: rows[0].summary,
+      items: JSON.parse(rows[0].items_json) as AiItem[],
+      generatedAt: rows[0].generated_at
+    }
+    const previous = rows[1]
+      ? { items: JSON.parse(rows[1].items_json) as AiItem[], generatedAt: rows[1].generated_at }
+      : null
+
+    const confLabel = (c: string) => c === 'high' ? '高' : c === 'low' ? '低' : '中'
+    const needReorder = current.items.filter((i) => i.suggested_reorder_qty > 0)
+
+    const sections: string[] = []
+    sections.push(BOM + '=== AI 需求預測報告 ===')
+    sections.push(`生成時間：${formatDt(current.generatedAt)}`)
+    sections.push('')
+    sections.push('AI 摘要：')
+    sections.push(escapeCell(current.summary))
+    sections.push('')
+    sections.push(`=== 補貨建議明細（共 ${current.items.length} 項，${needReorder.length} 項需補貨）===`)
+    sections.push(
+      toCsv(
+        ['SKU', '商品名稱', '分類', '目前庫存', '剩餘天數', '建議採購量', '日均銷量', '信心度', 'AI 分析'],
+        current.items.map((i) => [
+          i.sku, i.name, i.category, i.stock_qty,
+          i.days_remaining ?? '—', i.suggested_reorder_qty,
+          i.avg_daily_sales, confLabel(i.confidence), i.reasoning
+        ])
+      ).replace(BOM, '')
+    )
+
+    if (previous) {
+      const prevMap = new Map(previous.items.map((i) => [i.product_id, i.suggested_reorder_qty]))
+      sections.push('')
+      sections.push(`=== 與上次分析對比（上次生成：${formatDt(previous.generatedAt)}）===`)
+      sections.push(
+        toCsv(
+          ['SKU', '商品名稱', '本次建議', '上次建議', '變化'],
+          current.items.map((i) => {
+            const prev = prevMap.get(i.product_id)
+            const diff = prev !== undefined ? i.suggested_reorder_qty - prev : null
+            const change = diff === null ? '（新增）' : diff > 0 ? `+${diff}` : diff < 0 ? String(diff) : '持平'
+            return [i.sku, i.name, i.suggested_reorder_qty, prev ?? '—', change]
+          })
+        ).replace(BOM, '')
+      )
+    }
+
+    const { filePath } = await dialog.showSaveDialog({
+      defaultPath: `skillcraft-ai-report-${new Date().toISOString().slice(0, 10)}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    })
+    if (!filePath) return { success: false }
+
+    writeFileSync(filePath, sections.join('\r\n'), 'utf-8')
+    return { success: true, filePath }
+  })
 }

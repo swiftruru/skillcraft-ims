@@ -30,3 +30,16 @@ description: 當使用者要求匯出資料為 CSV 檔案、下載報表或將�
 5. **UI 觸發點**：匯出按鈕放在對應頁面的工具列右側，使用 `Download` icon（lucide-react），顯示文字「匯出 CSV」，按下後呈現 loading 狀態直到 IPC 回傳。
 
 6. **不在 renderer 組合 CSV**：CSV 內容組合邏輯全部在 main process 完成，renderer 只負責觸發 IPC 和顯示結果，不處理資料轉換。
+
+7. **AI 報表匯出（`export:aiReport`）**：
+   - Channel：`export:aiReport`，無需任何參數
+   - main process 直接從 DB 讀取最新 2 筆 `ai_forecasts`（`ORDER BY id DESC LIMIT 2`）
+   - 無資料時 throw Error（`'尚無 AI 分析結果，請先執行分析'`），不 return null
+   - CSV 採多 section 格式（同 `export:report`）：
+     - Section 1：報告標題 + 生成時間 + AI 摘要
+     - Section 2：補貨建議明細表（SKU、商品名稱、分類、目前庫存、剩餘天數、建議採購量、日均銷量、信心度、AI 分析）
+     - Section 3（選擇性）：與上次分析對比（只在 previous 不為 null 時輸出）
+   - 信心度對應中文：`high`→`高`、`medium`→`中`、`low`→`低`
+   - 預設檔名：`skillcraft-ai-report-YYYY-MM-DD.csv`
+   - main process 使用 inline type 定義 item 結構，**不 import renderer 側的 schema.ts**
+   - UI：AiInsight 頁面 header 右側（Generate 按鈕左側）加 `Download` icon 按鈕，`variant="outline" size="sm"`；`disabled` 條件：無 `latestData` 或正在 export；點擊後以 `useState` 控制 loading spinner
