@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -11,11 +13,18 @@ import {
   ChevronDown,
   Minus,
   Download,
-  Target
+  Target,
+  MessageSquare,
+  Send,
+  Bot,
+  User,
+  ChevronRight,
+  Shuffle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useLang } from '@/lib/useLang'
@@ -23,6 +32,32 @@ import { useToast } from '@/components/ui/use-toast'
 import { AiForecastScope, AiForecastItem, AiForecastLatest } from '@/types/schema'
 import { cn } from '@/lib/utils'
 import ProductPickerDialog from '@/components/ai/ProductPickerDialog'
+
+const QUESTION_POOL = [
+  '目前哪些商品庫存不足補貨點？',
+  '本月銷售業績如何？',
+  '有哪些待處理的訂單？',
+  '哪個客戶的未付款金額最高？',
+  '目前庫存最低的前 5 項商品是哪些？',
+  '近 30 天銷量最好的商品是什麼？',
+  '有多少筆採購單尚未付款？',
+  '有多少筆銷售單尚未付款？',
+  '目前有幾位客戶和幾家供應商？',
+  '應收未付款總金額是多少？',
+  '應付未付款總金額是多少？',
+  '近 30 天共完成幾筆銷售訂單？'
+]
+
+function pickRandom(pool: string[], n: number): string[] {
+  const shuffled = [...pool].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, n)
+}
+
+type ChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+  context?: string
+}
 
 type ConfidenceFilter = 'all' | 'high' | 'low'
 
@@ -52,6 +87,7 @@ export default function AiInsight(): React.JSX.Element {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
+  const [activeTab, setActiveTab] = useState<'forecast' | 'chat'>('forecast')
   const [scope, setScope] = useState<AiForecastScope>('smart')
   const [customIds, setCustomIds] = useState<number[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -61,6 +97,13 @@ export default function AiInsight(): React.JSX.Element {
   const [aiError, setAiError] = useState<string | null>(null)
   const [exportPending, setExportPending] = useState(false)
   const [applyConfirmOpen, setApplyConfirmOpen] = useState(false)
+
+  // Chat (RAG) state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatBottomRef = useRef<HTMLDivElement>(null)
+  const [displayedQuestions, setDisplayedQuestions] = useState<string[]>(() => pickRandom(QUESTION_POOL, 4))
 
   // Latest forecast from DB
   const { data: latest, isLoading: isLoadingLatest } = useQuery<AiForecastLatest | null>({
@@ -184,6 +227,28 @@ export default function AiInsight(): React.JSX.Element {
 
   const selectedItems = forecast?.items.filter((i) => selectedIds.has(i.product_id)) ?? []
 
+  // Chat handler — RAG flow: Retrieval (SQLite) → Augmented → Generation (Claude)
+  const handleChatSend = async (question: string): Promise<void> => {
+    const q = question.trim()
+    if (!q || chatLoading) return
+    setChatMessages((prev) => [...prev, { role: 'user', content: q }])
+    setChatInput('')
+    setChatLoading(true)
+    try {
+      const { answer, context } = await window.electronAPI.ai.chat(q)
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: answer, context }])
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '查詢失敗，請稍後重試。'
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: `⚠️ ${msg}` }])
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, chatLoading])
+
   const handleExport = async (): Promise<void> => {
     setExportPending(true)
     try {
@@ -232,30 +297,63 @@ export default function AiInsight(): React.JSX.Element {
           <Brain className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-semibold">{t.ai.title}</h1>
         </div>
-        <div className="flex items-center gap-3">
-          {preview && (
-            <span className="text-xs text-muted-foreground">{t.ai.willAnalyze(preview.count)}</span>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={handleExport}
-            disabled={!forecast || exportPending}
-            aria-label="匯出 AI 分析報告"
-          >
-            <Download className="w-3.5 h-3.5" />
-            {exportPending ? '匯出中...' : '匯出報告'}
-          </Button>
-          <Button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || (scope === 'custom' && customIds.length === 0)}
-            className="gap-2"
-          >
-            {mutation.isPending ? t.ai.generating : t.ai.generate}
-          </Button>
-        </div>
+        {activeTab === 'forecast' && (
+          <div className="flex items-center gap-3">
+            {preview && (
+              <span className="text-xs text-muted-foreground">{t.ai.willAnalyze(preview.count)}</span>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleExport}
+              disabled={!forecast || exportPending}
+              aria-label="匯出 AI 分析報告"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exportPending ? '匯出中...' : '匯出報告'}
+            </Button>
+            <Button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending || (scope === 'custom' && customIds.length === 0)}
+              className="gap-2"
+            >
+              {mutation.isPending ? t.ai.generating : t.ai.generate}
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Tab buttons */}
+      <div className="flex border-b border-border">
+        <button
+          onClick={() => setActiveTab('forecast')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            activeTab === 'forecast'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Brain className="w-3.5 h-3.5" />
+          需求預測
+        </button>
+        <button
+          onClick={() => setActiveTab('chat')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            activeTab === 'chat'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          AI 問答
+        </button>
+      </div>
+
+      {/* ── Forecast Tab ─────────────────────────────────────────────────── */}
+      {activeTab === 'forecast' && <>
 
       {/* Scope selector */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -532,6 +630,169 @@ export default function AiInsight(): React.JSX.Element {
             </table>
           </div>
         </>
+      )}
+
+      </>} {/* end forecast tab */}
+
+      {/* ── Chat Tab (RAG) ───────────────────────────────────────────────── */}
+      {activeTab === 'chat' && (
+        <div className="space-y-4">
+          {/* Description */}
+          <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-4 py-3 text-sm text-muted-foreground">
+            <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-400" />
+            <span>
+              RAG 流程：你的問題 → <strong>Step 1 Retrieval</strong> 從資料庫撈取業務資料 →{' '}
+              <strong>Step 2 Augmented</strong> 組成 prompt → <strong>Step 3 Generation</strong> Claude 回答
+            </span>
+          </div>
+
+          {/* Suggested questions */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">建議問題</span>
+              <button
+                onClick={() => setDisplayedQuestions(pickRandom(QUESTION_POOL, 4))}
+                disabled={chatLoading}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                title="隨機換一批建議問題"
+              >
+                <Shuffle className="w-3 h-3" />
+                Mock
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {displayedQuestions.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => handleChatSend(q)}
+                  disabled={chatLoading}
+                  className="text-xs px-3 py-1.5 rounded-full border border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Message list */}
+          <div className="space-y-3 min-h-[200px] max-h-[480px] overflow-y-auto pr-1">
+            {chatMessages.length === 0 && !chatLoading && (
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                <Bot className="w-12 h-12 text-muted-foreground/20" />
+                <p className="text-sm text-muted-foreground">點選建議問題或自行輸入，即可向 AI 詢問你的業務資料</p>
+              </div>
+            )}
+            {chatMessages.map((msg, i) => (
+              <div
+                key={i}
+                className={cn('flex gap-2.5', msg.role === 'user' ? 'justify-end' : 'justify-start')}
+              >
+                {msg.role === 'assistant' && (
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
+                    <Bot className="w-4 h-4 text-primary" />
+                  </div>
+                )}
+                <div className={cn('max-w-[82%] space-y-2', msg.role === 'user' ? 'items-end' : '')}>
+                  <div
+                    className={cn(
+                      'rounded-2xl px-4 py-2.5 text-sm',
+                      msg.role === 'user'
+                        ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                        : 'bg-muted/60 text-foreground rounded-tl-sm'
+                    )}
+                  >
+                    {msg.role === 'user' ? (
+                      <p className="leading-relaxed">{msg.content}</p>
+                    ) : (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({ children }) => <p className="leading-relaxed mb-2 last:mb-0">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
+                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                          h1: ({ children }) => <p className="font-semibold text-base mb-1">{children}</p>,
+                          h2: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
+                          h3: ({ children }) => <p className="font-medium mb-1">{children}</p>,
+                          table: ({ children }) => (
+                            <div className="overflow-x-auto mb-2">
+                              <table className="text-xs border-collapse w-full">{children}</table>
+                            </div>
+                          ),
+                          th: ({ children }) => <th className="border border-border px-2 py-1 bg-muted/40 font-medium text-left">{children}</th>,
+                          td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
+                          code: ({ children }) => <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                          hr: () => <hr className="border-border my-2" />
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    )}
+                  </div>
+                  {/* RAG context accordion */}
+                  {msg.role === 'assistant' && msg.context && (
+                    <details className="group">
+                      <summary className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer hover:text-foreground select-none list-none">
+                        <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                        查看本次使用的業務資料（Retrieval Context）
+                      </summary>
+                      <pre className="mt-2 text-xs bg-muted/40 border border-border rounded-lg p-3 whitespace-pre-wrap text-muted-foreground leading-relaxed overflow-x-auto">
+                        {msg.context}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+                {msg.role === 'user' && (
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center mt-0.5">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="flex gap-2.5 justify-start">
+                <div className="shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-primary" />
+                </div>
+                <div className="bg-muted/60 rounded-2xl rounded-tl-sm px-4 py-2.5">
+                  <div className="flex gap-1 items-center h-5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={chatBottomRef} />
+          </div>
+
+          {/* Input */}
+          <div className="flex gap-2 items-end">
+            <Textarea
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleChatSend(chatInput)
+                }
+              }}
+              placeholder={'輸入問題，例如：本月哪個商品賣最好？\n（Enter 送出，Shift+Enter 換行）'}
+              disabled={chatLoading}
+              rows={2}
+              className="flex-1 resize-none"
+            />
+            <Button
+              onClick={() => handleChatSend(chatInput)}
+              disabled={chatLoading || !chatInput.trim()}
+              className="gap-1.5 shrink-0"
+            >
+              <Send className="w-3.5 h-3.5" />
+              送出
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Batch purchase floating bar */}

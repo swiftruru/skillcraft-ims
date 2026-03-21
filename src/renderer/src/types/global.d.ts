@@ -161,6 +161,7 @@ declare global {
         getLatest(): Promise<import('./schema').AiForecastLatest | null>
         checkFreshness(): Promise<{ hoursSince: number; newSalesCount: number }>
         previewScope(params: import('./schema').AiForecastParams): Promise<{ count: number }>
+        chat(question: string): Promise<{ answer: string; context: string }>
       }
       notifications: {
         getAll(): Promise<import('./schema').AppNotification[]>

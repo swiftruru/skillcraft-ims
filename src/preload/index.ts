@@ -211,7 +211,8 @@ const electronAPI = {
     getLatest: () => ipcRenderer.invoke('ai:getLatest'),
     checkFreshness: () => ipcRenderer.invoke('ai:checkFreshness'),
     previewScope: (params: { scope?: string; productIds?: number[] }) =>
-      ipcRenderer.invoke('ai:previewScope', params)
+      ipcRenderer.invoke('ai:previewScope', params),
+    chat: (question: string) => ipcRenderer.invoke('ai:chat', question)
   },
 
   // Notifications

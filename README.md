@@ -11,6 +11,21 @@
 > 跨平台桌面進銷存管理系統，以 **Claude Code Skill 規範驅動開發**，整合 Google Sheets 雲端同步，
 > 展示「高等程式語言與軟體設計」課程三個核心方向的完整整合。
 
+---
+
+> ## 🔍 RAG（Retrieval-Augmented Generation）整合展示
+>
+> 本系統實作一個完整的 RAG 應用流程，並原生整合進桌面 App：
+>
+> | 步驟 | 說明 | 對應實作 |
+> | --- | --- | --- |
+> | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | SQLite 查詢庫存、銷售、訂單、客戶等即時資料 |
+> | **Step 2 Augmented** | 將擷取的資料「增強」為 LLM 上下文 | 格式化為結構化 prompt context |
+> | **Step 3 Generation** | 呼叫 LLM「生成」自然語言回答 | Claude API（claude-haiku-4-5）回答業務問題 |
+>
+> 開啟 AI 頁面 → **AI 問答** Tab，即可用中文自由提問你的進銷存資料。
+> 每則回答均可展開「查看本次使用的業務資料」，觀察 Retrieval Context 的完整內容。
+
 ## 截圖
 
 | Dashboard | 商品管理 |

@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.8.3] — 2026-03-22
+
+### 新功能
+
+- **AI 問答（RAG Chat）**：AI 頁面新增「AI 問答」Tab，實作完整 RAG 流程
+  - Step 1 Retrieval：從 SQLite 即時查詢庫存概況、近 30 天銷售、待處理訂單、客戶與帳款資料
+  - Step 2 Augmented：將查詢結果格式化為結構化 prompt context
+  - Step 3 Generation：呼叫 Claude API（claude-haiku-4-5）產生繁體中文回答
+  - 每則回答可展開「查看本次使用的業務資料（Retrieval Context）」，完整呈現 RAG 流程
+- **Mock 建議問題**：題庫 12 道問題，每次點擊 Mock 按鈕隨機抽取 4 題顯示
+- **Markdown 渲染**：AI 回答以 react-markdown + remark-gfm 渲染，支援標題、條列、**粗體**、表格
+- **多行輸入框**：問題輸入改為 Textarea，Enter 送出，Shift+Enter 換行
+
+### 文件
+
+- README 頂部新增 RAG 整合展示說明，含三步驟對照表
+
+---
+
 ## [v0.8.2] — 2026-03-16
 
 ### 修正

@@ -186,6 +186,139 @@ ${salesData
     return { hoursSince, newSalesCount: row.cnt }
   })
 
+  // ── RAG Chat ─────────────────────────────────────────────────────────────
+  ipcMain.handle('ai:chat', async (_e, question: string) => {
+    const db = getDb()
+    const apiKeyRow = db
+      .prepare(`SELECT value FROM app_settings WHERE key = 'claudeApiKey'`)
+      .get() as { value: string } | undefined
+    const apiKey = apiKeyRow?.value?.trim()
+    if (!apiKey) throw new Error('未設定 Claude API Key，請至設定頁面填入。')
+
+    // ── Step 1: Retrieval — query SQLite for business context ──────────────
+    const totalProducts = (
+      db.prepare('SELECT COUNT(*) as cnt FROM products').get() as { cnt: number }
+    ).cnt
+
+    const lowStockItems = db
+      .prepare(
+        `SELECT name, stock_qty, reorder_pt FROM products
+         WHERE stock_qty <= reorder_pt ORDER BY stock_qty ASC LIMIT 10`
+      )
+      .all() as { name: string; stock_qty: number; reorder_pt: number }[]
+
+    const salesStats = db
+      .prepare(
+        `SELECT COUNT(*) as order_count,
+                ROUND(COALESCE(SUM(total_amount), 0), 0) as total_amount
+         FROM sales_orders
+         WHERE status = 'completed' AND order_date >= date('now', '-30 days')`
+      )
+      .get() as { order_count: number; total_amount: number }
+
+    const topProducts = db
+      .prepare(
+        `SELECT p.name, SUM(si.quantity) as qty,
+                ROUND(SUM(si.quantity * si.unit_price), 0) as amount
+         FROM sale_items si
+         JOIN products p ON si.product_id = p.id
+         JOIN sales_orders so ON si.sales_order_id = so.id
+         WHERE so.status = 'completed' AND so.order_date >= date('now', '-30 days')
+         GROUP BY p.id ORDER BY qty DESC LIMIT 5`
+      )
+      .all() as { name: string; qty: number; amount: number }[]
+
+    const pendingPurchases = db
+      .prepare(
+        `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+         FROM purchase_orders WHERE status IN ('pending', 'ordered')`
+      )
+      .get() as { cnt: number; total: number }
+
+    const pendingSales = db
+      .prepare(
+        `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+         FROM sales_orders WHERE status IN ('pending', 'confirmed')`
+      )
+      .get() as { cnt: number; total: number }
+
+    const customerCount = (
+      db.prepare('SELECT COUNT(*) as cnt FROM customers').get() as { cnt: number }
+    ).cnt
+
+    const supplierCount = (
+      db.prepare('SELECT COUNT(*) as cnt FROM suppliers').get() as { cnt: number }
+    ).cnt
+
+    const unpaidSales = (
+      db
+        .prepare(
+          `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+           FROM sales_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
+        )
+        .get() as { total: number }
+    ).total
+
+    const unpaidPurchases = (
+      db
+        .prepare(
+          `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+           FROM purchase_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
+        )
+        .get() as { total: number }
+    ).total
+
+    // ── Step 2: Augment — build context string ─────────────────────────────
+    const context = [
+      `【庫存概況】`,
+      `- 總商品數：${totalProducts} 項`,
+      `- 低庫存商品（庫存 ≤ 補貨點）：${lowStockItems.length} 項`,
+      ...lowStockItems.map(
+        (p) => `  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}`
+      ),
+      ``,
+      `【近 30 天銷售】`,
+      `- 完成訂單數：${salesStats.order_count} 筆`,
+      `- 銷售總額：NT$${salesStats.total_amount.toLocaleString()}`,
+      `- 銷量前 5 名商品：`,
+      ...(topProducts.length > 0
+        ? topProducts.map(
+            (p, i) => `  ${i + 1}. ${p.name}：售出 ${p.qty} 件，金額 NT$${p.amount.toLocaleString()}`
+          )
+        : ['  （近 30 天無銷售資料）']),
+      ``,
+      `【待處理事項】`,
+      `- 待處理採購單：${pendingPurchases.cnt} 筆，金額 NT$${pendingPurchases.total.toLocaleString()}`,
+      `- 待處理銷售單：${pendingSales.cnt} 筆，金額 NT$${pendingSales.total.toLocaleString()}`,
+      ``,
+      `【客戶與供應商】`,
+      `- 客戶數：${customerCount} 位，供應商數：${supplierCount} 家`,
+      `- 應收未付（已完成銷售訂單）：NT$${unpaidSales.toLocaleString()}`,
+      `- 應付未付（已完成採購訂單）：NT$${unpaidPurchases.toLocaleString()}`
+    ].join('\n')
+
+    // ── Step 3: Generation — call Claude API ───────────────────────────────
+    const client = new Anthropic({ apiKey })
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system:
+        '你是 SkillCraft IMS 進銷存系統的 AI 助手。' +
+        '請嚴格根據【業務資料】回答使用者的問題。' +
+        '如果資料不足以回答，請說明限制，不要捏造數字。' +
+        '回答請使用繁體中文，條列式整理，簡潔有重點。',
+      messages: [
+        {
+          role: 'user',
+          content: `【業務資料】\n${context}\n\n【問題】\n${question}`
+        }
+      ]
+    })
+
+    const answer = message.content[0].type === 'text' ? message.content[0].text : ''
+    return { answer, context }
+  })
+
   ipcMain.handle('ai:previewScope', (_e, params: ForecastParams = {}) => {
     const db = getDb()
     const { scope = 'top_sales', productIds = [] } = params
