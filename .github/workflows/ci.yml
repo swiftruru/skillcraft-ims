@@ -27,11 +27,8 @@ jobs:
       - name: Install dependencies (skip native modules)
         run: npm ci --ignore-scripts
 
-      - name: Type Check (main process)
-        run: npx tsc --noEmit -p tsconfig.node.json
-
-      - name: Type Check (renderer)
-        run: npx tsc --noEmit -p tsconfig.web.json
+      - name: Type Check
+        run: npm run typecheck
 
       - name: Build (without native modules)
         run: npx electron-vite build
