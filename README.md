@@ -20,7 +20,7 @@
 > | 步驟 | 說明 | 對應實作 |
 > | --- | --- | --- |
 > | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | Guard → Query Rewriting → Time Range Detection → **Query Expansion** → Entity Extraction → Adaptive SQLite 查詢 |
-> | **Step 2 Augmented** | 將擷取的資料「增強」為 LLM 上下文 | Multi-model Routing（Haiku / Sonnet）+ 格式化 context 注入 system prompt |
+> | **Step 2 Augmented** | 將擷取的資料「增強」為 LLM 上下文 | Multi-model Routing（Haiku / Sonnet）+ 格式化 context 注入 system prompt + **結構化多輪摘要快取** |
 > | **Step 3 Generation** | 呼叫 LLM「生成」自然語言回答 | Claude 串流輸出 + Faithfulness Scoring + Citation Attribution + Followup 建議持久化 |
 >
 > 開啟 AI 頁面 → **AI 問答** Tab，即可用中文自由提問你的進銷存資料。
