@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, nativeTheme, Notification, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, nativeTheme, Notification, ipcMain, Menu, dialog } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -217,6 +217,37 @@ function setupAutoUpdater(win: BrowserWindow): void {
   setTimeout(() => autoUpdater.checkForUpdates(), 30_000)
 }
 
+async function checkForUpdatesFromMenu(): Promise<void> {
+  if (is.dev) {
+    await dialog.showMessageBox({ type: 'info', title: '開發模式', message: '開發模式下不檢查更新。', buttons: ['確定'] })
+    return
+  }
+  try {
+    const result = await autoUpdater.checkForUpdates()
+    if (result && result.updateInfo.version !== app.getVersion()) {
+      const { response } = await dialog.showMessageBox({
+        type: 'info',
+        title: '發現新版本',
+        message: `v${result.updateInfo.version} 現已可供下載`,
+        detail: '點擊「前往下載」開啟 GitHub Releases 頁面，下載最新版本後重新安裝。',
+        buttons: ['前往下載', '稍後再說'],
+        defaultId: 0,
+        cancelId: 1
+      })
+      if (response === 0) shell.openExternal('https://github.com/swiftruru/skillcraft-ims/releases/latest')
+    } else {
+      await dialog.showMessageBox({
+        type: 'info',
+        title: '已是最新版本',
+        message: `目前版本 v${app.getVersion()} 已是最新版本。`,
+        buttons: ['確定']
+      })
+    }
+  } catch {
+    await dialog.showMessageBox({ type: 'error', title: '檢查更新失敗', message: '無法連線至更新伺服器，請稍後再試。', buttons: ['確定'] })
+  }
+}
+
 function createWindow(): void {
   const winState = loadWindowState()
 
@@ -314,6 +345,31 @@ app.whenReady().then(async () => {
 
   createWindow()
   if (mainWindow) setupAutoUpdater(mainWindow)
+
+  // macOS app menu — add "Check for Updates…" below "About"
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      {
+        label: app.name,
+        submenu: [
+          { role: 'about' },
+          { type: 'separator' },
+          { label: '檢查更新…', click: () => checkForUpdatesFromMenu() },
+          { type: 'separator' },
+          { role: 'services' },
+          { type: 'separator' },
+          { role: 'hide' },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit' }
+        ]
+      },
+      { role: 'editMenu' },
+      { role: 'viewMenu' },
+      { role: 'windowMenu' }
+    ]))
+  }
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
