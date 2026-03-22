@@ -80,6 +80,93 @@ function resolveEntities(
   return { products, customers, suppliers }
 }
 
+// ── Semantic Entity Fallback: alias disambiguation via Haiku + cache ─────────
+async function semanticEntityFallback(
+  client: Anthropic,
+  db: ReturnType<typeof getDb>,
+  failedTokens: string[]
+): Promise<ResolvedEntities> {
+  const result: ResolvedEntities = { products: [], customers: [], suppliers: [] }
+  if (failedTokens.length === 0) return result
+
+  // ① Check alias cache first
+  const cached = failedTokens.flatMap((alias) =>
+    (db.prepare('SELECT * FROM entity_aliases WHERE alias = ?').all(alias) as {
+      alias: string; entity_type: string; entity_id: number; entity_name: string
+    }[])
+  )
+  const cachedAliases = new Set(cached.map((r) => r.alias))
+  cached.forEach((r) => {
+    const entity = { id: r.entity_id, name: r.entity_name }
+    if (r.entity_type === 'product' && !result.products.find((x) => x.id === r.entity_id))
+      result.products.push(entity)
+    if (r.entity_type === 'customer' && !result.customers.find((x) => x.id === r.entity_id))
+      result.customers.push(entity)
+    if (r.entity_type === 'supplier' && !result.suppliers.find((x) => x.id === r.entity_id))
+      result.suppliers.push(entity)
+  })
+
+  // ② Only call Haiku for tokens not in cache
+  const uncached = failedTokens.filter((t) => !cachedAliases.has(t))
+  if (uncached.length === 0) return result
+
+  try {
+    const productNames = db.prepare('SELECT id, name FROM products ORDER BY updated_at DESC LIMIT 50').all() as { id: number; name: string }[]
+    const customerNames = db.prepare('SELECT id, name FROM customers ORDER BY created_at DESC LIMIT 50').all() as { id: number; name: string }[]
+    const supplierNames = db.prepare('SELECT id, name FROM suppliers ORDER BY created_at DESC LIMIT 50').all() as { id: number; name: string }[]
+
+    const res = await client.messages.create({
+      model: MODEL_HAIKU,
+      max_tokens: 200,
+      system:
+        '你是進銷存系統的實體消歧義助手。找出查詢詞最可能對應的實體（支援縮寫、別名、拼字相似）。' +
+        '只輸出 JSON（不加 markdown）：{"products":["精確名稱"],"customers":["精確名稱"],"suppliers":["精確名稱"]}' +
+        '，若某類別無匹配輸出空陣列，各類別最多 3 個。',
+      messages: [{
+        role: 'user',
+        content:
+          `查詢詞：${uncached.join('、')}\n` +
+          `商品清單：${productNames.map((p) => p.name).join('、')}\n` +
+          `客戶清單：${customerNames.map((c) => c.name).join('、')}\n` +
+          `供應商清單：${supplierNames.map((s) => s.name).join('、')}`
+      }]
+    })
+
+    const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+    const match = text.match(/\{[\s\S]*\}/)
+    if (!match) return result
+    const parsed = JSON.parse(match[0]) as { products?: string[]; customers?: string[]; suppliers?: string[] }
+
+    // ③ Resolve names to IDs and persist alias cache
+    const insertAlias = db.prepare(
+      'INSERT OR IGNORE INTO entity_aliases(alias, entity_type, entity_id, entity_name) VALUES (?, ?, ?, ?)'
+    )
+    const processMatches = (
+      names: string[],
+      type: 'product' | 'customer' | 'supplier',
+      allRows: { id: number; name: string }[],
+      target: { id: number; name: string }[]
+    ): void => {
+      for (const name of (names ?? [])) {
+        const row = allRows.find((r) => r.name === name)
+        if (!row) continue
+        if (!target.find((x) => x.id === row.id)) target.push(row)
+        for (const alias of uncached) {
+          if (name.includes(alias) || alias.includes(name.slice(0, 2))) {
+            insertAlias.run(alias, type, row.id, row.name)
+          }
+        }
+      }
+    }
+
+    processMatches(parsed.products ?? [], 'product', productNames, result.products)
+    processMatches(parsed.customers ?? [], 'customer', customerNames, result.customers)
+    processMatches(parsed.suppliers ?? [], 'supplier', supplierNames, result.suppliers)
+  } catch { /* silent fallback */ }
+
+  return result
+}
+
 // ── Query Expansion: synonym/alias discovery (one fast Haiku call) ──────────
 async function expandQueryVocabulary(
   client: Anthropic,
@@ -537,6 +624,15 @@ ${salesData
     const expandedTerms = await expansionPromise
     const allCandidates = [...new Set([...candidates, ...expandedTerms])]
     const entities = resolveEntities(db, allCandidates)
+
+    // Semantic fallback: if candidates exist but LIKE matched nothing, ask Haiku to disambiguate
+    if (candidates.length > 0 && !entities.products.length && !entities.customers.length && !entities.suppliers.length) {
+      const semantic = await semanticEntityFallback(client, db, candidates)
+      entities.products.push(...semantic.products)
+      entities.customers.push(...semantic.customers)
+      entities.suppliers.push(...semantic.suppliers)
+    }
+
     const hasProducts = entities.products.length > 0
     const hasCustomers = entities.customers.length > 0
     const hasSuppliers = entities.suppliers.length > 0

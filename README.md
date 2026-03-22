@@ -19,7 +19,7 @@
 >
 > | 步驟 | 說明 | 對應實作 |
 > | --- | --- | --- |
-> | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | Guard → Query Rewriting → Time Range Detection → **Query Expansion** → Entity Extraction → Adaptive SQLite 查詢 |
+> | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | Guard → Query Rewriting → Time Range Detection → **Query Expansion** → Entity Extraction → **Semantic Entity Fallback** → Adaptive SQLite 查詢 |
 > | **Step 2 Augmented** | 將擷取的資料「增強」為 LLM 上下文 | Multi-model Routing（Haiku / Sonnet）+ 格式化 context 注入 system prompt + **結構化多輪摘要快取** |
 > | **Step 3 Generation** | 呼叫 LLM「生成」自然語言回答 | Claude 串流輸出 + Faithfulness Scoring + Citation Attribution + Followup 建議持久化 |
 >
@@ -282,6 +282,10 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 [Entity Extraction]    Regex 擷取商品 / 客戶 / 供應商名稱，SQLite LIKE 解析為 ID
     │
     ▼
+[Semantic Fallback]    LIKE 全部失配時，送 Haiku 比對實際實體清單（縮寫 / 別名 / 拼字相似）
+                       成功對應後寫入 entity_aliases 快取，下次相同縮寫直接查表，不再呼叫 API
+    │
+    ▼
 [Multi-model Routing]  Regex 判斷問題複雜度：簡單查詢 → Haiku，分析趨勢 → Sonnet
     │
     ▼
@@ -307,7 +311,7 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 - **後續問題建議**：每則回答附帶 3 個 AI 生成的後續問題，點擊即送出；重新進入歷史 Session 時建議問題同樣顯示（持久化存入 DB）
 - **引用來源標注**：每則回答以彩色徽章標注引用的資料來源（藍=庫存、綠=銷售、橘=客戶、黃=供應商）
 - **多模型路由**：純查詢問題使用 Haiku（低成本），含分析/趨勢/比較的複雜問題自動升級 Sonnet；回應 metadata 列顯示使用的模型
-- **實體擷取**：自動識別問題中的商品/客戶/供應商名稱，注入精確 SQL `WHERE IN (...)` 條件提升回答準確性
+- **實體擷取 + 語意消歧義**：自動識別問題中的商品/客戶/供應商名稱；LIKE 全部失配時啟動語意 fallback，以 Haiku 比對資料庫中的實際實體清單（支援縮寫、別名、拼字相似），對應結果持久化為 alias 快取，下次相同縮寫零 API 消耗直接命中
 - **可排序互動表格**：AI 回答含有多欄比較資料時，自動渲染為可點擊欄位標題排序的互動式表格，附複製為 TSV 按鈕
 - **忠實度評分**：每則回答顯示彩色分數徽章（綠 ≥90 / 黃 ≥70 / 紅 <70）與說明
 - **Token 用量顯示**：顯示每次呼叫的 input / output token 消耗
