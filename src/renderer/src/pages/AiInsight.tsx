@@ -96,6 +96,35 @@ function parseContentWithTables(content: string): ContentSegment[] {
   return segments.length > 0 ? segments : [{ type: 'text', content }]
 }
 
+const CITATION_COLORS: Record<string, string> = {
+  '庫存': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  '銷售': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  '客戶': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  '供應商': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+}
+
+function highlightCitations(text: string, keyPrefix: string): React.ReactNode[] {
+  const pattern = /\[(庫存|銷售|客戶|供應商)\]/g
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
+    const src = match[1]
+    parts.push(
+      <span
+        key={`${keyPrefix}-${match.index}`}
+        className={cn('text-[9px] px-1 py-0.5 rounded font-medium align-middle ml-0.5 inline-block leading-none', CITATION_COLORS[src])}
+      >
+        {src}
+      </span>
+    )
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+  return parts
+}
+
 type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
@@ -133,10 +162,22 @@ function formatRelativeTime(iso: string): string {
 }
 
 const mdComponents = {
-  p: ({ children }: { children?: React.ReactNode }) => <p className="leading-relaxed mb-2 last:mb-0">{children}</p>,
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="leading-relaxed mb-2 last:mb-0">
+      {React.Children.map(children, (child, i) =>
+        typeof child === 'string' ? highlightCitations(child, `p-${i}`) : child
+      )}
+    </p>
+  ),
   ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
   ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
-  li: ({ children }: { children?: React.ReactNode }) => <li className="leading-relaxed">{children}</li>,
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="leading-relaxed">
+      {React.Children.map(children, (child, i) =>
+        typeof child === 'string' ? highlightCitations(child, `li-${i}`) : child
+      )}
+    </li>
+  ),
   strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold">{children}</strong>,
   h1: ({ children }: { children?: React.ReactNode }) => <p className="font-semibold text-base mb-1">{children}</p>,
   h2: ({ children }: { children?: React.ReactNode }) => <p className="font-semibold mb-1">{children}</p>,
@@ -264,7 +305,8 @@ export default function AiInsight(): React.JSX.Element {
           role: m.role,
           content: m.content,
           context: m.context ?? undefined,
-          followups: m.followups ?? undefined
+          followups: m.followups ?? undefined,
+          sources: m.sources ?? undefined
         }))
       )
     }

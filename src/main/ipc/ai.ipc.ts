@@ -598,13 +598,14 @@ ${salesData
     const db = getDb()
     const rows = db
       .prepare(
-        `SELECT id, role, content, context, followups, created_at
+        `SELECT id, role, content, context, followups, sources, created_at
          FROM ai_chat_messages WHERE session_id = ? ORDER BY id ASC`
       )
-      .all(sessionId) as { id: number; role: string; content: string; context: string | null; followups: string | null; created_at: string }[]
+      .all(sessionId) as { id: number; role: string; content: string; context: string | null; followups: string | null; sources: string | null; created_at: string }[]
     return rows.map((r) => ({
       ...r,
-      followups: r.followups ? (JSON.parse(r.followups) as string[]) : null
+      followups: r.followups ? (JSON.parse(r.followups) as string[]) : null,
+      sources: r.sources ? (JSON.parse(r.sources) as string[]) : null
     }))
   })
 
@@ -936,6 +937,7 @@ ${salesData
       '你是 SkillCraft IMS 進銷存系統的 AI 助手。\n' +
       '請嚴格根據下方【最新業務資料】回答使用者的問題。\n' +
       '如果資料不足以回答，請說明限制，不要捏造數字。\n' +
+      '在每個具體數字、金額或關鍵事實後，加上來源標記 [庫存]、[銷售]、[客戶] 或 [供應商]（如：銷售額 $12,000 [銷售]、庫存 5 件 [庫存]）。\n' +
       '回答請使用繁體中文，條列式整理，簡潔有重點。\n' +
       '如果列舉多項商品、客戶或供應商的比較資料（含多個數值欄位），請以 Markdown 表格格式呈現。\n' +
       '在回答最後另起一行，輸出 3 個相關追問（只輸出這一行）：\n' +
