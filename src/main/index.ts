@@ -175,7 +175,8 @@ function setupAutoUpdater(win: BrowserWindow): void {
       win.webContents.send('updater:update-not-available')
       return null
     }
-    return autoUpdater.checkForUpdates()
+    autoUpdater.checkForUpdates()
+    return null
   })
   ipcMain.handle('updater:install', () => {
     if (is.dev) return

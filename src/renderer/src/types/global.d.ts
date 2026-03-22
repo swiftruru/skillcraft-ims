@@ -118,6 +118,7 @@ declare global {
         adjustments(): Promise<{ success: boolean; filePath?: string; error?: string }>
         report(days?: number): Promise<{ success: boolean; filePath?: string; error?: string }>
         aiReport(): Promise<{ success: boolean; filePath?: string; error?: string }>
+        aiChat(messages: { role: 'user' | 'assistant'; content: string; context?: string }[]): Promise<{ success: boolean; filePath?: string }>
       }
       inventory: {
         getPurchaseSuggestions(): Promise<import('./schema').PurchaseSuggestion[]>
@@ -161,7 +162,12 @@ declare global {
         getLatest(): Promise<import('./schema').AiForecastLatest | null>
         checkFreshness(): Promise<{ hoursSince: number; newSalesCount: number }>
         previewScope(params: import('./schema').AiForecastParams): Promise<{ count: number }>
-        chat(question: string): Promise<{ answer: string; context: string }>
+        chat(question: string, sessionId?: number): Promise<{ answer: string; context: string; inputTokens: number; outputTokens: number; followups: string[]; faithfulness: { score: number; note: string } }>
+        onChatStream(cb: (text: string) => void): () => void
+        getSessions(): Promise<{ id: number; title: string; created_at: string; updated_at: string; preview: string | null }[]>
+        getSessionMessages(sessionId: number): Promise<{ id: number; role: 'user' | 'assistant'; content: string; context: string | null; created_at: string }[]>
+        createSession(): Promise<{ id: number }>
+        deleteSession(sessionId: number): Promise<{ success: boolean }>
       }
       notifications: {
         getAll(): Promise<import('./schema').AppNotification[]>

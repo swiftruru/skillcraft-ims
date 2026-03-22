@@ -259,6 +259,50 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 - 回傳整體趨勢摘要 + 各商品建議補貨量與原因（繁體中文）；預估售完天數 < 7 天以橘色醒目標示
 - 每列可直接點擊「建立採購單」，跳轉至採購管理並自動開啟新增表單
 
+### AI 問答（進階 RAG Pipeline）
+
+開啟 AI 頁面 → **AI 問答** Tab，以中文自由提問你的即時進銷存資料。
+
+#### RAG 管線架構
+
+```text
+使用者問題
+    │
+    ▼
+[Pre-Retrieval Guard]  偵測與進銷存無關的問題，直接拒絕
+    │
+    ▼
+[Query Rewriting]      改寫為精確查詢語句（與 Guard 合併為單次 LLM 呼叫）
+    │
+    ▼
+[Time Range Detection] Regex 解析中文時間詞 → SQLite 日期條件
+    │
+    ▼
+[Adaptive Retrieval]   依主題（庫存/銷售/客戶/供應商）動態查詢 SQLite
+    │
+    ▼
+[Augmented Prompt]     查詢結果格式化為結構化 context 注入 system prompt
+    │
+    ▼
+[Streaming Generation] Claude API 串流輸出，逐字即時顯示
+    │
+    ▼
+[Faithfulness Scoring] 評分回答是否忠實於業務資料（0–100）
+```
+
+#### 功能特色
+
+- **串流回答**：Claude API 逐字即時輸出，含閃爍游標動畫
+- **多輪對話記憶**：Session 存入 SQLite，重啟 App 歷史保留；側邊欄可管理多個 Session
+- **後續問題建議**：每則回答附帶 3 個 AI 生成的後續問題，點擊即送出
+- **忠實度評分**：每則回答顯示彩色分數徽章（綠 ≥90 / 黃 ≥70 / 紅 <70）與說明
+- **Token 用量顯示**：顯示每次呼叫的 input / output token 消耗
+- **提示詞防護**：非進銷存問題自動攔截，不執行 Retrieval、不消耗 Token
+- **錯誤重試**：API 失敗時顯示錯誤並附「重試」按鈕
+- **Word 匯出**：對話記錄匯出為 `.docx`，Markdown 表格正確渲染為 Word 表格
+- **動態高度**：聊天面板自動填滿視窗剩餘空間，輸入框不超出畫面
+- **⌘/Ctrl+Enter 送出**，Enter 換行
+
 ### 庫存盤點
 
 - **建立盤點單**：快照當下所有商品庫存量為「帳面數量」

@@ -150,7 +150,9 @@ const electronAPI = {
     sales: () => ipcRenderer.invoke('export:sales'),
     adjustments: () => ipcRenderer.invoke('export:adjustments'),
     report: (days?: number) => ipcRenderer.invoke('export:report', days),
-    aiReport: () => ipcRenderer.invoke('export:aiReport')
+    aiReport: () => ipcRenderer.invoke('export:aiReport'),
+    aiChat: (messages: { role: 'user' | 'assistant'; content: string; context?: string }[]) =>
+      ipcRenderer.invoke('export:aiChat', messages)
   },
 
   // Inventory utilities
@@ -212,7 +214,16 @@ const electronAPI = {
     checkFreshness: () => ipcRenderer.invoke('ai:checkFreshness'),
     previewScope: (params: { scope?: string; productIds?: number[] }) =>
       ipcRenderer.invoke('ai:previewScope', params),
-    chat: (question: string) => ipcRenderer.invoke('ai:chat', question)
+    chat: (question: string, sessionId?: number) => ipcRenderer.invoke('ai:chat', question, sessionId),
+    onChatStream: (cb: (text: string) => void): (() => void) => {
+      const handler = (_: Electron.IpcRendererEvent, data: { text: string }) => cb(data.text)
+      ipcRenderer.on('ai:chat:stream', handler)
+      return () => ipcRenderer.removeListener('ai:chat:stream', handler)
+    },
+    getSessions: () => ipcRenderer.invoke('ai:getSessions'),
+    getSessionMessages: (sessionId: number) => ipcRenderer.invoke('ai:getSessionMessages', sessionId),
+    createSession: () => ipcRenderer.invoke('ai:createSession'),
+    deleteSession: (sessionId: number) => ipcRenderer.invoke('ai:deleteSession', sessionId)
   },
 
   // Notifications

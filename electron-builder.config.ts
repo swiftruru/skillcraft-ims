@@ -12,7 +12,8 @@ const config: Configuration = {
   extraResources: [],
   mac: {
     target: [
-      { target: 'dmg' }
+      { target: 'dmg' },
+      { target: 'zip' }
     ],
     icon: 'resources/icon.icns',
     category: 'public.app-category.business',

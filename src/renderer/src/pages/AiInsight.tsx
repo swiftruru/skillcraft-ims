@@ -19,7 +19,10 @@ import {
   Bot,
   User,
   ChevronRight,
-  Shuffle
+  Shuffle,
+  Plus,
+  Trash2,
+  Clock
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -57,6 +60,12 @@ type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
   context?: string
+  isError?: boolean
+  isStreaming?: boolean
+  inputTokens?: number
+  outputTokens?: number
+  followups?: string[]
+  faithfulness?: { score: number; note: string }
 }
 
 type ConfidenceFilter = 'all' | 'high' | 'low'
@@ -96,6 +105,7 @@ export default function AiInsight(): React.JSX.Element {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [aiError, setAiError] = useState<string | null>(null)
   const [exportPending, setExportPending] = useState(false)
+  const [exportChatPending, setExportChatPending] = useState(false)
   const [applyConfirmOpen, setApplyConfirmOpen] = useState(false)
 
   // Chat (RAG) state
@@ -104,6 +114,9 @@ export default function AiInsight(): React.JSX.Element {
   const [chatLoading, setChatLoading] = useState(false)
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const [displayedQuestions, setDisplayedQuestions] = useState<string[]>(() => pickRandom(QUESTION_POOL, 4))
+  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const [chatHeight, setChatHeight] = useState(480)
 
   // Latest forecast from DB
   const { data: latest, isLoading: isLoadingLatest } = useQuery<AiForecastLatest | null>({
@@ -154,6 +167,33 @@ export default function AiInsight(): React.JSX.Element {
       toast({ title: msg, variant: 'destructive' })
     }
   })
+
+  // Chat session queries
+  const { data: sessions = [], refetch: refetchSessions } = useQuery({
+    queryKey: ['ai', 'sessions'],
+    queryFn: () => window.electronAPI.ai.getSessions(),
+    enabled: activeTab === 'chat'
+  })
+
+  const { data: sessionMessages } = useQuery({
+    queryKey: ['ai', 'session', currentSessionId],
+    queryFn: () => window.electronAPI.ai.getSessionMessages(currentSessionId!),
+    enabled: currentSessionId !== null,
+    staleTime: Infinity
+  })
+
+  useEffect(() => {
+    if (currentSessionId === null) return
+    if (sessionMessages) {
+      setChatMessages(
+        sessionMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          context: m.context ?? undefined
+        }))
+      )
+    }
+  }, [sessionMessages, currentSessionId])
 
   const applyReorderMutation = useMutation({
     mutationFn: (updates: { id: number; reorder_pt: number }[]) =>
@@ -231,23 +271,111 @@ export default function AiInsight(): React.JSX.Element {
   const handleChatSend = async (question: string): Promise<void> => {
     const q = question.trim()
     if (!q || chatLoading) return
+
+    // Auto-create session on first message
+    let sid = currentSessionId
+    if (!sid) {
+      const { id } = await window.electronAPI.ai.createSession()
+      sid = id
+      setCurrentSessionId(id)
+    }
+
     setChatMessages((prev) => [...prev, { role: 'user', content: q }])
     setChatInput('')
     setChatLoading(true)
+
+    // Add streaming placeholder
+    setChatMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }])
+
+    // Register stream listener — strips [FQ]: line in real-time
+    const removeListener = window.electronAPI.ai.onChatStream((text) => {
+      setChatMessages((prev) => {
+        const msgs = [...prev]
+        const last = msgs[msgs.length - 1]
+        if (last?.role === 'assistant' && last.isStreaming) {
+          const accumulated = last.content + text
+          const fqIdx = accumulated.indexOf('\n[FQ]')
+          msgs[msgs.length - 1] = {
+            ...last,
+            content: fqIdx >= 0 ? accumulated.slice(0, fqIdx) : accumulated
+          }
+        }
+        return msgs
+      })
+    })
+
     try {
-      const { answer, context } = await window.electronAPI.ai.chat(q)
-      setChatMessages((prev) => [...prev, { role: 'assistant', content: answer, context }])
+      const { answer, context, inputTokens, outputTokens, followups, faithfulness } =
+        await window.electronAPI.ai.chat(q, sid)
+      setChatMessages((prev) => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: answer, context, inputTokens, outputTokens, followups, faithfulness }
+      ])
+      queryClient.invalidateQueries({ queryKey: ['ai', 'sessions'] })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '查詢失敗，請稍後重試。'
-      setChatMessages((prev) => [...prev, { role: 'assistant', content: `⚠️ ${msg}` }])
+      setChatMessages((prev) => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: `⚠️ ${msg}`, isError: true }
+      ])
     } finally {
+      removeListener()
       setChatLoading(false)
     }
+  }
+
+  const handleRetry = (): void => {
+    const lastUserMsg = [...chatMessages].reverse().find((m) => m.role === 'user')
+    if (!lastUserMsg) return
+    setChatMessages((prev) => prev.slice(0, -1))
+    handleChatSend(lastUserMsg.content)
+  }
+
+  const handleNewSession = (): void => {
+    setCurrentSessionId(null)
+    setChatMessages([])
+    setChatInput('')
+  }
+
+  const handleSelectSession = (id: number): void => {
+    if (id === currentSessionId) return
+    setCurrentSessionId(id)
+    setChatMessages([])
+  }
+
+  const handleDeleteSession = async (e: React.MouseEvent, id: number): Promise<void> => {
+    e.stopPropagation()
+    await window.electronAPI.ai.deleteSession(id)
+    if (currentSessionId === id) handleNewSession()
+    refetchSessions()
+  }
+
+  function formatSessionTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `${mins}m`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h`
+    return `${Math.floor(hrs / 24)}d`
   }
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages, chatLoading])
+
+  // Dynamically compute chat panel height based on actual position in viewport
+  useEffect(() => {
+    if (activeTab !== 'chat') return
+    function compute(): void {
+      if (!chatContainerRef.current) return
+      const top = chatContainerRef.current.getBoundingClientRect().top
+      setChatHeight(Math.max(400, window.innerHeight - top - 28))
+    }
+    // Small delay to let layout settle after tab switch
+    const timer = setTimeout(compute, 0)
+    window.addEventListener('resize', compute)
+    return () => { clearTimeout(timer); window.removeEventListener('resize', compute) }
+  }, [activeTab])
 
   const handleExport = async (): Promise<void> => {
     setExportPending(true)
@@ -259,6 +387,19 @@ export default function AiInsight(): React.JSX.Element {
       toast({ title: msg, variant: 'destructive' })
     } finally {
       setExportPending(false)
+    }
+  }
+
+  const handleExportChat = async (): Promise<void> => {
+    if (chatMessages.length === 0) return
+    setExportChatPending(true)
+    try {
+      const res = await window.electronAPI.export.aiChat(chatMessages)
+      if (res.success) toast({ title: '對話已匯出為 Word 文件', variant: 'success' })
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : '匯出失敗', variant: 'destructive' })
+    } finally {
+      setExportChatPending(false)
     }
   }
 
@@ -636,162 +777,293 @@ export default function AiInsight(): React.JSX.Element {
 
       {/* ── Chat Tab (RAG) ───────────────────────────────────────────────── */}
       {activeTab === 'chat' && (
-        <div className="space-y-4">
-          {/* Description */}
-          <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-4 py-3 text-sm text-muted-foreground">
-            <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-400" />
-            <span>
-              RAG 流程：你的問題 → <strong>Step 1 Retrieval</strong> 從資料庫撈取業務資料 →{' '}
-              <strong>Step 2 Augmented</strong> 組成 prompt → <strong>Step 3 Generation</strong> Claude 回答
-            </span>
-          </div>
+        <div ref={chatContainerRef} className="flex gap-3" style={{ height: chatHeight }}>
 
-          {/* Suggested questions */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">建議問題</span>
+          {/* Session sidebar */}
+          <div className="w-52 shrink-0 flex flex-col gap-1 border border-border rounded-lg overflow-hidden bg-muted/20">
+            <div className="p-2 border-b border-border">
               <button
-                onClick={() => setDisplayedQuestions(pickRandom(QUESTION_POOL, 4))}
-                disabled={chatLoading}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                title="隨機換一批建議問題"
+                onClick={handleNewSession}
+                className="w-full flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                <Shuffle className="w-3 h-3" />
-                Mock
+                <Plus className="w-3.5 h-3.5" />
+                新對話
               </button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {displayedQuestions.map((q) => (
+            <div className="flex-1 overflow-y-auto p-1 space-y-0.5">
+              {sessions.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-6 px-2">尚無對話紀錄</p>
+              )}
+              {sessions.map((s) => (
                 <button
-                  key={q}
-                  onClick={() => handleChatSend(q)}
-                  disabled={chatLoading}
-                  className="text-xs px-3 py-1.5 rounded-full border border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+                  key={s.id}
+                  onClick={() => handleSelectSession(s.id)}
+                  className={cn(
+                    'group w-full text-left px-2.5 py-2 rounded-md text-xs transition-colors flex flex-col gap-0.5',
+                    currentSessionId === s.id
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
                 >
-                  {q}
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="font-medium line-clamp-2 flex-1 leading-snug">{s.title}</span>
+                    <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+                      <span className="text-[10px] opacity-60">{formatSessionTime(s.updated_at)}</span>
+                      <button
+                        onClick={(e) => handleDeleteSession(e, s.id)}
+                        className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity p-0.5 rounded"
+                        title="刪除此對話"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  {s.preview && (
+                    <span className="text-[10px] opacity-50 truncate">{s.preview}</span>
+                  )}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Message list */}
-          <div className="space-y-3 min-h-[200px] max-h-[480px] overflow-y-auto pr-1">
-            {chatMessages.length === 0 && !chatLoading && (
-              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                <Bot className="w-12 h-12 text-muted-foreground/20" />
-                <p className="text-sm text-muted-foreground">點選建議問題或自行輸入，即可向 AI 詢問你的業務資料</p>
-              </div>
-            )}
-            {chatMessages.map((msg, i) => (
-              <div
-                key={i}
-                className={cn('flex gap-2.5', msg.role === 'user' ? 'justify-end' : 'justify-start')}
+          {/* Chat area */}
+          <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
+
+            {/* Description + export */}
+            <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-4 py-3 text-sm text-muted-foreground shrink-0">
+              <Info className="w-4 h-4 shrink-0 text-blue-400" />
+              <span className="flex-1">
+                RAG 流程：你的問題 → <strong>Step 1 Retrieval</strong> 從資料庫撈取業務資料 →{' '}
+                <strong>Step 2 Augmented</strong> 組成 prompt → <strong>Step 3 Generation</strong> Claude 回答
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0"
+                onClick={handleExportChat}
+                disabled={chatMessages.length === 0 || exportChatPending}
+                aria-label="匯出對話紀錄為 Word"
               >
-                {msg.role === 'assistant' && (
-                  <div className="shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
-                    <Bot className="w-4 h-4 text-primary" />
-                  </div>
-                )}
-                <div className={cn('max-w-[82%] space-y-2', msg.role === 'user' ? 'items-end' : '')}>
-                  <div
-                    className={cn(
-                      'rounded-2xl px-4 py-2.5 text-sm',
-                      msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                        : 'bg-muted/60 text-foreground rounded-tl-sm'
-                    )}
+                <Download className="w-3.5 h-3.5" />
+                {exportChatPending ? '匯出中...' : '匯出 Word'}
+              </Button>
+            </div>
+
+            {/* Suggested questions */}
+            <div className="space-y-2 shrink-0">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">建議問題</span>
+                <button
+                  onClick={() => setDisplayedQuestions(pickRandom(QUESTION_POOL, 4))}
+                  disabled={chatLoading}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  title="隨機換一批建議問題"
+                >
+                  <Shuffle className="w-3 h-3" />
+                  Mock
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {displayedQuestions.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => handleChatSend(q)}
+                    disabled={chatLoading}
+                    className="text-xs px-3 py-1.5 rounded-full border border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
                   >
-                    {msg.role === 'user' ? (
-                      <p className="leading-relaxed">{msg.content}</p>
-                    ) : (
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          p: ({ children }) => <p className="leading-relaxed mb-2 last:mb-0">{children}</p>,
-                          ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
-                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                          h1: ({ children }) => <p className="font-semibold text-base mb-1">{children}</p>,
-                          h2: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
-                          h3: ({ children }) => <p className="font-medium mb-1">{children}</p>,
-                          table: ({ children }) => (
-                            <div className="overflow-x-auto mb-2">
-                              <table className="text-xs border-collapse w-full">{children}</table>
-                            </div>
-                          ),
-                          th: ({ children }) => <th className="border border-border px-2 py-1 bg-muted/40 font-medium text-left">{children}</th>,
-                          td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
-                          code: ({ children }) => <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
-                          hr: () => <hr className="border-border my-2" />
-                        }}
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Message list */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-0">
+              {chatMessages.length === 0 && !chatLoading && (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                  <Bot className="w-12 h-12 text-muted-foreground/20" />
+                  <p className="text-sm text-muted-foreground">點選建議問題或自行輸入，即可向 AI 詢問你的業務資料</p>
+                </div>
+              )}
+              {chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={cn('flex gap-2.5', msg.role === 'user' ? 'justify-end' : 'justify-start')}
+                >
+                  {msg.role === 'assistant' && (
+                    <div className="shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
+                      <Bot className="w-4 h-4 text-primary" />
+                    </div>
+                  )}
+                  <div className={cn('max-w-[82%] space-y-2', msg.role === 'user' ? 'items-end' : '')}>
+                    <div
+                      className={cn(
+                        'rounded-2xl px-4 py-2.5 text-sm',
+                        msg.role === 'user'
+                          ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                          : 'bg-muted/60 text-foreground rounded-tl-sm'
+                      )}
+                    >
+                      {msg.role === 'user' ? (
+                        <p className="leading-relaxed">{msg.content}</p>
+                      ) : msg.isStreaming && msg.content === '' ? (
+                        <div className="flex gap-1 items-center h-5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
+                        </div>
+                      ) : (
+                        <>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              p: ({ children }) => <p className="leading-relaxed mb-2 last:mb-0">{children}</p>,
+                              ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
+                              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                              h1: ({ children }) => <p className="font-semibold text-base mb-1">{children}</p>,
+                              h2: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
+                              h3: ({ children }) => <p className="font-medium mb-1">{children}</p>,
+                              table: ({ children }) => (
+                                <div className="overflow-x-auto mb-2">
+                                  <table className="text-xs border-collapse w-full">{children}</table>
+                                </div>
+                              ),
+                              th: ({ children }) => <th className="border border-border px-2 py-1 bg-muted/40 font-medium text-left">{children}</th>,
+                              td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
+                              code: ({ children }) => <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                              hr: () => <hr className="border-border my-2" />
+                            }}
+                          >
+                            {msg.content}
+                          </ReactMarkdown>
+                          {msg.isStreaming && (
+                            <span className="inline-block w-0.5 h-3.5 bg-foreground/60 ml-0.5 animate-pulse align-text-bottom" />
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {/* Faithfulness badge + token usage */}
+                    {msg.role === 'assistant' && !msg.isStreaming && (msg.faithfulness || msg.inputTokens) && (
+                      <div className="flex items-center gap-2 px-1 flex-wrap">
+                        {msg.faithfulness && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={cn(
+                                'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                                msg.faithfulness.score >= 90
+                                  ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+                                  : msg.faithfulness.score >= 70
+                                    ? 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400'
+                                    : 'bg-red-500/15 text-red-600 dark:text-red-400'
+                              )}
+                            >
+                              忠實度 {msg.faithfulness.score}/100
+                            </span>
+                            {msg.faithfulness.note && (
+                              <span className="text-[10px] text-muted-foreground/60">
+                                {msg.faithfulness.note}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {(msg.inputTokens || msg.outputTokens) && (
+                          <span className="text-[10px] text-muted-foreground/50">
+                            {msg.inputTokens} in · {msg.outputTokens} out tokens
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {/* Followup suggestions */}
+                    {msg.followups && msg.followups.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {msg.followups.map((fq) => (
+                          <button
+                            key={fq}
+                            onClick={() => handleChatSend(fq)}
+                            disabled={chatLoading}
+                            className="text-xs px-2.5 py-1 rounded-full border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                          >
+                            {fq}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {/* Retry button on error */}
+                    {msg.isError && (
+                      <button
+                        onClick={handleRetry}
+                        disabled={chatLoading}
+                        className="text-xs text-primary hover:underline disabled:opacity-50 mt-1"
                       >
-                        {msg.content}
-                      </ReactMarkdown>
+                        重新發送
+                      </button>
+                    )}
+                    {/* RAG context accordion */}
+                    {msg.role === 'assistant' && msg.context && (
+                      <details className="group">
+                        <summary className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer hover:text-foreground select-none list-none">
+                          <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                          查看本次使用的業務資料（Retrieval Context）
+                        </summary>
+                        <pre className="mt-2 text-xs bg-muted/40 border border-border rounded-lg p-3 whitespace-pre-wrap text-muted-foreground leading-relaxed overflow-x-auto">
+                          {msg.context}
+                        </pre>
+                      </details>
                     )}
                   </div>
-                  {/* RAG context accordion */}
-                  {msg.role === 'assistant' && msg.context && (
-                    <details className="group">
-                      <summary className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer hover:text-foreground select-none list-none">
-                        <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
-                        查看本次使用的業務資料（Retrieval Context）
-                      </summary>
-                      <pre className="mt-2 text-xs bg-muted/40 border border-border rounded-lg p-3 whitespace-pre-wrap text-muted-foreground leading-relaxed overflow-x-auto">
-                        {msg.context}
-                      </pre>
-                    </details>
+                  {msg.role === 'user' && (
+                    <div className="shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center mt-0.5">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                    </div>
                   )}
                 </div>
-                {msg.role === 'user' && (
-                  <div className="shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center mt-0.5">
-                    <User className="w-4 h-4 text-muted-foreground" />
+              ))}
+              {chatLoading && chatMessages[chatMessages.length - 1]?.role !== 'assistant' && (
+                <div className="flex gap-2.5 justify-start">
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-primary" />
                   </div>
-                )}
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="flex gap-2.5 justify-start">
-                <div className="shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-primary" />
-                </div>
-                <div className="bg-muted/60 rounded-2xl rounded-tl-sm px-4 py-2.5">
-                  <div className="flex gap-1 items-center h-5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
+                  <div className="bg-muted/60 rounded-2xl rounded-tl-sm px-4 py-2.5">
+                    <div className="flex gap-1 items-center h-5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            <div ref={chatBottomRef} />
-          </div>
+              )}
+              <div ref={chatBottomRef} />
+            </div>
 
-          {/* Input */}
-          <div className="flex gap-2 items-end">
-            <Textarea
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleChatSend(chatInput)
-                }
-              }}
-              placeholder={'輸入問題，例如：本月哪個商品賣最好？\n（Enter 送出，Shift+Enter 換行）'}
-              disabled={chatLoading}
-              rows={2}
-              className="flex-1 resize-none"
-            />
-            <Button
-              onClick={() => handleChatSend(chatInput)}
-              disabled={chatLoading || !chatInput.trim()}
-              className="gap-1.5 shrink-0"
-            >
-              <Send className="w-3.5 h-3.5" />
-              送出
-            </Button>
-          </div>
+            {/* Input */}
+            <div className="flex gap-2 items-end shrink-0">
+              <Textarea
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    handleChatSend(chatInput)
+                  }
+                }}
+                placeholder={'輸入問題，例如：本月哪個商品賣最好？\n（⌘/Ctrl + Enter 送出，Enter 換行）'}
+                disabled={chatLoading}
+                rows={2}
+                className="flex-1 resize-none"
+              />
+              <Button
+                onClick={() => handleChatSend(chatInput)}
+                disabled={chatLoading || !chatInput.trim()}
+                className="gap-1.5 shrink-0"
+              >
+                <Send className="w-3.5 h-3.5" />
+                送出
+              </Button>
+            </div>
+
+          </div>{/* end chat area */}
         </div>
       )}
 

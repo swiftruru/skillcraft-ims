@@ -1,6 +1,20 @@
 import { ipcMain, dialog } from 'electron'
 import { writeFileSync } from 'fs'
 import { getDb } from '../db'
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
+  AlignmentType,
+  BorderStyle,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  ShadingType
+} from 'docx'
 
 // UTF-8 BOM so Excel opens Chinese correctly
 const BOM = '\uFEFF'
@@ -228,4 +242,215 @@ export function registerExportIpc(): void {
     writeFileSync(filePath, sections.join('\r\n'), 'utf-8')
     return { success: true, filePath }
   })
+
+  // ── AI Chat → Word export ─────────────────────────────────────────────────
+  ipcMain.handle(
+    'export:aiChat',
+    async (
+      _e,
+      messages: { role: 'user' | 'assistant'; content: string; context?: string }[]
+    ) => {
+      const { filePath } = await dialog.showSaveDialog({
+        defaultPath: `skillcraft-ai-chat-${new Date().toISOString().slice(0, 10)}.docx`,
+        filters: [{ name: 'Word 文件', extensions: ['docx'] }]
+      })
+      if (!filePath) return { success: false }
+
+      const dateStr = new Date().toLocaleString('zh-TW', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      })
+
+      // Parse markdown (including GFM tables) into docx elements
+      function mdToDocxElements(text: string): (Paragraph | Table)[] {
+        const elements: (Paragraph | Table)[] = []
+        const lines = text.split('\n')
+        const isSep = (l: string): boolean => /^\|[-|: ]+\|$/.test(l.trim())
+
+        const makeRuns = (raw: string): TextRun[] => {
+          const runs: TextRun[] = []
+          for (const part of raw.split(/(\*\*[^*]+\*\*)/)) {
+            const bold = part.match(/^\*\*(.+)\*\*$/)
+            runs.push(new TextRun({ text: bold ? bold[1] : part, bold: !!bold }))
+          }
+          return runs
+        }
+
+        let i = 0
+        while (i < lines.length) {
+          const trimmed = lines[i].trim()
+
+          // ── GFM Table: current line is pipe row, next line is separator ─────
+          if (trimmed.startsWith('|') && i + 1 < lines.length && isSep(lines[i + 1])) {
+            const tableLines: string[] = []
+            while (i < lines.length && lines[i].trim().startsWith('|')) {
+              tableLines.push(lines[i].trim())
+              i++
+            }
+            // tableLines[0]=header, tableLines[1]=separator, tableLines[2+]=data
+            const parseRow = (l: string): string[] =>
+              l.split('|').slice(1, -1).map((c) => c.trim())
+
+            const headerCells = parseRow(tableLines[0])
+            const dataRows = tableLines.slice(2).map(parseRow)
+
+            elements.push(
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                  // Header row
+                  new TableRow({
+                    tableHeader: true,
+                    children: headerCells.map(
+                      (cell) =>
+                        new TableCell({
+                          shading: { type: ShadingType.SOLID, color: 'E5E7EB' },
+                          children: [
+                            new Paragraph({ children: [new TextRun({ text: cell, bold: true })] })
+                          ]
+                        })
+                    )
+                  }),
+                  // Data rows
+                  ...dataRows.map(
+                    (row) =>
+                      new TableRow({
+                        children: row.map(
+                          (cell) =>
+                            new TableCell({
+                              children: [new Paragraph({ children: makeRuns(cell) })]
+                            })
+                        )
+                      })
+                  )
+                ]
+              })
+            )
+            elements.push(new Paragraph({ text: '' }))
+            continue
+          }
+
+          // ── Headings ─────────────────────────────────────────────────────────
+          if (!trimmed) { elements.push(new Paragraph({ text: '' })); i++; continue }
+          const h1 = trimmed.match(/^#\s+(.+)/); if (h1) { elements.push(new Paragraph({ text: h1[1], heading: HeadingLevel.HEADING_3 })); i++; continue }
+          const h2 = trimmed.match(/^##\s+(.+)/); if (h2) { elements.push(new Paragraph({ text: h2[1], heading: HeadingLevel.HEADING_3 })); i++; continue }
+          const h3 = trimmed.match(/^###\s+(.+)/); if (h3) { elements.push(new Paragraph({ text: h3[1], heading: HeadingLevel.HEADING_3 })); i++; continue }
+
+          // ── List items ───────────────────────────────────────────────────────
+          const li = trimmed.match(/^[-*]\s+(.+)/); const oli = trimmed.match(/^\d+\.\s+(.+)/)
+          if (li || oli) {
+            const raw = (li?.[1] ?? oli![1]).replace(/\*\*(.+?)\*\*/g, '$1')
+            elements.push(new Paragraph({ text: `• ${raw}`, indent: { left: 360 } })); i++; continue
+          }
+
+          // ── Plain text with inline bold ──────────────────────────────────────
+          elements.push(new Paragraph({ children: makeRuns(trimmed) }))
+          i++
+        }
+        return elements
+      }
+
+      const children: (Paragraph | Table)[] = [
+        new Paragraph({
+          text: 'SkillCraft IMS — AI 問答對話紀錄',
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `匯出時間：${dateStr}`, color: '888888', size: 20 })],
+          alignment: AlignmentType.CENTER
+        }),
+        new Paragraph({ text: '' }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: 'RAG 流程說明：', bold: true }),
+            new TextRun({ text: 'Step 1 Retrieval（SQLite 查詢業務資料）→ Step 2 Augmented（組成 prompt）→ Step 3 Generation（Claude API 回答）' })
+          ],
+          border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' } }
+        }),
+        new Paragraph({ text: '' })
+      ]
+
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i]
+        const isUser = msg.role === 'user'
+
+        // Role label
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: isUser ? '👤 使用者問題' : '🤖 AI 回答',
+                bold: true,
+                color: isUser ? '1D4ED8' : '065F46'
+              })
+            ]
+          })
+        )
+
+        if (isUser) {
+          children.push(
+            new Paragraph({
+              children: [new TextRun({ text: msg.content })],
+              indent: { left: 360 }
+            })
+          )
+        } else {
+          // Render markdown content (with table support)
+          for (const el of mdToDocxElements(msg.content)) {
+            children.push(el)
+          }
+          // Retrieval context as a collapsed table
+          if (msg.context) {
+            children.push(new Paragraph({ text: '' }))
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: '▸ Retrieval Context（業務資料）', italics: true, color: '888888', size: 18 })]
+              })
+            )
+            children.push(
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        shading: { type: ShadingType.SOLID, color: 'F3F4F6' },
+                        children: msg.context.split('\n').map(
+                          (line) => new Paragraph({
+                            children: [new TextRun({ text: line, font: 'Courier New', size: 18 })]
+                          })
+                        )
+                      })
+                    ]
+                  })
+                ]
+              })
+            )
+          }
+        }
+
+        if (i < messages.length - 1) {
+          children.push(new Paragraph({ text: '' }))
+          children.push(
+            new Paragraph({
+              border: { bottom: { style: BorderStyle.DASHED, size: 1, color: 'DDDDDD' } },
+              text: ''
+            })
+          )
+          children.push(new Paragraph({ text: '' }))
+        }
+      }
+
+      const doc = new Document({
+        sections: [{ children }],
+        creator: 'SkillCraft IMS',
+        title: 'AI 問答對話紀錄'
+      })
+
+      const buffer = await Packer.toBuffer(doc)
+      writeFileSync(filePath, buffer)
+      return { success: true, filePath }
+    }
+  )
 }

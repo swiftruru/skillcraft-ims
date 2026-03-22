@@ -1,5 +1,37 @@
 # Changelog
 
+## [v0.9.0] — 2026-03-22
+
+### 新功能
+
+- **RAG Pipeline 全面升級**：AI 問答從基礎 RAG 升級為多階段智慧管線
+  - **Pre-Retrieval Guard**：提示詞防護層，自動偵測並拒絕非進銷存相關問題（如「寫貪食蛇演算法」）
+  - **Query Rewriting**：Guard 與重寫合併為單次 LLM 呼叫，自動將口語化問題改寫為精確查詢語句
+  - **Dynamic Time Range Detection**：純 Regex 解析「上週」「本月」「今年」「近 N 天」等中文時間表達，自動轉換為 SQLite 日期條件
+  - **Adaptive Retrieval**：依問題主題（庫存/銷售/客戶/供應商）動態決定撈取哪些資料段，避免無關噪音
+  - **Streaming Responses**：Claude API 串流輸出，回答逐字即時顯示，含閃爍游標
+  - **Follow-up Suggestions**：每則回答附帶 3 個 AI 生成的後續問題，點擊即可送出
+  - **RAG Faithfulness Scoring**：回答後自動評分（0–100），標示回答是否忠實於業務資料，含評分說明
+  - **Conversation Summarization**：超過 8 輪訊息時，自動摘要舊訊息注入 system prompt，維持對話連貫性
+  - **Token Usage Display**：每則回答顯示 input / output token 用量
+- **多輪對話記憶**：對話紀錄存入 SQLite（`ai_chat_sessions` + `ai_chat_messages`），重啟 App 歷史仍保留
+- **側邊欄 Session 列表**：可建立多個對話 Session，點擊切換歷史紀錄，可刪除個別 Session
+- **錯誤重試按鈕**：API 呼叫失敗時顯示錯誤訊息，附「重試」按鈕一鍵重新送出最後一個問題
+- **Word 匯出改善**：AI 問答匯出 `.docx` 時正確渲染 GFM Markdown 表格（docx Table 物件），Retrieval Context 按行分段顯示
+- **動態聊天面板高度**：自動偵測視窗大小，聊天區域精確填滿剩餘空間，輸入框不再超出畫面
+
+### 變更
+
+- **鍵盤快捷鍵調整**：⌘/Ctrl+Enter 送出問題，Enter 換行（原為 Enter 送出，Shift+Enter 換行）
+
+### 修正
+
+- **Session 側邊欄點擊無反應**：修正 React Query `staleTime: Infinity` 快取導致 `useEffect` 不觸發的問題
+- **Auto-updater macOS ZIP 修正**：`electron-builder.config.ts` 新增 `zip` target；Release workflow 改以 zip sha512 產生 `latest-mac.yml`，解決 `ZIP file not provided` 錯誤
+- **`updater:checkForUpdates` IPC 錯誤**：handler 回傳值改為 `null`，避免 `CancellationToken` 無法被 structured clone 序列化導致的「An object could not be cloned」錯誤
+
+---
+
 ## [v0.8.3] — 2026-03-22
 
 ### 新功能

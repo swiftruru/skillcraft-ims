@@ -9,6 +9,116 @@ interface ForecastParams {
   productIds?: number[]
 }
 
+function classifyTopics(question: string): {
+  inventory: boolean; sales: boolean; customers: boolean; suppliers: boolean
+} {
+  const inv = /庫存|商品|補貨|低庫存|存貨|缺貨/.test(question)
+  const sal = /銷售|業績|賣出|銷量|銷售訂單|完成訂單|收入|營業額/.test(question)
+  const cus = /客戶|應收|收款|欠款/.test(question)
+  const sup = /供應商|採購|進貨|應付|採購單/.test(question)
+  const none = !inv && !sal && !cus && !sup
+  return { inventory: inv || none, sales: sal || none, customers: cus || none, suppliers: sup || none }
+}
+
+// ── Pre-Retrieval: time range detection (regex, no API call) ────────────────
+interface TimeRange { label: string; sqlFrom: string; sqlTo?: string }
+
+function detectTimeRange(question: string): TimeRange {
+  if (/上週|上周|上個禮拜/.test(question))
+    return { label: '近 7 天', sqlFrom: "date('now', '-7 days')" }
+  if (/本月|這個月/.test(question))
+    return { label: '本月', sqlFrom: "date('now', 'start of month')" }
+  if (/上個月|上月/.test(question))
+    return { label: '上個月', sqlFrom: "date('now', 'start of month', '-1 month')", sqlTo: "date('now', 'start of month', '-1 day')" }
+  if (/今年|本年度/.test(question))
+    return { label: '今年', sqlFrom: "date('now', 'start of year')" }
+  if (/去年/.test(question))
+    return { label: '去年', sqlFrom: "date('now', 'start of year', '-1 year')", sqlTo: "date('now', 'start of year', '-1 day')" }
+  const daysMatch = question.match(/近\s*(\d+)\s*天/)
+  if (daysMatch) { const n = parseInt(daysMatch[1]); return { label: `近 ${n} 天`, sqlFrom: `date('now', '-${n} days')` } }
+  const weekMatch = question.match(/近\s*(\d+)\s*週/)
+  if (weekMatch) { const n = parseInt(weekMatch[1]); return { label: `近 ${n} 週`, sqlFrom: `date('now', '-${n * 7} days')` } }
+  return { label: '近 30 天', sqlFrom: "date('now', '-30 days')" }
+}
+
+// ── Guard Layer + Query Rewriting (combined, one API call) ─────────────────
+async function preProcessQuestion(
+  client: Anthropic,
+  question: string
+): Promise<{ inScope: boolean; rewritten: string }> {
+  try {
+    const res = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 150,
+      system:
+        '你是進銷存系統的查詢前處理助手。判斷問題是否在業務範疇內（庫存、銷售、採購、客戶、供應商、財務應收應付），並將業務問題改寫成清晰的標準查詢。\n' +
+        '只輸出 JSON，格式：{"inScope": true或false, "rewritten": "改寫後的問題或原問題"}\n' +
+        'inScope 為 false 的例子：寫程式、閒聊、學術問題、與進銷存完全無關的請求。',
+      messages: [{ role: 'user', content: question }]
+    })
+    const text = res.content[0].type === 'text' ? res.content[0].text : ''
+    const match = text.match(/\{[\s\S]*?\}/)
+    const parsed = match ? JSON.parse(match[0]) : {}
+    return {
+      inScope: parsed.inScope !== false,
+      rewritten: typeof parsed.rewritten === 'string' ? parsed.rewritten.trim() : question
+    }
+  } catch { return { inScope: true, rewritten: question } }
+}
+
+// ── Context Window Management: summarize old history ───────────────────────
+async function buildHistoryWithSummary(
+  client: Anthropic,
+  messages: { role: 'user' | 'assistant'; content: string }[]
+): Promise<{ history: { role: 'user' | 'assistant'; content: string }[]; summaryNote: string }> {
+  const KEEP_RECENT = 8
+  if (messages.length <= KEEP_RECENT) return { history: messages, summaryNote: '' }
+  try {
+    const older = messages.slice(0, -KEEP_RECENT)
+    const transcript = older
+      .map((m) => `${m.role === 'user' ? 'Q' : 'A'}: ${m.content.slice(0, 300)}`)
+      .join('\n')
+    const res = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      messages: [{ role: 'user', content: `摘要以下對話的關鍵結論（2-3 句，保留重要數字）：\n${transcript}` }]
+    })
+    const summary = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+    return {
+      history: messages.slice(-KEEP_RECENT),
+      summaryNote: `\n\n【對話歷史摘要（已壓縮 ${older.length} 則舊訊息）】\n${summary}`
+    }
+  } catch {
+    return { history: messages.slice(-KEEP_RECENT), summaryNote: '\n\n（舊對話已自動截斷以控制 token 用量）' }
+  }
+}
+
+// ── RAG Evaluation: faithfulness scoring ───────────────────────────────────
+async function evaluateFaithfulness(
+  client: Anthropic,
+  context: string,
+  answer: string
+): Promise<{ score: number; note: string }> {
+  try {
+    const res = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 100,
+      system: '評估 AI 回答是否忠實於業務資料，不包含捏造數字。只輸出 JSON：{"score": 0-100, "note": "一句中文說明"}',
+      messages: [{
+        role: 'user',
+        content: `【業務資料】\n${context.slice(0, 700)}\n\n【AI 回答】\n${answer.slice(0, 500)}`
+      }]
+    })
+    const text = res.content[0].type === 'text' ? res.content[0].text : ''
+    const match = text.match(/\{[\s\S]*?\}/)
+    const parsed = match ? JSON.parse(match[0]) : {}
+    return {
+      score: typeof parsed.score === 'number' ? Math.max(0, Math.min(100, Math.round(parsed.score))) : 0,
+      note: typeof parsed.note === 'string' ? parsed.note : ''
+    }
+  } catch { return { score: 0, note: '評估失敗' } }
+}
+
 export function registerAiIpc(): void {
   ipcMain.handle('ai:forecast', async (_e, params: ForecastParams = {}) => {
     const db = getDb()
@@ -186,8 +296,45 @@ ${salesData
     return { hoursSince, newSalesCount: row.cnt }
   })
 
+  // ── Chat Session Management ───────────────────────────────────────────────
+  ipcMain.handle('ai:getSessions', () => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT s.id, s.title, s.created_at, s.updated_at,
+                (SELECT content FROM ai_chat_messages WHERE session_id = s.id AND role = 'user' ORDER BY id ASC LIMIT 1) as preview
+         FROM ai_chat_sessions s
+         ORDER BY s.updated_at DESC`
+      )
+      .all()
+  })
+
+  ipcMain.handle('ai:getSessionMessages', (_e, sessionId: number) => {
+    const db = getDb()
+    return db
+      .prepare(
+        `SELECT id, role, content, context, created_at
+         FROM ai_chat_messages WHERE session_id = ? ORDER BY id ASC`
+      )
+      .all(sessionId)
+  })
+
+  ipcMain.handle('ai:createSession', () => {
+    const db = getDb()
+    const result = db
+      .prepare(`INSERT INTO ai_chat_sessions (title) VALUES ('新對話')`)
+      .run()
+    return { id: result.lastInsertRowid as number }
+  })
+
+  ipcMain.handle('ai:deleteSession', (_e, sessionId: number) => {
+    const db = getDb()
+    db.prepare(`DELETE FROM ai_chat_sessions WHERE id = ?`).run(sessionId)
+    return { success: true }
+  })
+
   // ── RAG Chat ─────────────────────────────────────────────────────────────
-  ipcMain.handle('ai:chat', async (_e, question: string) => {
+  ipcMain.handle('ai:chat', async (_e, question: string, sessionId?: number) => {
     const db = getDb()
     const apiKeyRow = db
       .prepare(`SELECT value FROM app_settings WHERE key = 'claudeApiKey'`)
@@ -195,128 +342,275 @@ ${salesData
     const apiKey = apiKeyRow?.value?.trim()
     if (!apiKey) throw new Error('未設定 Claude API Key，請至設定頁面填入。')
 
-    // ── Step 1: Retrieval — query SQLite for business context ──────────────
-    const totalProducts = (
-      db.prepare('SELECT COUNT(*) as cnt FROM products').get() as { cnt: number }
-    ).cnt
+    const client = new Anthropic({ apiKey })
 
-    const lowStockItems = db
-      .prepare(
-        `SELECT name, stock_qty, reorder_pt FROM products
-         WHERE stock_qty <= reorder_pt ORDER BY stock_qty ASC LIMIT 10`
-      )
-      .all() as { name: string; stock_qty: number; reorder_pt: number }[]
+    // ── Step 1: Pre-Retrieval ─────────────────────────────────────────────
+    // 1a. Detect time range from original question (regex, no extra API call)
+    const timeRange = detectTimeRange(question)
+    const dateCondition = timeRange.sqlTo
+      ? `AND order_date >= ${timeRange.sqlFrom} AND order_date <= ${timeRange.sqlTo}`
+      : `AND order_date >= ${timeRange.sqlFrom}`
 
-    const salesStats = db
-      .prepare(
-        `SELECT COUNT(*) as order_count,
-                ROUND(COALESCE(SUM(total_amount), 0), 0) as total_amount
-         FROM sales_orders
-         WHERE status = 'completed' AND order_date >= date('now', '-30 days')`
-      )
-      .get() as { order_count: number; total_amount: number }
+    // 1b. Guard Layer + Query Rewriting (one combined LLM call)
+    const { inScope, rewritten: rewrittenQ } = await preProcessQuestion(client, question)
 
-    const topProducts = db
-      .prepare(
-        `SELECT p.name, SUM(si.quantity) as qty,
-                ROUND(SUM(si.quantity * si.unit_price), 0) as amount
-         FROM sale_items si
-         JOIN products p ON si.product_id = p.id
-         JOIN sales_orders so ON si.sales_order_id = so.id
-         WHERE so.status = 'completed' AND so.order_date >= date('now', '-30 days')
-         GROUP BY p.id ORDER BY qty DESC LIMIT 5`
-      )
-      .all() as { name: string; qty: number; amount: number }[]
+    // ── Guard: reject off-topic questions immediately ──────────────────────
+    if (!inScope) {
+      return {
+        answer:
+          '抱歉，這個問題超出了 SkillCraft IMS 的業務範疇。\n\n我只能回答與進銷存業務相關的問題，例如：\n- 庫存狀況與低庫存警示\n- 銷售業績與訂單統計\n- 採購管理與待處理事項\n- 客戶應收帳款\n- 供應商應付帳款\n\n請嘗試詢問你的業務資料！',
+        context: '【問題防護】偵測到問題與進銷存業務無關，已拒絕回答，不執行 Retrieval。',
+        inputTokens: 0,
+        outputTokens: 0,
+        followups: ['目前哪些商品庫存不足？', '本月銷售業績如何？', '有哪些待處理的訂單？'],
+        faithfulness: { score: 100, note: '問題超出業務範疇，系統防護層已攔截' }
+      }
+    }
 
-    const pendingPurchases = db
-      .prepare(
-        `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
-         FROM purchase_orders WHERE status IN ('pending', 'ordered')`
-      )
-      .get() as { cnt: number; total: number }
+    // ── Step 2: Classify topics (Adaptive Retrieval) ──────────────────────
+    const topics = classifyTopics(rewrittenQ)
+    const topicNames = [
+      topics.inventory && '庫存',
+      topics.sales && '銷售',
+      topics.customers && '客戶應收',
+      topics.suppliers && '供應商應付'
+    ].filter(Boolean).join('、')
 
-    const pendingSales = db
-      .prepare(
-        `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
-         FROM sales_orders WHERE status IN ('pending', 'confirmed')`
-      )
-      .get() as { cnt: number; total: number }
-
-    const customerCount = (
-      db.prepare('SELECT COUNT(*) as cnt FROM customers').get() as { cnt: number }
-    ).cnt
-
-    const supplierCount = (
-      db.prepare('SELECT COUNT(*) as cnt FROM suppliers').get() as { cnt: number }
-    ).cnt
-
-    const unpaidSales = (
-      db
-        .prepare(
-          `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
-           FROM sales_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
-        )
-        .get() as { total: number }
-    ).total
-
-    const unpaidPurchases = (
-      db
-        .prepare(
-          `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
-           FROM purchase_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
-        )
-        .get() as { total: number }
-    ).total
-
-    // ── Step 2: Augment — build context string ─────────────────────────────
-    const context = [
-      `【庫存概況】`,
-      `- 總商品數：${totalProducts} 項`,
-      `- 低庫存商品（庫存 ≤ 補貨點）：${lowStockItems.length} 項`,
-      ...lowStockItems.map(
-        (p) => `  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}`
-      ),
-      ``,
-      `【近 30 天銷售】`,
-      `- 完成訂單數：${salesStats.order_count} 筆`,
-      `- 銷售總額：NT$${salesStats.total_amount.toLocaleString()}`,
-      `- 銷量前 5 名商品：`,
-      ...(topProducts.length > 0
-        ? topProducts.map(
-            (p, i) => `  ${i + 1}. ${p.name}：售出 ${p.qty} 件，金額 NT$${p.amount.toLocaleString()}`
-          )
-        : ['  （近 30 天無銷售資料）']),
-      ``,
-      `【待處理事項】`,
-      `- 待處理採購單：${pendingPurchases.cnt} 筆，金額 NT$${pendingPurchases.total.toLocaleString()}`,
-      `- 待處理銷售單：${pendingSales.cnt} 筆，金額 NT$${pendingSales.total.toLocaleString()}`,
-      ``,
-      `【客戶與供應商】`,
-      `- 客戶數：${customerCount} 位，供應商數：${supplierCount} 家`,
-      `- 應收未付（已完成銷售訂單）：NT$${unpaidSales.toLocaleString()}`,
-      `- 應付未付（已完成採購訂單）：NT$${unpaidPurchases.toLocaleString()}`
+    const metaSection = [
+      `【查詢處理】`,
+      rewrittenQ !== question
+        ? `- 問題改寫：「${question}」→「${rewrittenQ}」`
+        : `- 原始問題：「${question}」`,
+      `- 時間範圍：${timeRange.label}`,
+      `- 擷取資料：${topicNames}`
     ].join('\n')
 
-    // ── Step 3: Generation — call Claude API ───────────────────────────────
-    const client = new Anthropic({ apiKey })
-    const message = await client.messages.create({
+    const sections: string[] = [metaSection]
+
+    // ── Step 2: Retrieval — conditionally query SQLite ─────────────────────
+    if (topics.inventory) {
+      const totalProducts = (
+        db.prepare('SELECT COUNT(*) as cnt FROM products').get() as { cnt: number }
+      ).cnt
+      const lowStockItems = db
+        .prepare(
+          `SELECT name, stock_qty, reorder_pt FROM products
+           WHERE stock_qty <= reorder_pt ORDER BY stock_qty ASC LIMIT 10`
+        )
+        .all() as { name: string; stock_qty: number; reorder_pt: number }[]
+      sections.push(
+        [
+          `【庫存概況】`,
+          `- 總商品數：${totalProducts} 項`,
+          `- 低庫存商品（庫存 ≤ 補貨點）：${lowStockItems.length} 項`,
+          ...lowStockItems.map(
+            (p) => `  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}`
+          )
+        ].join('\n')
+      )
+    }
+
+    if (topics.sales) {
+      const salesStats = db
+        .prepare(
+          `SELECT COUNT(*) as order_count,
+                  ROUND(COALESCE(SUM(total_amount), 0), 0) as total_amount
+           FROM sales_orders
+           WHERE status = 'completed' ${dateCondition}`
+        )
+        .get() as { order_count: number; total_amount: number }
+      const topProducts = db
+        .prepare(
+          `SELECT p.name, SUM(si.quantity) as qty,
+                  ROUND(SUM(si.quantity * si.unit_price), 0) as amount
+           FROM sale_items si
+           JOIN products p ON si.product_id = p.id
+           JOIN sales_orders so ON si.sales_order_id = so.id
+           WHERE so.status = 'completed' ${dateCondition}
+           GROUP BY p.id ORDER BY qty DESC LIMIT 5`
+        )
+        .all() as { name: string; qty: number; amount: number }[]
+      const salesByCategory = db
+        .prepare(
+          `SELECT p.category, SUM(si.quantity) as qty,
+                  ROUND(SUM(si.quantity * si.unit_price), 0) as amount
+           FROM sale_items si
+           JOIN products p ON si.product_id = p.id
+           JOIN sales_orders so ON si.sales_order_id = so.id
+           WHERE so.status = 'completed' ${dateCondition}
+           GROUP BY p.category ORDER BY amount DESC LIMIT 5`
+        )
+        .all() as { category: string; qty: number; amount: number }[]
+      const pendingSales = db
+        .prepare(
+          `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+           FROM sales_orders WHERE status IN ('pending', 'confirmed')`
+        )
+        .get() as { cnt: number; total: number }
+      sections.push(
+        [
+          `【近 30 天銷售】`,
+          `- 完成訂單數：${salesStats.order_count} 筆`,
+          `- 銷售總額：NT$${salesStats.total_amount.toLocaleString()}`,
+          `- 銷量前 5 名商品：`,
+          ...(topProducts.length > 0
+            ? topProducts.map(
+                (p, i) => `  ${i + 1}. ${p.name}：售出 ${p.qty} 件，金額 NT$${p.amount.toLocaleString()}`
+              )
+            : ['  （近 30 天無銷售資料）']),
+          `- 各分類銷售：`,
+          ...(salesByCategory.length > 0
+            ? salesByCategory.map((c) => `  · ${c.category}：${c.qty} 件，NT$${c.amount.toLocaleString()}`)
+            : ['  （無資料）']),
+          `- 待處理銷售單：${pendingSales.cnt} 筆，金額 NT$${pendingSales.total.toLocaleString()}`
+        ].join('\n')
+      )
+    }
+
+    if (topics.customers) {
+      const customerCount = (
+        db.prepare('SELECT COUNT(*) as cnt FROM customers').get() as { cnt: number }
+      ).cnt
+      const unpaidSales = (
+        db
+          .prepare(
+            `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+             FROM sales_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
+          )
+          .get() as { total: number }
+      ).total
+      const topUnpaidCustomers = db
+        .prepare(
+          `SELECT c.name, ROUND(SUM(so.total_amount), 0) as unpaid
+           FROM sales_orders so
+           JOIN customers c ON so.customer_id = c.id
+           WHERE so.payment_status = 'unpaid' AND so.status = 'completed'
+           GROUP BY c.id ORDER BY unpaid DESC LIMIT 5`
+        )
+        .all() as { name: string; unpaid: number }[]
+      sections.push(
+        [
+          `【客戶應收帳款】`,
+          `- 客戶數：${customerCount} 位`,
+          `- 應收未付總計：NT$${unpaidSales.toLocaleString()}`,
+          `- 應收未付前 5 名客戶：`,
+          ...(topUnpaidCustomers.length > 0
+            ? topUnpaidCustomers.map((c, i) => `  ${i + 1}. ${c.name}：NT$${c.unpaid.toLocaleString()}`)
+            : ['  （無未付款客戶）'])
+        ].join('\n')
+      )
+    }
+
+    if (topics.suppliers) {
+      const supplierCount = (
+        db.prepare('SELECT COUNT(*) as cnt FROM suppliers').get() as { cnt: number }
+      ).cnt
+      const unpaidPurchases = (
+        db
+          .prepare(
+            `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+             FROM purchase_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
+          )
+          .get() as { total: number }
+      ).total
+      const topUnpaidSuppliers = db
+        .prepare(
+          `SELECT s.name, ROUND(SUM(po.total_amount), 0) as unpaid
+           FROM purchase_orders po
+           JOIN suppliers s ON po.supplier_id = s.id
+           WHERE po.payment_status = 'unpaid' AND po.status = 'completed'
+           GROUP BY s.id ORDER BY unpaid DESC LIMIT 5`
+        )
+        .all() as { name: string; unpaid: number }[]
+      const pendingPurchases = db
+        .prepare(
+          `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+           FROM purchase_orders WHERE status IN ('pending', 'ordered')`
+        )
+        .get() as { cnt: number; total: number }
+      sections.push(
+        [
+          `【供應商應付帳款】`,
+          `- 供應商數：${supplierCount} 家`,
+          `- 待處理採購單：${pendingPurchases.cnt} 筆，金額 NT$${pendingPurchases.total.toLocaleString()}`,
+          `- 應付未付總計：NT$${unpaidPurchases.toLocaleString()}`,
+          `- 應付未付前 5 名供應商：`,
+          ...(topUnpaidSuppliers.length > 0
+            ? topUnpaidSuppliers.map((s, i) => `  ${i + 1}. ${s.name}：NT$${s.unpaid.toLocaleString()}`)
+            : ['  （無未付款供應商）'])
+        ].join('\n')
+      )
+    }
+
+    const context = sections.join('\n\n')
+
+    // ── Step 3: Load history + summarize if too long ──────────────────────
+    const rawHistory: { role: 'user' | 'assistant'; content: string }[] = sessionId
+      ? (db
+          .prepare(`SELECT role, content FROM ai_chat_messages WHERE session_id = ? ORDER BY id ASC`)
+          .all(sessionId) as { role: 'user' | 'assistant'; content: string }[])
+      : []
+
+    const { history: historyMessages, summaryNote } = await buildHistoryWithSummary(client, rawHistory)
+
+    // ── Step 4: Generation — streaming Claude API ──────────────────────────
+    const systemPrompt =
+      '你是 SkillCraft IMS 進銷存系統的 AI 助手。\n' +
+      '請嚴格根據下方【最新業務資料】回答使用者的問題。\n' +
+      '如果資料不足以回答，請說明限制，不要捏造數字。\n' +
+      '回答請使用繁體中文，條列式整理，簡潔有重點。\n' +
+      '在回答最後另起一行，輸出 3 個相關追問（只輸出這一行）：\n' +
+      '[FQ]: 問題1 | 問題2 | 問題3\n\n' +
+      `【最新業務資料】\n${context}${summaryNote}`
+
+    const stream = client.messages.stream({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
-      system:
-        '你是 SkillCraft IMS 進銷存系統的 AI 助手。' +
-        '請嚴格根據【業務資料】回答使用者的問題。' +
-        '如果資料不足以回答，請說明限制，不要捏造數字。' +
-        '回答請使用繁體中文，條列式整理，簡潔有重點。',
-      messages: [
-        {
-          role: 'user',
-          content: `【業務資料】\n${context}\n\n【問題】\n${question}`
-        }
-      ]
+      system: systemPrompt,
+      messages: [...historyMessages, { role: 'user', content: question }]
     })
 
-    const answer = message.content[0].type === 'text' ? message.content[0].text : ''
-    return { answer, context }
+    let fullText = ''
+    stream.on('text', (text) => {
+      fullText += text
+      if (!_e.sender.isDestroyed()) {
+        _e.sender.send('ai:chat:stream', { text })
+      }
+    })
+
+    const finalMsg = await stream.finalMessage()
+    const inputTokens = finalMsg.usage.input_tokens
+    const outputTokens = finalMsg.usage.output_tokens
+
+    // Parse [FQ]: followup line from answer
+    const fqMatch = fullText.match(/\n?\[FQ\]:\s*(.+?)(?:\n|$)/)
+    const followups = fqMatch
+      ? fqMatch[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 3)
+      : []
+    const answer = fullText.replace(/\n?\[FQ\]:[^\n]*/m, '').trimEnd()
+
+    // ── Step 5: RAG Faithfulness Evaluation ───────────────────────────────
+    const faithfulness = await evaluateFaithfulness(client, context, answer)
+
+    // Persist messages and update session
+    if (sessionId) {
+      const isFirstMessage = historyMessages.length === 0
+      db.prepare(`INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, 'user', ?)`)
+        .run(sessionId, question)
+      db.prepare(
+        `INSERT INTO ai_chat_messages (session_id, role, content, context) VALUES (?, 'assistant', ?, ?)`
+      ).run(sessionId, answer, context)
+      if (isFirstMessage) {
+        const title = question.length > 30 ? question.slice(0, 30) + '…' : question
+        db.prepare(`UPDATE ai_chat_sessions SET title = ?, updated_at = datetime('now') WHERE id = ?`)
+          .run(title, sessionId)
+      } else {
+        db.prepare(`UPDATE ai_chat_sessions SET updated_at = datetime('now') WHERE id = ?`)
+          .run(sessionId)
+      }
+    }
+
+    return { answer, context, inputTokens, outputTokens, followups, faithfulness }
   })
 
   ipcMain.handle('ai:previewScope', (_e, params: ForecastParams = {}) => {

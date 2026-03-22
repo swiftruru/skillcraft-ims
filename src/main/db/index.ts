@@ -20,6 +20,8 @@ import creditLimitSql from './migrations/015_credit_limit.sql?raw'
 import salesPartialReturnSql from './migrations/016_sales_partial_return_status.sql?raw'
 import statusHistorySql from './migrations/017_status_history.sql?raw'
 import aiForecastsSql from './migrations/018_ai_forecasts.sql?raw'
+import orderLineDiscountSql from './migrations/019_order_line_discount.sql?raw'
+import aiChatSessionsSql from './migrations/020_ai_chat_sessions.sql?raw'
 
 let db: Database.Database | null = null
 
@@ -101,6 +103,8 @@ async function runMigrations(database: Database.Database): Promise<void> {
     { name: '016_sales_partial_return_status', sql: salesPartialReturnSql },
     { name: '017_status_history', sql: statusHistorySql },
     { name: '018_ai_forecasts', sql: aiForecastsSql },
+    { name: '019_order_line_discount', sql: orderLineDiscountSql },
+    { name: '020_ai_chat_sessions', sql: aiChatSessionsSql },
   ]
 
   for (const migration of migrations) {

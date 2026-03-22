@@ -34,14 +34,14 @@ jobs:
       - name: Generate latest-mac.yml
         run: |
           cd release
-          DMG=$(ls *.dmg | head -1)
-          SIZE=$(stat -f%z "$DMG")
-          SHA512_HEX=$(shasum -a 512 "$DMG" | awk '{print $1}')
+          ZIP=$(ls *.zip | head -1)
+          SIZE=$(stat -f%z "$ZIP")
+          SHA512_HEX=$(shasum -a 512 "$ZIP" | awk '{print $1}')
           SHA512_B64=$(echo "$SHA512_HEX" | xxd -r -p | base64)
           VERSION=$(node -p "require('../package.json').version")
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
           printf "version: %s\nfiles:\n  - url: %s\n    sha512: %s\n    size: %s\npath: %s\nsha512: %s\nreleaseDate: '%s'\n" \
-            "$VERSION" "$DMG" "$SHA512_B64" "$SIZE" "$DMG" "$SHA512_B64" "$DATE" > latest-mac.yml
+            "$VERSION" "$ZIP" "$SHA512_B64" "$SIZE" "$ZIP" "$SHA512_B64" "$DATE" > latest-mac.yml
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -49,6 +49,7 @@ jobs:
           name: macos-dmg
           path: |
             release/*.dmg
+            release/*.zip
             release/latest-mac.yml
 
   build-windows:
