@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.9.12] — 2026-03-22
+
+### 修復
+
+- **修正 Portable 版誤跳 NSIS 安裝精靈**：Portable 版本偵測到 `PORTABLE_EXECUTABLE_DIR` 時跳過 auto-updater，改為提示前往 GitHub Releases 手動下載
+
+---
+
 ## [v0.9.11] — 2026-03-22
 
 ### 改善

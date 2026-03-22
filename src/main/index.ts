@@ -168,6 +168,11 @@ function checkLowStockNotification(): void {
   }
 }
 
+// Portable builds (Windows) set PORTABLE_EXECUTABLE_DIR at runtime.
+// Auto-update via NSIS installer is incompatible with portable mode —
+// redirect to GitHub releases for manual download instead.
+const isPortable = !!process.env['PORTABLE_EXECUTABLE_DIR']
+
 function setupAutoUpdater(win: BrowserWindow): void {
   // Always register IPC handlers so renderer never gets "no handler" error
   ipcMain.handle('updater:checkForUpdates', () => {
@@ -175,13 +180,17 @@ function setupAutoUpdater(win: BrowserWindow): void {
       win.webContents.send('updater:error', '開發模式下無法執行自動更新，請使用正式安裝版 App 測試此功能。')
       return null
     }
+    if (isPortable) {
+      win.webContents.send('updater:error', 'Portable 版本不支援自動更新，請至 GitHub Releases 下載最新版本。')
+      return null
+    }
     autoUpdater.checkForUpdates()
     return null
   })
   ipcMain.handle('updater:install', () => {
     if (is.dev) return
-    // macOS: unsigned builds cannot pass ShipIt validation — open GitHub releases instead
-    if (process.platform === 'darwin') {
+    // Portable & macOS: open GitHub releases for manual download
+    if (isPortable || process.platform === 'darwin') {
       shell.openExternal('https://github.com/swiftruru/skillcraft-ims/releases/latest')
     } else {
       autoUpdater.quitAndInstall(false, true)
@@ -189,6 +198,7 @@ function setupAutoUpdater(win: BrowserWindow): void {
   })
 
   if (is.dev) return // skip autoUpdater events & startup check in dev mode
+  if (isPortable) return // portable builds do not support auto-update
 
   // macOS: skip auto-download since ShipIt cannot install unsigned updates
   autoUpdater.autoDownload = process.platform !== 'darwin'
