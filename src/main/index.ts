@@ -172,7 +172,7 @@ function setupAutoUpdater(win: BrowserWindow): void {
   // Always register IPC handlers so renderer never gets "no handler" error
   ipcMain.handle('updater:checkForUpdates', () => {
     if (is.dev) {
-      win.webContents.send('updater:update-not-available')
+      win.webContents.send('updater:error', '開發模式下無法執行自動更新，請使用正式安裝版 App 測試此功能。')
       return null
     }
     autoUpdater.checkForUpdates()
