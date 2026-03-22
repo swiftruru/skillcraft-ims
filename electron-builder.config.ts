@@ -11,6 +11,7 @@ const config: Configuration = {
   files: ['out/**/*', 'package.json'],
   extraResources: [],
   mac: {
+    artifactName: 'SkillCraft-IMS-${version}-${arch}-mac.${ext}',
     target: [
       { target: 'dmg' },
       { target: 'zip' }

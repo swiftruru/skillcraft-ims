@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.9.4] — 2026-03-22
+
+### 修復
+
+- **自動更新 404 修正**：macOS 打包檔名含空格導致 GitHub 下載 URL 不符，現透過 `artifactName` 明確使用 dash 分隔，修復 electron-updater 404 錯誤
+
+---
+
 ## [v0.9.3] — 2026-03-22
 
 ### 新功能
