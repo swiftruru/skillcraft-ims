@@ -21,8 +21,7 @@ import {
   ChevronRight,
   Shuffle,
   Plus,
-  Trash2,
-  Clock
+  Trash2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -66,6 +65,7 @@ type ChatMessage = {
   outputTokens?: number
   followups?: string[]
   faithfulness?: { score: number; note: string }
+  modelUsed?: string
 }
 
 type ConfidenceFilter = 'all' | 'high' | 'low'
@@ -305,11 +305,11 @@ export default function AiInsight(): React.JSX.Element {
     })
 
     try {
-      const { answer, context, inputTokens, outputTokens, followups, faithfulness } =
+      const { answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed } =
         await window.electronAPI.ai.chat(q, sid)
       setChatMessages((prev) => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: answer, context, inputTokens, outputTokens, followups, faithfulness }
+        { role: 'assistant', content: answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed }
       ])
       queryClient.invalidateQueries({ queryKey: ['ai', 'sessions'] })
     } catch (err: unknown) {
@@ -971,6 +971,16 @@ export default function AiInsight(): React.JSX.Element {
                         {(msg.inputTokens || msg.outputTokens) && (
                           <span className="text-[10px] text-muted-foreground/50">
                             {msg.inputTokens} in · {msg.outputTokens} out tokens
+                          </span>
+                        )}
+                        {msg.modelUsed && (
+                          <span className={cn(
+                            'text-[10px] px-1.5 py-0.5 rounded font-mono',
+                            msg.modelUsed.includes('sonnet')
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                          )}>
+                            {msg.modelUsed.includes('sonnet') ? 'Sonnet' : 'Haiku'}
                           </span>
                         )}
                       </div>

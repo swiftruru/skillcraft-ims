@@ -2,6 +2,9 @@ import { ipcMain } from 'electron'
 import Anthropic from '@anthropic-ai/sdk'
 import { getDb } from '../db'
 
+const MODEL_HAIKU = 'claude-haiku-4-5-20251001'
+const MODEL_SONNET = 'claude-sonnet-4-6'
+
 type ForecastScope = 'smart' | 'low_stock' | 'top_sales' | 'custom'
 
 interface ForecastParams {
@@ -18,6 +21,63 @@ function classifyTopics(question: string): {
   const sup = /供應商|採購|進貨|應付|採購單/.test(question)
   const none = !inv && !sal && !cus && !sup
   return { inventory: inv || none, sales: sal || none, customers: cus || none, suppliers: sup || none }
+}
+
+// ── Model complexity routing (regex, no API call) ───────────────────────────
+function classifyComplexity(question: string): 'haiku' | 'sonnet' {
+  const complexPatterns = [
+    /分析|趨勢|比較|預測|建議|原因|為什麼|影響/,
+    /如果|假設|當.{1,10}時/,
+    /怎麼做|如何改善|策略|優化|最佳/
+  ]
+  if (complexPatterns.some((p) => p.test(question))) return 'sonnet'
+  const topics = classifyTopics(question)
+  const hitCount = Object.values(topics).filter(Boolean).length
+  if (hitCount >= 3) return 'sonnet'
+  return 'haiku'
+}
+
+// ── Entity Extraction (regex stopword removal + SQLite LIKE, no API call) ───
+function extractEntityCandidates(question: string): string[] {
+  const stopwords =
+    /庫存|銷售|採購|業績|供應商|客戶|商品|產品|訂單|帳款|應收|應付|補貨|低庫存|待處理|未付款|付款|有哪些|哪個|哪些|目前|本月|上月|今年|去年|近期|最近|最多|最少|多少|幾個|幾筆|所有|全部|分析|趨勢|比較|預測|建議|原因|為什麼|影響|怎麼做|如何|策略|優化|最佳|情況|狀況|狀態|資料|資訊|統計|報告/g
+  const cleaned = question
+    .replace(stopwords, ' ')
+    .replace(/[？?。，,！!、\s]+/g, ' ')
+    .trim()
+  return cleaned.split(' ').filter((t) => t.length >= 2)
+}
+
+interface ResolvedEntities {
+  products: { id: number; name: string }[]
+  customers: { id: number; name: string }[]
+  suppliers: { id: number; name: string }[]
+}
+
+function resolveEntities(
+  db: ReturnType<typeof getDb>,
+  candidates: string[]
+): ResolvedEntities {
+  if (candidates.length === 0) return { products: [], customers: [], suppliers: [] }
+  const products: { id: number; name: string }[] = []
+  const customers: { id: number; name: string }[] = []
+  const suppliers: { id: number; name: string }[] = []
+  for (const token of candidates) {
+    const like = `%${token}%`
+    const ps = db
+      .prepare('SELECT id, name FROM products WHERE name LIKE ? LIMIT 3')
+      .all(like) as { id: number; name: string }[]
+    const cs = db
+      .prepare('SELECT id, name FROM customers WHERE name LIKE ? LIMIT 3')
+      .all(like) as { id: number; name: string }[]
+    const ss = db
+      .prepare('SELECT id, name FROM suppliers WHERE name LIKE ? LIMIT 3')
+      .all(like) as { id: number; name: string }[]
+    ps.forEach((r) => { if (!products.find((x) => x.id === r.id)) products.push(r) })
+    cs.forEach((r) => { if (!customers.find((x) => x.id === r.id)) customers.push(r) })
+    ss.forEach((r) => { if (!suppliers.find((x) => x.id === r.id)) suppliers.push(r) })
+  }
+  return { products, customers, suppliers }
 }
 
 // ── Pre-Retrieval: time range detection (regex, no API call) ────────────────
@@ -367,8 +427,9 @@ ${salesData
       }
     }
 
-    // ── Step 2: Classify topics (Adaptive Retrieval) ──────────────────────
+    // ── Step 2: Classify topics (Adaptive Retrieval) + Model routing ─────
     const topics = classifyTopics(rewrittenQ)
+    const selectedModel = classifyComplexity(rewrittenQ) === 'sonnet' ? MODEL_SONNET : MODEL_HAIKU
     const topicNames = [
       topics.inventory && '庫存',
       topics.sales && '銷售',
@@ -376,14 +437,30 @@ ${salesData
       topics.suppliers && '供應商應付'
     ].filter(Boolean).join('、')
 
-    const metaSection = [
+    // ── Entity Extraction ─────────────────────────────────────────────────
+    const candidates = extractEntityCandidates(rewrittenQ)
+    const entities = resolveEntities(db, candidates)
+    const hasProducts = entities.products.length > 0
+    const hasCustomers = entities.customers.length > 0
+    const hasSuppliers = entities.suppliers.length > 0
+
+    const metaLines: string[] = [
       `【查詢處理】`,
       rewrittenQ !== question
         ? `- 問題改寫：「${question}」→「${rewrittenQ}」`
         : `- 原始問題：「${question}」`,
       `- 時間範圍：${timeRange.label}`,
       `- 擷取資料：${topicNames}`
-    ].join('\n')
+    ]
+    if (hasProducts || hasCustomers || hasSuppliers) {
+      const entityParts = [
+        hasProducts && `商品「${entities.products.map((e) => e.name).join('」「')}」`,
+        hasCustomers && `客戶「${entities.customers.map((e) => e.name).join('」「')}」`,
+        hasSuppliers && `供應商「${entities.suppliers.map((e) => e.name).join('」「')}」`
+      ].filter(Boolean).join('、')
+      metaLines.push(`- 識別實體：${entityParts}`)
+    }
+    const metaSection = metaLines.join('\n')
 
     const sections: string[] = [metaSection]
 
@@ -392,25 +469,41 @@ ${salesData
       const totalProducts = (
         db.prepare('SELECT COUNT(*) as cnt FROM products').get() as { cnt: number }
       ).cnt
-      const lowStockItems = db
-        .prepare(
-          `SELECT name, stock_qty, reorder_pt FROM products
-           WHERE stock_qty <= reorder_pt ORDER BY stock_qty ASC LIMIT 10`
-        )
-        .all() as { name: string; stock_qty: number; reorder_pt: number }[]
-      sections.push(
-        [
-          `【庫存概況】`,
-          `- 總商品數：${totalProducts} 項`,
-          `- 低庫存商品（庫存 ≤ 補貨點）：${lowStockItems.length} 項`,
-          ...lowStockItems.map(
-            (p) => `  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}`
+      const inventoryLines: string[] = [`【庫存概況】`, `- 總商品數：${totalProducts} 項`]
+      if (hasProducts) {
+        const ids = entities.products.map((e) => e.id).join(',')
+        const entityProducts = db
+          .prepare(
+            `SELECT name, stock_qty, reorder_pt, sell_price, buy_price
+             FROM products WHERE id IN (${ids})`
           )
-        ].join('\n')
-      )
+          .all() as { name: string; stock_qty: number; reorder_pt: number; sell_price: number; buy_price: number }[]
+        inventoryLines.push(`- 指定商品庫存詳情：`)
+        entityProducts.forEach((p) => {
+          const status = p.stock_qty <= p.reorder_pt ? '⚠️ 低庫存' : '正常'
+          inventoryLines.push(
+            `  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}，售價 NT$${p.sell_price}，進價 NT$${p.buy_price}（${status}）`
+          )
+        })
+      } else {
+        const lowStockItems = db
+          .prepare(
+            `SELECT name, stock_qty, reorder_pt FROM products
+             WHERE stock_qty <= reorder_pt ORDER BY stock_qty ASC LIMIT 10`
+          )
+          .all() as { name: string; stock_qty: number; reorder_pt: number }[]
+        inventoryLines.push(`- 低庫存商品（庫存 ≤ 補貨點）：${lowStockItems.length} 項`)
+        lowStockItems.forEach((p) =>
+          inventoryLines.push(`  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}`)
+        )
+      }
+      sections.push(inventoryLines.join('\n'))
     }
 
     if (topics.sales) {
+      const productFilter = hasProducts
+        ? `AND p.id IN (${entities.products.map((e) => e.id).join(',')})`
+        : ''
       const salesStats = db
         .prepare(
           `SELECT COUNT(*) as order_count,
@@ -426,8 +519,8 @@ ${salesData
            FROM sale_items si
            JOIN products p ON si.product_id = p.id
            JOIN sales_orders so ON si.sales_order_id = so.id
-           WHERE so.status = 'completed' ${dateCondition}
-           GROUP BY p.id ORDER BY qty DESC LIMIT 5`
+           WHERE so.status = 'completed' ${dateCondition} ${productFilter}
+           GROUP BY p.id ORDER BY qty DESC LIMIT ${hasProducts ? 20 : 5}`
         )
         .all() as { name: string; qty: number; amount: number }[]
       const salesByCategory = db
@@ -468,6 +561,9 @@ ${salesData
     }
 
     if (topics.customers) {
+      const customerFilter = hasCustomers
+        ? `AND c.id IN (${entities.customers.map((e) => e.id).join(',')})`
+        : ''
       const customerCount = (
         db.prepare('SELECT COUNT(*) as cnt FROM customers').get() as { cnt: number }
       ).cnt
@@ -484,8 +580,8 @@ ${salesData
           `SELECT c.name, ROUND(SUM(so.total_amount), 0) as unpaid
            FROM sales_orders so
            JOIN customers c ON so.customer_id = c.id
-           WHERE so.payment_status = 'unpaid' AND so.status = 'completed'
-           GROUP BY c.id ORDER BY unpaid DESC LIMIT 5`
+           WHERE so.payment_status = 'unpaid' AND so.status = 'completed' ${customerFilter}
+           GROUP BY c.id ORDER BY unpaid DESC LIMIT ${hasCustomers ? 20 : 5}`
         )
         .all() as { name: string; unpaid: number }[]
       sections.push(
@@ -502,6 +598,9 @@ ${salesData
     }
 
     if (topics.suppliers) {
+      const supplierFilter = hasSuppliers
+        ? `AND s.id IN (${entities.suppliers.map((e) => e.id).join(',')})`
+        : ''
       const supplierCount = (
         db.prepare('SELECT COUNT(*) as cnt FROM suppliers').get() as { cnt: number }
       ).cnt
@@ -518,8 +617,8 @@ ${salesData
           `SELECT s.name, ROUND(SUM(po.total_amount), 0) as unpaid
            FROM purchase_orders po
            JOIN suppliers s ON po.supplier_id = s.id
-           WHERE po.payment_status = 'unpaid' AND po.status = 'completed'
-           GROUP BY s.id ORDER BY unpaid DESC LIMIT 5`
+           WHERE po.payment_status = 'unpaid' AND po.status = 'completed' ${supplierFilter}
+           GROUP BY s.id ORDER BY unpaid DESC LIMIT ${hasSuppliers ? 20 : 5}`
         )
         .all() as { name: string; unpaid: number }[]
       const pendingPurchases = db
@@ -564,7 +663,7 @@ ${salesData
       `【最新業務資料】\n${context}${summaryNote}`
 
     const stream = client.messages.stream({
-      model: 'claude-haiku-4-5-20251001',
+      model: selectedModel,
       max_tokens: 1024,
       system: systemPrompt,
       messages: [...historyMessages, { role: 'user', content: question }]
@@ -610,7 +709,7 @@ ${salesData
       }
     }
 
-    return { answer, context, inputTokens, outputTokens, followups, faithfulness }
+    return { answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed: selectedModel }
   })
 
   ipcMain.handle('ai:previewScope', (_e, params: ForecastParams = {}) => {
