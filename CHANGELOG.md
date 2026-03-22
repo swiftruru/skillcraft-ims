@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.9.3] — 2026-03-22
+
+### 新功能
+
+- **查詢展開（Query Expansion）**：Guard 通過後立即以 Haiku 並行展開問題詞彙（同義詞、縮寫、別名），與 Entity Extraction 合併後送 SQLite LIKE 查詢，提升召回率
+- **RAG 品質儀表板**：AI 頁面新增「品質分析」Tab——忠實度分佈、Haiku/Sonnet 比例、Guard 攔截率、引用來源分佈、近 7 天問答趨勢
+
+### 改善
+
+- **統計欄位持久化**：`ai_chat_messages` 新增 5 個欄位，記錄每次對話的忠實度、模型、Token、來源，為品質儀表板提供資料
+
+---
+
 ## [v0.9.2] — 2026-03-22
 
 ### 修復

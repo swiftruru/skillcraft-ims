@@ -19,12 +19,13 @@
 >
 > | 步驟 | 說明 | 對應實作 |
 > | --- | --- | --- |
-> | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | Guard → Query Rewriting → Time Range Detection → Entity Extraction → Adaptive SQLite 查詢 |
-> | **Step 2 Augmented** | 將擷取的資料「增強」為 LLM 上下文 | Multi-model Routing + 格式化 context 注入 system prompt |
-> | **Step 3 Generation** | 呼叫 LLM「生成」自然語言回答 | Claude Haiku / Sonnet 串流輸出 + Faithfulness Scoring + Citation Attribution |
+> | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | Guard → Query Rewriting → Time Range Detection → **Query Expansion** → Entity Extraction → Adaptive SQLite 查詢 |
+> | **Step 2 Augmented** | 將擷取的資料「增強」為 LLM 上下文 | Multi-model Routing（Haiku / Sonnet）+ 格式化 context 注入 system prompt |
+> | **Step 3 Generation** | 呼叫 LLM「生成」自然語言回答 | Claude 串流輸出 + Faithfulness Scoring + Citation Attribution + Followup 建議持久化 |
 >
 > 開啟 AI 頁面 → **AI 問答** Tab，即可用中文自由提問你的進銷存資料。
 > 每則回答均可展開「查看本次使用的業務資料」，觀察完整 Retrieval Context；引用來源以彩色徽章標注，多欄資料自動渲染為可排序表格。
+> **品質分析** Tab 提供歷史忠實度分佈、模型使用比例、Guard 攔截率、近 7 天問答趨勢等 KPI 儀表板。
 
 ## 截圖
 
