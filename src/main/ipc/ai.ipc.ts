@@ -80,6 +80,30 @@ function resolveEntities(
   return { products, customers, suppliers }
 }
 
+// ── Query Expansion: synonym/alias discovery (one fast Haiku call) ──────────
+async function expandQueryVocabulary(
+  client: Anthropic,
+  question: string
+): Promise<string[]> {
+  try {
+    const res = await client.messages.create({
+      model: MODEL_HAIKU,
+      max_tokens: 80,
+      system:
+        '你是進銷存系統的查詢助手。從問題中提取可能是商品名稱、客戶名稱、供應商名稱或商品分類的詞彙，包含同義詞、縮寫、別名。\n' +
+        '只輸出 JSON 陣列，最多 5 個詞（2字以上），例如：["LCD螢幕","顯示器","液晶"]。\n' +
+        '若問題只含通用概念（如「庫存」「銷售」「訂單」），回傳 []。',
+      messages: [{ role: 'user', content: question }]
+    })
+    const text = res.content[0].type === 'text' ? res.content[0].text : '[]'
+    const match = text.match(/\[[\s\S]*?\]/)
+    const parsed = match ? JSON.parse(match[0]) : []
+    return Array.isArray(parsed)
+      ? parsed.filter((s: unknown) => typeof s === 'string' && (s as string).length >= 2)
+      : []
+  } catch { return [] }
+}
+
 // ── Pre-Retrieval: time range detection (regex, no API call) ────────────────
 interface TimeRange { label: string; sqlFrom: string; sqlTo?: string }
 
@@ -459,9 +483,13 @@ ${salesData
       topics.suppliers && '供應商應付'
     ].filter(Boolean).join('、')
 
-    // ── Entity Extraction ─────────────────────────────────────────────────
+    // ── Entity Extraction + Query Expansion (parallel) ────────────────────
+    // Start expansion LLM call immediately; run sync steps concurrently
+    const expansionPromise = expandQueryVocabulary(client, rewrittenQ)
     const candidates = extractEntityCandidates(rewrittenQ)
-    const entities = resolveEntities(db, candidates)
+    const expandedTerms = await expansionPromise
+    const allCandidates = [...new Set([...candidates, ...expandedTerms])]
+    const entities = resolveEntities(db, allCandidates)
     const hasProducts = entities.products.length > 0
     const hasCustomers = entities.customers.length > 0
     const hasSuppliers = entities.suppliers.length > 0
@@ -474,6 +502,9 @@ ${salesData
       `- 時間範圍：${timeRange.label}`,
       `- 擷取資料：${topicNames}`
     ]
+    if (expandedTerms.length > 0) {
+      metaLines.push(`- 查詢展開：${expandedTerms.join('、')}`)
+    }
     if (hasProducts || hasCustomers || hasSuppliers) {
       const entityParts = [
         hasProducts && `商品「${entities.products.map((e) => e.name).join('」「')}」`,
