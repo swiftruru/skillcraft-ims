@@ -21,8 +21,18 @@ import {
   ChevronRight,
   Shuffle,
   Plus,
-  Trash2
+  Trash2,
+  BarChart2
 } from 'lucide-react'
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip
+} from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -152,7 +162,7 @@ export default function AiInsight(): React.JSX.Element {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const [activeTab, setActiveTab] = useState<'forecast' | 'chat'>('forecast')
+  const [activeTab, setActiveTab] = useState<'forecast' | 'chat' | 'quality'>('forecast')
   const [scope, setScope] = useState<AiForecastScope>('smart')
   const [customIds, setCustomIds] = useState<number[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -190,6 +200,14 @@ export default function AiInsight(): React.JSX.Element {
     queryFn: () => window.electronAPI.ai.checkFreshness(),
     staleTime: 0,
     enabled: !isLoadingLatest
+  })
+
+  // RAG quality stats
+  const { data: qualityStats } = useQuery({
+    queryKey: ['ai', 'qualityStats'],
+    queryFn: () => window.electronAPI.ai.getQualityStats(),
+    enabled: activeTab === 'quality',
+    staleTime: 0
   })
 
   // Scope preview count
@@ -553,6 +571,18 @@ export default function AiInsight(): React.JSX.Element {
         >
           <MessageSquare className="w-3.5 h-3.5" />
           AI 問答
+        </button>
+        <button
+          onClick={() => setActiveTab('quality')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            activeTab === 'quality'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <BarChart2 className="w-3.5 h-3.5" />
+          品質分析
         </button>
       </div>
 
@@ -1150,6 +1180,125 @@ export default function AiInsight(): React.JSX.Element {
             </div>
 
           </div>{/* end chat area */}
+        </div>
+      )}
+
+      {/* ── Quality Dashboard Tab ─────────────────────────────────────────── */}
+      {activeTab === 'quality' && (
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          {!qualityStats ? (
+            <div className="flex justify-center py-16"><LoadingSpinner /></div>
+          ) : (() => {
+            const qs = qualityStats
+            const totalAnswered = qs.haikuCount + qs.sonnetCount
+            const guardRate = qs.totalQuestions > 0 ? Math.round((qs.guardBlocked / qs.totalQuestions) * 100) : 0
+            const faithTotal = qs.faithHigh + qs.faithMid + qs.faithLow
+            const pct = (n: number) => faithTotal > 0 ? Math.round((n / faithTotal) * 100) : 0
+            const haikuPct = totalAnswered > 0 ? Math.round((qs.haikuCount / totalAnswered) * 100) : 0
+            const sourceMax = Math.max(...Object.values(qs.sourceCounts), 1)
+
+            return (
+              <>
+                {/* KPI Cards */}
+                <div className="grid grid-cols-4 gap-3">
+                  {[
+                    { label: '總問答數', value: qs.totalQuestions, sub: `含 ${qs.guardBlocked} 次攔截` },
+                    { label: '平均忠實度', value: qs.avgFaithfulness != null ? `${qs.avgFaithfulness} / 100` : '—', sub: faithTotal > 0 ? `共 ${faithTotal} 則回答` : '尚無資料' },
+                    { label: 'Guard 攔截率', value: `${guardRate}%`, sub: `${qs.guardBlocked} / ${qs.totalQuestions} 次` },
+                    { label: '平均 Token / 回答', value: qs.avgInputTokens != null ? `${Math.round(Number(qs.avgInputTokens)).toLocaleString()}` : '—', sub: qs.avgOutputTokens != null ? `輸出 ${Math.round(Number(qs.avgOutputTokens))} tokens` : '' }
+                  ].map(({ label, value, sub }) => (
+                    <Card key={label} className="p-4">
+                      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                      <p className="text-2xl font-bold tabular-nums">{value}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+                    </Card>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Left column: bar stats */}
+                  <div className="space-y-4">
+                    {/* Faithfulness distribution */}
+                    <Card className="p-4">
+                      <p className="text-sm font-medium mb-3">忠實度分佈</p>
+                      <div className="space-y-2">
+                        {[
+                          { label: '高（≥ 90）', count: qs.faithHigh, color: 'bg-green-500' },
+                          { label: '中（70–89）', count: qs.faithMid, color: 'bg-yellow-400' },
+                          { label: '低（< 70）', count: qs.faithLow, color: 'bg-red-400' }
+                        ].map(({ label, count, color }) => (
+                          <div key={label} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-20 shrink-0">{label}</span>
+                            <div className="flex-1 bg-muted rounded-full h-2">
+                              <div className={`${color} h-2 rounded-full transition-all`} style={{ width: `${pct(count)}%` }} />
+                            </div>
+                            <span className="text-xs tabular-nums w-8 text-right">{pct(count)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    {/* Model distribution */}
+                    <Card className="p-4">
+                      <p className="text-sm font-medium mb-3">模型使用比例</p>
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Haiku', count: qs.haikuCount, pct: haikuPct, color: 'bg-blue-400' },
+                          { label: 'Sonnet', count: qs.sonnetCount, pct: 100 - haikuPct, color: 'bg-violet-500' }
+                        ].map(({ label, count, pct: p, color }) => (
+                          <div key={label} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-14 shrink-0">{label}</span>
+                            <div className="flex-1 bg-muted rounded-full h-2">
+                              <div className={`${color} h-2 rounded-full transition-all`} style={{ width: `${p}%` }} />
+                            </div>
+                            <span className="text-xs tabular-nums w-14 text-right">{count} 次 ({p}%)</span>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    {/* Source citation distribution */}
+                    <Card className="p-4">
+                      <p className="text-sm font-medium mb-3">引用來源分佈</p>
+                      <div className="space-y-2">
+                        {Object.entries(qs.sourceCounts).map(([src, count]) => (
+                          <div key={src} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-12 shrink-0">{src}</span>
+                            <div className="flex-1 bg-muted rounded-full h-2">
+                              <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${Math.round((count / sourceMax) * 100)}%` }} />
+                            </div>
+                            <span className="text-xs tabular-nums w-8 text-right">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Right column: 7-day trend */}
+                  <Card className="p-4">
+                    <p className="text-sm font-medium mb-3">近 7 天問答趨勢</p>
+                    {qs.daily.length === 0 ? (
+                      <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">尚無資料</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={240}>
+                        <BarChart data={qs.daily} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <Tooltip
+                            contentStyle={{ fontSize: 12 }}
+                            formatter={(v: number) => [`${v} 次`, '問答數']}
+                            labelFormatter={(l) => `日期：${l}`}
+                          />
+                          <Bar dataKey="count" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </Card>
+                </div>
+              </>
+            )
+          })()}
         </div>
       )}
 

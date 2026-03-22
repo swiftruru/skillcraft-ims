@@ -168,6 +168,20 @@ declare global {
         getSessionMessages(sessionId: number): Promise<{ id: number; role: 'user' | 'assistant'; content: string; context: string | null; followups: string[] | null; created_at: string }[]>
         createSession(): Promise<{ id: number }>
         deleteSession(sessionId: number): Promise<{ success: boolean }>
+        getQualityStats(): Promise<{
+          totalQuestions: number
+          guardBlocked: number
+          avgFaithfulness: number | null
+          avgInputTokens: number | null
+          avgOutputTokens: number | null
+          haikuCount: number
+          sonnetCount: number
+          faithHigh: number
+          faithMid: number
+          faithLow: number
+          sourceCounts: Record<string, number>
+          daily: { date: string; count: number }[]
+        }>
       }
       notifications: {
         getAll(): Promise<import('./schema').AppNotification[]>

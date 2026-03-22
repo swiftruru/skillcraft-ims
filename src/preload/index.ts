@@ -223,7 +223,8 @@ const electronAPI = {
     getSessions: () => ipcRenderer.invoke('ai:getSessions'),
     getSessionMessages: (sessionId: number) => ipcRenderer.invoke('ai:getSessionMessages', sessionId),
     createSession: () => ipcRenderer.invoke('ai:createSession'),
-    deleteSession: (sessionId: number) => ipcRenderer.invoke('ai:deleteSession', sessionId)
+    deleteSession: (sessionId: number) => ipcRenderer.invoke('ai:deleteSession', sessionId),
+    getQualityStats: () => ipcRenderer.invoke('ai:getQualityStats')
   },
 
   // Notifications

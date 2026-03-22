@@ -453,7 +453,7 @@ ${salesData
       if (sessionId) {
         const isFirst = (db.prepare(`SELECT COUNT(*) as n FROM ai_chat_messages WHERE session_id = ?`).get(sessionId) as { n: number }).n === 0
         db.prepare(`INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, 'user', ?)`).run(sessionId, question)
-        db.prepare(`INSERT INTO ai_chat_messages (session_id, role, content, context, followups) VALUES (?, 'assistant', ?, ?, ?)`).run(sessionId, guardAnswer, guardContext, JSON.stringify(guardFollowups))
+        db.prepare(`INSERT INTO ai_chat_messages (session_id, role, content, context, followups, faithfulness_score, model_used, input_tokens, output_tokens, sources) VALUES (?, 'assistant', ?, ?, ?, 100, ?, 0, 0, '[]')`).run(sessionId, guardAnswer, guardContext, JSON.stringify(guardFollowups), MODEL_HAIKU)
         if (isFirst) {
           const title = question.length > 30 ? question.slice(0, 30) + '…' : question
           db.prepare(`UPDATE ai_chat_sessions SET title = ?, updated_at = datetime('now') WHERE id = ?`).run(title, sessionId)
@@ -760,8 +760,8 @@ ${salesData
       db.prepare(`INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, 'user', ?)`)
         .run(sessionId, question)
       db.prepare(
-        `INSERT INTO ai_chat_messages (session_id, role, content, context, followups) VALUES (?, 'assistant', ?, ?, ?)`
-      ).run(sessionId, answer, context, JSON.stringify(followups))
+        `INSERT INTO ai_chat_messages (session_id, role, content, context, followups, faithfulness_score, model_used, input_tokens, output_tokens, sources) VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(sessionId, answer, context, JSON.stringify(followups), faithfulness.score, selectedModel, inputTokens, outputTokens, JSON.stringify(sources))
       if (isFirstMessage) {
         const title = question.length > 30 ? question.slice(0, 30) + '…' : question
         db.prepare(`UPDATE ai_chat_sessions SET title = ?, updated_at = datetime('now') WHERE id = ?`)
@@ -773,6 +773,44 @@ ${salesData
     }
 
     return { answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed: selectedModel, sources }
+  })
+
+  // ── RAG Quality Stats ───────────────────────────────────────────────────
+  ipcMain.handle('ai:getQualityStats', () => {
+    const db = getDb()
+    const totals = db.prepare(`
+      SELECT
+        COUNT(*) FILTER (WHERE role='user') AS totalQuestions,
+        COUNT(*) FILTER (WHERE role='assistant' AND input_tokens = 0) AS guardBlocked,
+        ROUND(AVG(faithfulness_score) FILTER (WHERE role='assistant' AND input_tokens > 0), 1) AS avgFaithfulness,
+        ROUND(AVG(input_tokens) FILTER (WHERE role='assistant' AND input_tokens > 0), 0) AS avgInputTokens,
+        ROUND(AVG(output_tokens) FILTER (WHERE role='assistant' AND input_tokens > 0), 0) AS avgOutputTokens,
+        COUNT(*) FILTER (WHERE role='assistant' AND model_used LIKE '%haiku%' AND input_tokens > 0) AS haikuCount,
+        COUNT(*) FILTER (WHERE role='assistant' AND model_used LIKE '%sonnet%' AND input_tokens > 0) AS sonnetCount,
+        COUNT(*) FILTER (WHERE role='assistant' AND faithfulness_score >= 90 AND input_tokens > 0) AS faithHigh,
+        COUNT(*) FILTER (WHERE role='assistant' AND faithfulness_score >= 70 AND faithfulness_score < 90 AND input_tokens > 0) AS faithMid,
+        COUNT(*) FILTER (WHERE role='assistant' AND faithfulness_score < 70 AND input_tokens > 0) AS faithLow
+      FROM ai_chat_messages
+    `).get() as Record<string, number>
+
+    const allSourceRows = db.prepare(
+      `SELECT sources FROM ai_chat_messages WHERE role='assistant' AND sources IS NOT NULL AND sources != '[]'`
+    ).all() as { sources: string }[]
+    const sourceCounts: Record<string, number> = { 庫存: 0, 銷售: 0, 客戶: 0, 供應商: 0 }
+    for (const { sources } of allSourceRows) {
+      try {
+        const arr: string[] = JSON.parse(sources)
+        for (const s of arr) if (s in sourceCounts) sourceCounts[s]++
+      } catch { /* skip */ }
+    }
+
+    const daily = db.prepare(`
+      SELECT DATE(created_at) as date, COUNT(*) as count
+      FROM ai_chat_messages WHERE role='user' AND created_at >= DATE('now', '-6 days')
+      GROUP BY DATE(created_at) ORDER BY date ASC
+    `).all() as { date: string; count: number }[]
+
+    return { ...totals, sourceCounts, daily }
   })
 
   ipcMain.handle('ai:previewScope', (_e, params: ForecastParams = {}) => {
