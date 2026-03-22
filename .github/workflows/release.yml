@@ -30,6 +30,8 @@ jobs:
 
       - name: Build & Package
         run: npm run build && npx electron-builder --mac --arm64 --publish never --config electron-builder.config.ts
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Generate latest-mac.yml
         run: |

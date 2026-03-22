@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.9.6] — 2026-03-22
+
+### 修復
+
+- **macOS 更新安裝失敗**：下載完成後 ShipIt 驗證簽名失敗（ad-hoc 簽名不完整），透過 `identity: null` 與 `CSC_IDENTITY_AUTO_DISCOVERY=false` 完全略過代碼簽名，修復更新安裝流程
+
+---
+
 ## [v0.9.5] — 2026-03-22
 
 ### 改善

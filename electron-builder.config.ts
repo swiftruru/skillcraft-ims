@@ -18,7 +18,8 @@ const config: Configuration = {
     ],
     icon: 'resources/icon.icns',
     category: 'public.app-category.business',
-    darkModeSupport: true
+    darkModeSupport: true,
+    identity: null
   },
   win: {
     target: [
