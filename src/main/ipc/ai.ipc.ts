@@ -244,6 +244,349 @@ function updateEntityStats(
   for (const e of entities.suppliers) upsert.run('supplier', e.id, faithfulnessScore)
 }
 
+// ── Query Decomposition: detect and split compound questions ─────────────────
+type DecomposeResult = { isCompound: boolean; subQuestions: string[] }
+
+async function decomposeQuery(
+  client: Anthropic,
+  question: string
+): Promise<DecomposeResult> {
+  const COMPOUND_RE = /和|以及|各|分別|還有|另外|同時/
+  if (question.length < 20 || !COMPOUND_RE.test(question)) {
+    return { isCompound: false, subQuestions: [question] }
+  }
+  try {
+    const res = await client.messages.create({
+      model: MODEL_HAIKU,
+      max_tokens: 200,
+      system:
+        '判斷問題是否包含多個獨立的業務子問題。若是，將其拆解為獨立子問題清單（最多 4 個）。\n' +
+        '只輸出 JSON：{"isCompound": true/false, "subQuestions": ["子問題1", "子問題2"]}\n' +
+        '若問題是單一問題（即使包含"和"），isCompound 為 false，subQuestions 只含原問題。',
+      messages: [{ role: 'user', content: question }]
+    })
+    const text = res.content[0].type === 'text' ? res.content[0].text : ''
+    const match = text.match(/\{[\s\S]*?\}/)
+    const parsed = match ? JSON.parse(match[0]) : {}
+    if (parsed.isCompound && Array.isArray(parsed.subQuestions) && parsed.subQuestions.length >= 2) {
+      return { isCompound: true, subQuestions: parsed.subQuestions.slice(0, 4) }
+    }
+    return { isCompound: false, subQuestions: [question] }
+  } catch { return { isCompound: false, subQuestions: [question] } }
+}
+
+// ── Per-query Retrieval (entity extraction + SQL context building) ────────────
+type RetrievalResult = {
+  retrievalContext: string
+  entities: ResolvedEntities
+  topics: ReturnType<typeof classifyTopics>
+  hasProducts: boolean
+  hasCustomers: boolean
+  hasSuppliers: boolean
+  expandedMode: boolean
+  expandedTerms: string[]
+  metaLine: string
+}
+
+async function retrieveContextForQuery(
+  db: ReturnType<typeof getDb>,
+  client: Anthropic,
+  question: string,
+  dateCondition: string,
+  sessionId?: number
+): Promise<RetrievalResult> {
+  const topics = classifyTopics(question)
+
+  // Entity Extraction + Query Expansion (parallel)
+  const expansionPromise = expandQueryVocabulary(client, question)
+  const candidates = extractEntityCandidates(question)
+  const expandedTerms = await expansionPromise
+  const allCandidates = [...new Set([...candidates, ...expandedTerms])]
+  const entities = resolveEntities(db, allCandidates)
+
+  // Semantic fallback: if candidates exist but LIKE matched nothing
+  if (candidates.length > 0 && !entities.products.length && !entities.customers.length && !entities.suppliers.length) {
+    const semantic = await semanticEntityFallback(client, db, candidates)
+    entities.products.push(...semantic.products)
+    entities.customers.push(...semantic.customers)
+    entities.suppliers.push(...semantic.suppliers)
+  }
+
+  // Cross-turn entity memory: pronoun detected + all entity resolution failed
+  if (
+    !entities.products.length && !entities.customers.length && !entities.suppliers.length &&
+    sessionId != null &&
+    /他|她|它|那個|此|同樣|這個|一樣|這間|那間|該/.test(question)
+  ) {
+    const sessionNames = getSessionEntityNames(db, sessionId)
+    if (sessionNames.length > 0) {
+      const resolved = resolveEntities(db, sessionNames)
+      entities.products.push(...resolved.products)
+      entities.customers.push(...resolved.customers)
+      entities.suppliers.push(...resolved.suppliers)
+    }
+  }
+
+  const hasProducts = entities.products.length > 0
+  const hasCustomers = entities.customers.length > 0
+  const hasSuppliers = entities.suppliers.length > 0
+  const expandedMode = (hasProducts || hasCustomers || hasSuppliers)
+    ? checkExpandedMode(db, entities)
+    : false
+
+  // Build entity identification line for metaSection
+  let metaLine = ''
+  if (hasProducts || hasCustomers || hasSuppliers) {
+    const entityParts = [
+      hasProducts && `商品「${entities.products.map((e) => e.name).join('」「')}」`,
+      hasCustomers && `客戶「${entities.customers.map((e) => e.name).join('」「')}」`,
+      hasSuppliers && `供應商「${entities.suppliers.map((e) => e.name).join('」「')}」`
+    ].filter(Boolean).join('、')
+    metaLine = entityParts
+  }
+
+  const sections: string[] = []
+
+  // ── Inventory block ──────────────────────────────────────────────────────
+  if (topics.inventory) {
+    const totalProducts = (
+      db.prepare('SELECT COUNT(*) as cnt FROM products').get() as { cnt: number }
+    ).cnt
+    const inventoryLines: string[] = [`【庫存概況】`, `- 總商品數：${totalProducts} 項`]
+    if (hasProducts) {
+      const ids = entities.products.map((e) => e.id).join(',')
+      const entityProducts = db
+        .prepare(
+          `SELECT name, stock_qty, reorder_pt, sell_price, buy_price
+           FROM products WHERE id IN (${ids})`
+        )
+        .all() as { name: string; stock_qty: number; reorder_pt: number; sell_price: number; buy_price: number }[]
+      inventoryLines.push(`- 指定商品庫存詳情：`)
+      entityProducts.forEach((p) => {
+        const status = p.stock_qty <= p.reorder_pt ? '⚠️ 低庫存' : '正常'
+        inventoryLines.push(
+          `  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}，售價 NT$${p.sell_price}，進價 NT$${p.buy_price}（${status}）`
+        )
+      })
+      if (expandedMode) {
+        const recentSales = db.prepare(
+          `SELECT p.name, SUM(si.quantity) as qty,
+                  ROUND(SUM(si.quantity * si.unit_price), 0) as amount,
+                  MAX(so.order_date) as last_date
+           FROM sale_items si
+           JOIN products p ON si.product_id = p.id
+           JOIN sales_orders so ON si.sales_order_id = so.id
+           WHERE p.id IN (${ids}) AND so.status = 'completed'
+             AND so.order_date >= date('now', '-90 days')
+           GROUP BY p.id ORDER BY qty DESC`
+        ).all() as { name: string; qty: number; amount: number; last_date: string }[]
+        if (recentSales.length > 0) {
+          inventoryLines.push(`- 近 90 天銷售軌跡（擴展）：`)
+          recentSales.forEach((r) =>
+            inventoryLines.push(`  · ${r.name}：售出 ${r.qty} 件，金額 NT$${r.amount.toLocaleString()}，最後銷售 ${r.last_date}`)
+          )
+        }
+      }
+    } else {
+      const lowStockItems = db
+        .prepare(
+          `SELECT name, stock_qty, reorder_pt FROM products
+           WHERE stock_qty <= reorder_pt ORDER BY stock_qty ASC LIMIT 10`
+        )
+        .all() as { name: string; stock_qty: number; reorder_pt: number }[]
+      inventoryLines.push(`- 低庫存商品（庫存 ≤ 補貨點）：${lowStockItems.length} 項`)
+      lowStockItems.forEach((p) =>
+        inventoryLines.push(`  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}`)
+      )
+    }
+    sections.push(inventoryLines.join('\n'))
+  }
+
+  // ── Sales block ──────────────────────────────────────────────────────────
+  if (topics.sales) {
+    const productFilter = hasProducts
+      ? `AND p.id IN (${entities.products.map((e) => e.id).join(',')})`
+      : ''
+    const salesStats = db
+      .prepare(
+        `SELECT COUNT(*) as order_count,
+                ROUND(COALESCE(SUM(total_amount), 0), 0) as total_amount
+         FROM sales_orders
+         WHERE status = 'completed' ${dateCondition}`
+      )
+      .get() as { order_count: number; total_amount: number }
+    const topProducts = db
+      .prepare(
+        `SELECT p.name, SUM(si.quantity) as qty,
+                ROUND(SUM(si.quantity * si.unit_price), 0) as amount
+         FROM sale_items si
+         JOIN products p ON si.product_id = p.id
+         JOIN sales_orders so ON si.sales_order_id = so.id
+         WHERE so.status = 'completed' ${dateCondition} ${productFilter}
+         GROUP BY p.id ORDER BY qty DESC LIMIT ${hasProducts ? 20 : 5}`
+      )
+      .all() as { name: string; qty: number; amount: number }[]
+    const salesByCategory = db
+      .prepare(
+        `SELECT p.category, SUM(si.quantity) as qty,
+                ROUND(SUM(si.quantity * si.unit_price), 0) as amount
+         FROM sale_items si
+         JOIN products p ON si.product_id = p.id
+         JOIN sales_orders so ON si.sales_order_id = so.id
+         WHERE so.status = 'completed' ${dateCondition}
+         GROUP BY p.category ORDER BY amount DESC LIMIT 5`
+      )
+      .all() as { category: string; qty: number; amount: number }[]
+    const pendingSales = db
+      .prepare(
+        `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+         FROM sales_orders WHERE status IN ('pending', 'confirmed')`
+      )
+      .get() as { cnt: number; total: number }
+    sections.push(
+      [
+        `【近 30 天銷售】`,
+        `- 完成訂單數：${salesStats.order_count} 筆`,
+        `- 銷售總額：NT$${salesStats.total_amount.toLocaleString()}`,
+        `- 銷量前 5 名商品：`,
+        ...(topProducts.length > 0
+          ? topProducts.map(
+              (p, i) => `  ${i + 1}. ${p.name}：售出 ${p.qty} 件，金額 NT$${p.amount.toLocaleString()}`
+            )
+          : ['  （近 30 天無銷售資料）']),
+        `- 各分類銷售：`,
+        ...(salesByCategory.length > 0
+          ? salesByCategory.map((c) => `  · ${c.category}：${c.qty} 件，NT$${c.amount.toLocaleString()}`)
+          : ['  （無資料）']),
+        `- 待處理銷售單：${pendingSales.cnt} 筆，金額 NT$${pendingSales.total.toLocaleString()}`
+      ].join('\n')
+    )
+  }
+
+  // ── Customers block ──────────────────────────────────────────────────────
+  if (topics.customers) {
+    const customerFilter = hasCustomers
+      ? `AND c.id IN (${entities.customers.map((e) => e.id).join(',')})`
+      : ''
+    const customerCount = (
+      db.prepare('SELECT COUNT(*) as cnt FROM customers').get() as { cnt: number }
+    ).cnt
+    const unpaidSales = (
+      db
+        .prepare(
+          `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+           FROM sales_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
+        )
+        .get() as { total: number }
+    ).total
+    const topUnpaidCustomers = db
+      .prepare(
+        `SELECT c.name, ROUND(SUM(so.total_amount), 0) as unpaid
+         FROM sales_orders so
+         JOIN customers c ON so.customer_id = c.id
+         WHERE so.payment_status = 'unpaid' AND so.status = 'completed' ${customerFilter}
+         GROUP BY c.id ORDER BY unpaid DESC LIMIT ${hasCustomers ? 20 : 5}`
+      )
+      .all() as { name: string; unpaid: number }[]
+    const customerLines: string[] = [
+      `【客戶應收帳款】`,
+      `- 客戶數：${customerCount} 位`,
+      `- 應收未付總計：NT$${unpaidSales.toLocaleString()}`,
+      `- 應收未付前 5 名客戶：`,
+      ...(topUnpaidCustomers.length > 0
+        ? topUnpaidCustomers.map((c, i) => `  ${i + 1}. ${c.name}：NT$${c.unpaid.toLocaleString()}`)
+        : ['  （無未付款客戶）'])
+    ]
+    if (expandedMode && hasCustomers) {
+      const customerIds = entities.customers.map((e) => e.id).join(',')
+      const recentOrders = db.prepare(
+        `SELECT c.name, so.order_no, so.order_date, so.total_amount, so.payment_status
+         FROM sales_orders so JOIN customers c ON so.customer_id = c.id
+         WHERE c.id IN (${customerIds})
+         ORDER BY so.created_at DESC LIMIT 10`
+      ).all() as { name: string; order_no: string; order_date: string; total_amount: number; payment_status: string }[]
+      if (recentOrders.length > 0) {
+        customerLines.push(`- 最近 10 筆訂單明細（擴展）：`)
+        recentOrders.forEach((o) =>
+          customerLines.push(`  · ${o.name} ${o.order_no} ${o.order_date} NT$${o.total_amount.toLocaleString()} [${o.payment_status}]`)
+        )
+      }
+    }
+    sections.push(customerLines.join('\n'))
+  }
+
+  // ── Suppliers block ──────────────────────────────────────────────────────
+  if (topics.suppliers) {
+    const supplierFilter = hasSuppliers
+      ? `AND s.id IN (${entities.suppliers.map((e) => e.id).join(',')})`
+      : ''
+    const supplierCount = (
+      db.prepare('SELECT COUNT(*) as cnt FROM suppliers').get() as { cnt: number }
+    ).cnt
+    const unpaidPurchases = (
+      db
+        .prepare(
+          `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+           FROM purchase_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
+        )
+        .get() as { total: number }
+    ).total
+    const topUnpaidSuppliers = db
+      .prepare(
+        `SELECT s.name, ROUND(SUM(po.total_amount), 0) as unpaid
+         FROM purchase_orders po
+         JOIN suppliers s ON po.supplier_id = s.id
+         WHERE po.payment_status = 'unpaid' AND po.status = 'completed' ${supplierFilter}
+         GROUP BY s.id ORDER BY unpaid DESC LIMIT ${hasSuppliers ? 20 : 5}`
+      )
+      .all() as { name: string; unpaid: number }[]
+    const pendingPurchases = db
+      .prepare(
+        `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
+         FROM purchase_orders WHERE status IN ('pending', 'ordered')`
+      )
+      .get() as { cnt: number; total: number }
+    const supplierLines: string[] = [
+      `【供應商應付帳款】`,
+      `- 供應商數：${supplierCount} 家`,
+      `- 待處理採購單：${pendingPurchases.cnt} 筆，金額 NT$${pendingPurchases.total.toLocaleString()}`,
+      `- 應付未付總計：NT$${unpaidPurchases.toLocaleString()}`,
+      `- 應付未付前 5 名供應商：`,
+      ...(topUnpaidSuppliers.length > 0
+        ? topUnpaidSuppliers.map((s, i) => `  ${i + 1}. ${s.name}：NT$${s.unpaid.toLocaleString()}`)
+        : ['  （無未付款供應商）'])
+    ]
+    if (expandedMode && hasSuppliers) {
+      const supplierIds = entities.suppliers.map((e) => e.id).join(',')
+      const recentPurchases = db.prepare(
+        `SELECT s.name, po.order_no, po.order_date, po.total_amount, po.payment_status
+         FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.id
+         WHERE s.id IN (${supplierIds})
+         ORDER BY po.created_at DESC LIMIT 10`
+      ).all() as { name: string; order_no: string; order_date: string; total_amount: number; payment_status: string }[]
+      if (recentPurchases.length > 0) {
+        supplierLines.push(`- 最近 10 筆採購明細（擴展）：`)
+        recentPurchases.forEach((o) =>
+          supplierLines.push(`  · ${o.name} ${o.order_no} ${o.order_date} NT$${o.total_amount.toLocaleString()} [${o.payment_status}]`)
+        )
+      }
+    }
+    sections.push(supplierLines.join('\n'))
+  }
+
+  return {
+    retrievalContext: sections.join('\n\n'),
+    entities,
+    topics,
+    hasProducts,
+    hasCustomers,
+    hasSuppliers,
+    expandedMode,
+    expandedTerms,
+    metaLine
+  }
+}
+
 // ── Adaptive Context Pruning: trim oversized context with Haiku ──────────────
 async function pruneContext(
   client: Anthropic,
@@ -710,304 +1053,64 @@ ${salesData
       }
     }
 
-    // ── Step 2: Classify topics (Adaptive Retrieval) + Model routing ─────
-    const topics = classifyTopics(rewrittenQ)
+    // ── Step 2: Query Decomposition + Parallel Retrieval ─────────────────
+    const { isCompound, subQuestions } = await decomposeQuery(client, rewrittenQ)
     const selectedModel = classifyComplexity(rewrittenQ) === 'sonnet' ? MODEL_SONNET : MODEL_HAIKU
-    const topicNames = [
-      topics.inventory && '庫存',
-      topics.sales && '銷售',
-      topics.customers && '客戶應收',
-      topics.suppliers && '供應商應付'
-    ].filter(Boolean).join('、')
 
-    // ── Entity Extraction + Query Expansion (parallel) ────────────────────
-    // Start expansion LLM call immediately; run sync steps concurrently
-    const expansionPromise = expandQueryVocabulary(client, rewrittenQ)
-    const candidates = extractEntityCandidates(rewrittenQ)
-    const expandedTerms = await expansionPromise
-    const allCandidates = [...new Set([...candidates, ...expandedTerms])]
-    const entities = resolveEntities(db, allCandidates)
+    const retrievals = await Promise.all(
+      subQuestions.map((sq) =>
+        retrieveContextForQuery(db, client, sq, dateCondition, sessionId)
+      )
+    )
 
-    // Semantic fallback: if candidates exist but LIKE matched nothing, ask Haiku to disambiguate
-    if (candidates.length > 0 && !entities.products.length && !entities.customers.length && !entities.suppliers.length) {
-      const semantic = await semanticEntityFallback(client, db, candidates)
-      entities.products.push(...semantic.products)
-      entities.customers.push(...semantic.customers)
-      entities.suppliers.push(...semantic.suppliers)
+    // Merge entities (de-duplicate by id)
+    const mergedEntities: ResolvedEntities = {
+      products:  [...new Map(retrievals.flatMap((r) => r.entities.products).map((e) => [e.id, e])).values()],
+      customers: [...new Map(retrievals.flatMap((r) => r.entities.customers).map((e) => [e.id, e])).values()],
+      suppliers: [...new Map(retrievals.flatMap((r) => r.entities.suppliers).map((e) => [e.id, e])).values()],
     }
+    const hasProducts = mergedEntities.products.length > 0
+    const hasCustomers = mergedEntities.customers.length > 0
+    const hasSuppliers = mergedEntities.suppliers.length > 0
 
-    // Cross-turn entity memory: pronoun detected + all entity resolution failed → look up session history
-    if (
-      !entities.products.length && !entities.customers.length && !entities.suppliers.length &&
-      sessionId != null &&
-      /他|她|它|那個|此|同樣|這個|一樣|這間|那間|該/.test(rewrittenQ)
-    ) {
-      const sessionNames = getSessionEntityNames(db, sessionId)
-      if (sessionNames.length > 0) {
-        const resolved = resolveEntities(db, sessionNames)
-        entities.products.push(...resolved.products)
-        entities.customers.push(...resolved.customers)
-        entities.suppliers.push(...resolved.suppliers)
-      }
-    }
-
-    const hasProducts = entities.products.length > 0
-    const hasCustomers = entities.customers.length > 0
-    const hasSuppliers = entities.suppliers.length > 0
-
-    // Adaptive retrieval: check if any entity qualifies for expanded mode
-    const expandedMode = (hasProducts || hasCustomers || hasSuppliers)
-      ? checkExpandedMode(db, entities)
-      : false
-
-    const metaLines: string[] = [
-      `【查詢處理】`,
-      rewrittenQ !== question
-        ? `- 問題改寫：「${question}」→「${rewrittenQ}」`
-        : `- 原始問題：「${question}」`,
-      `- 時間範圍：${timeRange.label}`,
-      `- 擷取資料：${topicNames}`
-    ]
-    if (expandedTerms.length > 0) {
-      metaLines.push(`- 查詢展開：${expandedTerms.join('、')}`)
-    }
-    if (hasProducts || hasCustomers || hasSuppliers) {
-      const entityParts = [
-        hasProducts && `商品「${entities.products.map((e) => e.name).join('」「')}」`,
-        hasCustomers && `客戶「${entities.customers.map((e) => e.name).join('」「')}」`,
-        hasSuppliers && `供應商「${entities.suppliers.map((e) => e.name).join('」「')}」`
+    // Build meta section
+    const metaLines: string[] = [`【查詢處理】`]
+    if (isCompound) {
+      metaLines.push(`- 複合問題：已拆解為 ${subQuestions.length} 個子問題`)
+      subQuestions.forEach((sq, i) => {
+        const note = retrievals[i].metaLine ? `（${retrievals[i].metaLine}）` : ''
+        metaLines.push(`- 子問題 ${i + 1}：「${sq}」${note}`)
+      })
+      metaLines.push(`- 時間範圍：${timeRange.label}`)
+    } else {
+      const r = retrievals[0]
+      metaLines.push(
+        rewrittenQ !== question
+          ? `- 問題改寫：「${question}」→「${rewrittenQ}」`
+          : `- 原始問題：「${question}」`
+      )
+      metaLines.push(`- 時間範圍：${timeRange.label}`)
+      const topicNames = [
+        r.topics.inventory && '庫存',
+        r.topics.sales && '銷售',
+        r.topics.customers && '客戶應收',
+        r.topics.suppliers && '供應商應付'
       ].filter(Boolean).join('、')
-      metaLines.push(`- 識別實體：${entityParts}`)
+      metaLines.push(`- 擷取資料：${topicNames}`)
+      if (r.expandedTerms.length > 0) {
+        metaLines.push(`- 查詢展開：${r.expandedTerms.join('、')}`)
+      }
+      if (r.metaLine) {
+        metaLines.push(`- 識別實體：${r.metaLine}`)
+      }
     }
     const metaSection = metaLines.join('\n')
 
-    const sections: string[] = [metaSection]
-
-    // ── Step 2: Retrieval — conditionally query SQLite ─────────────────────
-    if (topics.inventory) {
-      const totalProducts = (
-        db.prepare('SELECT COUNT(*) as cnt FROM products').get() as { cnt: number }
-      ).cnt
-      const inventoryLines: string[] = [`【庫存概況】`, `- 總商品數：${totalProducts} 項`]
-      if (hasProducts) {
-        const ids = entities.products.map((e) => e.id).join(',')
-        const entityProducts = db
-          .prepare(
-            `SELECT name, stock_qty, reorder_pt, sell_price, buy_price
-             FROM products WHERE id IN (${ids})`
-          )
-          .all() as { name: string; stock_qty: number; reorder_pt: number; sell_price: number; buy_price: number }[]
-        inventoryLines.push(`- 指定商品庫存詳情：`)
-        entityProducts.forEach((p) => {
-          const status = p.stock_qty <= p.reorder_pt ? '⚠️ 低庫存' : '正常'
-          inventoryLines.push(
-            `  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}，售價 NT$${p.sell_price}，進價 NT$${p.buy_price}（${status}）`
-          )
-        })
-        if (expandedMode) {
-          const recentSales = db.prepare(
-            `SELECT p.name, SUM(si.quantity) as qty,
-                    ROUND(SUM(si.quantity * si.unit_price), 0) as amount,
-                    MAX(so.order_date) as last_date
-             FROM sale_items si
-             JOIN products p ON si.product_id = p.id
-             JOIN sales_orders so ON si.sales_order_id = so.id
-             WHERE p.id IN (${ids}) AND so.status = 'completed'
-               AND so.order_date >= date('now', '-90 days')
-             GROUP BY p.id ORDER BY qty DESC`
-          ).all() as { name: string; qty: number; amount: number; last_date: string }[]
-          if (recentSales.length > 0) {
-            inventoryLines.push(`- 近 90 天銷售軌跡（擴展）：`)
-            recentSales.forEach((r) =>
-              inventoryLines.push(`  · ${r.name}：售出 ${r.qty} 件，金額 NT$${r.amount.toLocaleString()}，最後銷售 ${r.last_date}`)
-            )
-          }
-        }
-      } else {
-        const lowStockItems = db
-          .prepare(
-            `SELECT name, stock_qty, reorder_pt FROM products
-             WHERE stock_qty <= reorder_pt ORDER BY stock_qty ASC LIMIT 10`
-          )
-          .all() as { name: string; stock_qty: number; reorder_pt: number }[]
-        inventoryLines.push(`- 低庫存商品（庫存 ≤ 補貨點）：${lowStockItems.length} 項`)
-        lowStockItems.forEach((p) =>
-          inventoryLines.push(`  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}`)
-        )
-      }
-      sections.push(inventoryLines.join('\n'))
-    }
-
-    if (topics.sales) {
-      const productFilter = hasProducts
-        ? `AND p.id IN (${entities.products.map((e) => e.id).join(',')})`
-        : ''
-      const salesStats = db
-        .prepare(
-          `SELECT COUNT(*) as order_count,
-                  ROUND(COALESCE(SUM(total_amount), 0), 0) as total_amount
-           FROM sales_orders
-           WHERE status = 'completed' ${dateCondition}`
-        )
-        .get() as { order_count: number; total_amount: number }
-      const topProducts = db
-        .prepare(
-          `SELECT p.name, SUM(si.quantity) as qty,
-                  ROUND(SUM(si.quantity * si.unit_price), 0) as amount
-           FROM sale_items si
-           JOIN products p ON si.product_id = p.id
-           JOIN sales_orders so ON si.sales_order_id = so.id
-           WHERE so.status = 'completed' ${dateCondition} ${productFilter}
-           GROUP BY p.id ORDER BY qty DESC LIMIT ${hasProducts ? 20 : 5}`
-        )
-        .all() as { name: string; qty: number; amount: number }[]
-      const salesByCategory = db
-        .prepare(
-          `SELECT p.category, SUM(si.quantity) as qty,
-                  ROUND(SUM(si.quantity * si.unit_price), 0) as amount
-           FROM sale_items si
-           JOIN products p ON si.product_id = p.id
-           JOIN sales_orders so ON si.sales_order_id = so.id
-           WHERE so.status = 'completed' ${dateCondition}
-           GROUP BY p.category ORDER BY amount DESC LIMIT 5`
-        )
-        .all() as { category: string; qty: number; amount: number }[]
-      const pendingSales = db
-        .prepare(
-          `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
-           FROM sales_orders WHERE status IN ('pending', 'confirmed')`
-        )
-        .get() as { cnt: number; total: number }
-      sections.push(
-        [
-          `【近 30 天銷售】`,
-          `- 完成訂單數：${salesStats.order_count} 筆`,
-          `- 銷售總額：NT$${salesStats.total_amount.toLocaleString()}`,
-          `- 銷量前 5 名商品：`,
-          ...(topProducts.length > 0
-            ? topProducts.map(
-                (p, i) => `  ${i + 1}. ${p.name}：售出 ${p.qty} 件，金額 NT$${p.amount.toLocaleString()}`
-              )
-            : ['  （近 30 天無銷售資料）']),
-          `- 各分類銷售：`,
-          ...(salesByCategory.length > 0
-            ? salesByCategory.map((c) => `  · ${c.category}：${c.qty} 件，NT$${c.amount.toLocaleString()}`)
-            : ['  （無資料）']),
-          `- 待處理銷售單：${pendingSales.cnt} 筆，金額 NT$${pendingSales.total.toLocaleString()}`
-        ].join('\n')
-      )
-    }
-
-    if (topics.customers) {
-      const customerFilter = hasCustomers
-        ? `AND c.id IN (${entities.customers.map((e) => e.id).join(',')})`
-        : ''
-      const customerCount = (
-        db.prepare('SELECT COUNT(*) as cnt FROM customers').get() as { cnt: number }
-      ).cnt
-      const unpaidSales = (
-        db
-          .prepare(
-            `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
-             FROM sales_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
-          )
-          .get() as { total: number }
-      ).total
-      const topUnpaidCustomers = db
-        .prepare(
-          `SELECT c.name, ROUND(SUM(so.total_amount), 0) as unpaid
-           FROM sales_orders so
-           JOIN customers c ON so.customer_id = c.id
-           WHERE so.payment_status = 'unpaid' AND so.status = 'completed' ${customerFilter}
-           GROUP BY c.id ORDER BY unpaid DESC LIMIT ${hasCustomers ? 20 : 5}`
-        )
-        .all() as { name: string; unpaid: number }[]
-      const customerLines: string[] = [
-        `【客戶應收帳款】`,
-        `- 客戶數：${customerCount} 位`,
-        `- 應收未付總計：NT$${unpaidSales.toLocaleString()}`,
-        `- 應收未付前 5 名客戶：`,
-        ...(topUnpaidCustomers.length > 0
-          ? topUnpaidCustomers.map((c, i) => `  ${i + 1}. ${c.name}：NT$${c.unpaid.toLocaleString()}`)
-          : ['  （無未付款客戶）'])
-      ]
-      if (expandedMode && hasCustomers) {
-        const customerIds = entities.customers.map((e) => e.id).join(',')
-        const recentOrders = db.prepare(
-          `SELECT c.name, so.order_no, so.order_date, so.total_amount, so.payment_status
-           FROM sales_orders so JOIN customers c ON so.customer_id = c.id
-           WHERE c.id IN (${customerIds})
-           ORDER BY so.created_at DESC LIMIT 10`
-        ).all() as { name: string; order_no: string; order_date: string; total_amount: number; payment_status: string }[]
-        if (recentOrders.length > 0) {
-          customerLines.push(`- 最近 10 筆訂單明細（擴展）：`)
-          recentOrders.forEach((o) =>
-            customerLines.push(`  · ${o.name} ${o.order_no} ${o.order_date} NT$${o.total_amount.toLocaleString()} [${o.payment_status}]`)
-          )
-        }
-      }
-      sections.push(customerLines.join('\n'))
-    }
-
-    if (topics.suppliers) {
-      const supplierFilter = hasSuppliers
-        ? `AND s.id IN (${entities.suppliers.map((e) => e.id).join(',')})`
-        : ''
-      const supplierCount = (
-        db.prepare('SELECT COUNT(*) as cnt FROM suppliers').get() as { cnt: number }
-      ).cnt
-      const unpaidPurchases = (
-        db
-          .prepare(
-            `SELECT ROUND(COALESCE(SUM(total_amount), 0), 0) as total
-             FROM purchase_orders WHERE payment_status = 'unpaid' AND status = 'completed'`
-          )
-          .get() as { total: number }
-      ).total
-      const topUnpaidSuppliers = db
-        .prepare(
-          `SELECT s.name, ROUND(SUM(po.total_amount), 0) as unpaid
-           FROM purchase_orders po
-           JOIN suppliers s ON po.supplier_id = s.id
-           WHERE po.payment_status = 'unpaid' AND po.status = 'completed' ${supplierFilter}
-           GROUP BY s.id ORDER BY unpaid DESC LIMIT ${hasSuppliers ? 20 : 5}`
-        )
-        .all() as { name: string; unpaid: number }[]
-      const pendingPurchases = db
-        .prepare(
-          `SELECT COUNT(*) as cnt, ROUND(COALESCE(SUM(total_amount), 0), 0) as total
-           FROM purchase_orders WHERE status IN ('pending', 'ordered')`
-        )
-        .get() as { cnt: number; total: number }
-      const supplierLines: string[] = [
-        `【供應商應付帳款】`,
-        `- 供應商數：${supplierCount} 家`,
-        `- 待處理採購單：${pendingPurchases.cnt} 筆，金額 NT$${pendingPurchases.total.toLocaleString()}`,
-        `- 應付未付總計：NT$${unpaidPurchases.toLocaleString()}`,
-        `- 應付未付前 5 名供應商：`,
-        ...(topUnpaidSuppliers.length > 0
-          ? topUnpaidSuppliers.map((s, i) => `  ${i + 1}. ${s.name}：NT$${s.unpaid.toLocaleString()}`)
-          : ['  （無未付款供應商）'])
-      ]
-      if (expandedMode && hasSuppliers) {
-        const supplierIds = entities.suppliers.map((e) => e.id).join(',')
-        const recentPurchases = db.prepare(
-          `SELECT s.name, po.order_no, po.order_date, po.total_amount, po.payment_status
-           FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.id
-           WHERE s.id IN (${supplierIds})
-           ORDER BY po.created_at DESC LIMIT 10`
-        ).all() as { name: string; order_no: string; order_date: string; total_amount: number; payment_status: string }[]
-        if (recentPurchases.length > 0) {
-          supplierLines.push(`- 最近 10 筆採購明細（擴展）：`)
-          recentPurchases.forEach((o) =>
-            supplierLines.push(`  · ${o.name} ${o.order_no} ${o.order_date} NT$${o.total_amount.toLocaleString()} [${o.payment_status}]`)
-          )
-        }
-      }
-      sections.push(supplierLines.join('\n'))
-    }
-
-    const rawContext = sections.join('\n\n')
+    // Build combined context
+    const retrievalContext = isCompound
+      ? retrievals.map((r, i) => `═══ 子問題 ${i + 1}：${subQuestions[i]} ═══\n${r.retrievalContext}`).join('\n\n')
+      : retrievals[0].retrievalContext
+    const rawContext = [metaSection, retrievalContext].filter(Boolean).join('\n\n')
     const context = rawContext.length > CONTEXT_CHAR_LIMIT
       ? await pruneContext(client, rewrittenQ, rawContext)
       : rawContext
@@ -1026,6 +1129,7 @@ ${salesData
       '你是 SkillCraft IMS 進銷存系統的 AI 助手。\n' +
       '請嚴格根據下方【最新業務資料】回答使用者的問題。\n' +
       '如果資料不足以回答，請說明限制，不要捏造數字。\n' +
+      (isCompound ? '問題已拆解為多個子問題，請逐一分段回答，各段清楚標示對應子問題編號。\n' : '') +
       '在每個具體數字、金額或關鍵事實後，加上來源標記 [庫存]、[銷售]、[客戶] 或 [供應商]（如：銷售額 $12,000 [銷售]、庫存 5 件 [庫存]）。\n' +
       '回答請使用繁體中文，條列式整理，簡潔有重點。\n' +
       '如果列舉多項商品、客戶或供應商的比較資料（含多個數值欄位），請以 Markdown 表格格式呈現。\n' +
@@ -1073,7 +1177,7 @@ ${salesData
 
     // Adaptive learning: update entity stats with this query's faithfulness
     if (hasProducts || hasCustomers || hasSuppliers) {
-      updateEntityStats(db, entities, faithfulness.score)
+      updateEntityStats(db, mergedEntities, faithfulness.score)
     }
 
     // Persist messages and update session

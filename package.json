@@ -1,6 +1,6 @@
 {
   "name": "skillcraft-ims",
-  "version": "0.9.14",
+  "version": "0.9.15",
   "description": "跨平台桌面進銷存系統 - Electron + React + Google Sheets + AI Skills",
   "main": "out/main/index.js",
   "author": "SkillCraft",
