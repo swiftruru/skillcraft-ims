@@ -4,6 +4,7 @@ import { getDb } from '../db'
 
 const MODEL_HAIKU = 'claude-haiku-4-5-20251001'
 const MODEL_SONNET = 'claude-sonnet-4-6'
+const CONTEXT_CHAR_LIMIT = 2500 // trigger adaptive pruning above this threshold
 
 type ForecastScope = 'smart' | 'low_stock' | 'top_sales' | 'custom'
 
@@ -165,6 +166,31 @@ async function semanticEntityFallback(
   } catch { /* silent fallback */ }
 
   return result
+}
+
+// ── Adaptive Context Pruning: trim oversized context with Haiku ──────────────
+async function pruneContext(
+  client: Anthropic,
+  question: string,
+  context: string
+): Promise<string> {
+  try {
+    const res = await client.messages.create({
+      model: MODEL_HAIKU,
+      max_tokens: 1200,
+      system:
+        '你是進銷存系統的資料剪裁助手。從以下業務資料中，保留與使用者問題最相關的條目，' +
+        '移除無關或重複的資料列。保持原有的區段標題與格式，只輸出剪裁後的資料，不加任何說明或前言。',
+      messages: [{
+        role: 'user',
+        content: `使用者問題：${question}\n\n業務資料：\n${context}`
+      }]
+    })
+    const pruned = res.content[0].type === 'text' ? res.content[0].text.trim() : context
+    return pruned.length > 0 ? pruned : context
+  } catch {
+    return context // silent fallback on error
+  }
 }
 
 // ── Query Expansion: synonym/alias discovery (one fast Haiku call) ──────────
@@ -837,7 +863,10 @@ ${salesData
       )
     }
 
-    const context = sections.join('\n\n')
+    const rawContext = sections.join('\n\n')
+    const context = rawContext.length > CONTEXT_CHAR_LIMIT
+      ? await pruneContext(client, rewrittenQ, rawContext)
+      : rawContext
 
     // ── Step 3: Load history + summarize if too long ──────────────────────
     const rawHistory: { role: 'user' | 'assistant'; content: string }[] = sessionId
