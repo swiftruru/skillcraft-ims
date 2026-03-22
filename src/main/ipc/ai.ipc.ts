@@ -207,6 +207,43 @@ function getSessionEntityNames(
   return [...new Set(names)]
 }
 
+// ── Adaptive Retrieval: entity-level feedback stats ───────────────────────────
+function checkExpandedMode(
+  db: ReturnType<typeof getDb>,
+  entities: ResolvedEntities
+): boolean {
+  const rows = [
+    ...entities.products.map((e) =>
+      db.prepare('SELECT query_count, faith_sum FROM ai_entity_stats WHERE entity_type = ? AND entity_id = ?')
+        .get('product', e.id) as { query_count: number; faith_sum: number } | undefined),
+    ...entities.customers.map((e) =>
+      db.prepare('SELECT query_count, faith_sum FROM ai_entity_stats WHERE entity_type = ? AND entity_id = ?')
+        .get('customer', e.id) as { query_count: number; faith_sum: number } | undefined),
+    ...entities.suppliers.map((e) =>
+      db.prepare('SELECT query_count, faith_sum FROM ai_entity_stats WHERE entity_type = ? AND entity_id = ?')
+        .get('supplier', e.id) as { query_count: number; faith_sum: number } | undefined),
+  ].filter((r): r is { query_count: number; faith_sum: number } => r != null)
+  return rows.some((r) => r.query_count >= 2 && r.faith_sum / r.query_count < 70)
+}
+
+function updateEntityStats(
+  db: ReturnType<typeof getDb>,
+  entities: ResolvedEntities,
+  faithfulnessScore: number
+): void {
+  const upsert = db.prepare(`
+    INSERT INTO ai_entity_stats (entity_type, entity_id, query_count, faith_sum, last_queried)
+    VALUES (?, ?, 1, ?, unixepoch())
+    ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+      query_count  = query_count + 1,
+      faith_sum    = faith_sum + excluded.faith_sum,
+      last_queried = unixepoch()
+  `)
+  for (const e of entities.products)  upsert.run('product',  e.id, faithfulnessScore)
+  for (const e of entities.customers) upsert.run('customer', e.id, faithfulnessScore)
+  for (const e of entities.suppliers) upsert.run('supplier', e.id, faithfulnessScore)
+}
+
 // ── Adaptive Context Pruning: trim oversized context with Haiku ──────────────
 async function pruneContext(
   client: Anthropic,
@@ -718,6 +755,11 @@ ${salesData
     const hasCustomers = entities.customers.length > 0
     const hasSuppliers = entities.suppliers.length > 0
 
+    // Adaptive retrieval: check if any entity qualifies for expanded mode
+    const expandedMode = (hasProducts || hasCustomers || hasSuppliers)
+      ? checkExpandedMode(db, entities)
+      : false
+
     const metaLines: string[] = [
       `【查詢處理】`,
       rewrittenQ !== question
@@ -762,6 +804,25 @@ ${salesData
             `  · ${p.name}：庫存 ${p.stock_qty}，補貨點 ${p.reorder_pt}，售價 NT$${p.sell_price}，進價 NT$${p.buy_price}（${status}）`
           )
         })
+        if (expandedMode) {
+          const recentSales = db.prepare(
+            `SELECT p.name, SUM(si.quantity) as qty,
+                    ROUND(SUM(si.quantity * si.unit_price), 0) as amount,
+                    MAX(so.order_date) as last_date
+             FROM sale_items si
+             JOIN products p ON si.product_id = p.id
+             JOIN sales_orders so ON si.sales_order_id = so.id
+             WHERE p.id IN (${ids}) AND so.status = 'completed'
+               AND so.order_date >= date('now', '-90 days')
+             GROUP BY p.id ORDER BY qty DESC`
+          ).all() as { name: string; qty: number; amount: number; last_date: string }[]
+          if (recentSales.length > 0) {
+            inventoryLines.push(`- 近 90 天銷售軌跡（擴展）：`)
+            recentSales.forEach((r) =>
+              inventoryLines.push(`  · ${r.name}：售出 ${r.qty} 件，金額 NT$${r.amount.toLocaleString()}，最後銷售 ${r.last_date}`)
+            )
+          }
+        }
       } else {
         const lowStockItems = db
           .prepare(
@@ -861,17 +922,31 @@ ${salesData
            GROUP BY c.id ORDER BY unpaid DESC LIMIT ${hasCustomers ? 20 : 5}`
         )
         .all() as { name: string; unpaid: number }[]
-      sections.push(
-        [
-          `【客戶應收帳款】`,
-          `- 客戶數：${customerCount} 位`,
-          `- 應收未付總計：NT$${unpaidSales.toLocaleString()}`,
-          `- 應收未付前 5 名客戶：`,
-          ...(topUnpaidCustomers.length > 0
-            ? topUnpaidCustomers.map((c, i) => `  ${i + 1}. ${c.name}：NT$${c.unpaid.toLocaleString()}`)
-            : ['  （無未付款客戶）'])
-        ].join('\n')
-      )
+      const customerLines: string[] = [
+        `【客戶應收帳款】`,
+        `- 客戶數：${customerCount} 位`,
+        `- 應收未付總計：NT$${unpaidSales.toLocaleString()}`,
+        `- 應收未付前 5 名客戶：`,
+        ...(topUnpaidCustomers.length > 0
+          ? topUnpaidCustomers.map((c, i) => `  ${i + 1}. ${c.name}：NT$${c.unpaid.toLocaleString()}`)
+          : ['  （無未付款客戶）'])
+      ]
+      if (expandedMode && hasCustomers) {
+        const customerIds = entities.customers.map((e) => e.id).join(',')
+        const recentOrders = db.prepare(
+          `SELECT c.name, so.order_no, so.order_date, so.total_amount, so.payment_status
+           FROM sales_orders so JOIN customers c ON so.customer_id = c.id
+           WHERE c.id IN (${customerIds})
+           ORDER BY so.created_at DESC LIMIT 10`
+        ).all() as { name: string; order_no: string; order_date: string; total_amount: number; payment_status: string }[]
+        if (recentOrders.length > 0) {
+          customerLines.push(`- 最近 10 筆訂單明細（擴展）：`)
+          recentOrders.forEach((o) =>
+            customerLines.push(`  · ${o.name} ${o.order_no} ${o.order_date} NT$${o.total_amount.toLocaleString()} [${o.payment_status}]`)
+          )
+        }
+      }
+      sections.push(customerLines.join('\n'))
     }
 
     if (topics.suppliers) {
@@ -904,18 +979,32 @@ ${salesData
            FROM purchase_orders WHERE status IN ('pending', 'ordered')`
         )
         .get() as { cnt: number; total: number }
-      sections.push(
-        [
-          `【供應商應付帳款】`,
-          `- 供應商數：${supplierCount} 家`,
-          `- 待處理採購單：${pendingPurchases.cnt} 筆，金額 NT$${pendingPurchases.total.toLocaleString()}`,
-          `- 應付未付總計：NT$${unpaidPurchases.toLocaleString()}`,
-          `- 應付未付前 5 名供應商：`,
-          ...(topUnpaidSuppliers.length > 0
-            ? topUnpaidSuppliers.map((s, i) => `  ${i + 1}. ${s.name}：NT$${s.unpaid.toLocaleString()}`)
-            : ['  （無未付款供應商）'])
-        ].join('\n')
-      )
+      const supplierLines: string[] = [
+        `【供應商應付帳款】`,
+        `- 供應商數：${supplierCount} 家`,
+        `- 待處理採購單：${pendingPurchases.cnt} 筆，金額 NT$${pendingPurchases.total.toLocaleString()}`,
+        `- 應付未付總計：NT$${unpaidPurchases.toLocaleString()}`,
+        `- 應付未付前 5 名供應商：`,
+        ...(topUnpaidSuppliers.length > 0
+          ? topUnpaidSuppliers.map((s, i) => `  ${i + 1}. ${s.name}：NT$${s.unpaid.toLocaleString()}`)
+          : ['  （無未付款供應商）'])
+      ]
+      if (expandedMode && hasSuppliers) {
+        const supplierIds = entities.suppliers.map((e) => e.id).join(',')
+        const recentPurchases = db.prepare(
+          `SELECT s.name, po.order_no, po.order_date, po.total_amount, po.payment_status
+           FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.id
+           WHERE s.id IN (${supplierIds})
+           ORDER BY po.created_at DESC LIMIT 10`
+        ).all() as { name: string; order_no: string; order_date: string; total_amount: number; payment_status: string }[]
+        if (recentPurchases.length > 0) {
+          supplierLines.push(`- 最近 10 筆採購明細（擴展）：`)
+          recentPurchases.forEach((o) =>
+            supplierLines.push(`  · ${o.name} ${o.order_no} ${o.order_date} NT$${o.total_amount.toLocaleString()} [${o.payment_status}]`)
+          )
+        }
+      }
+      sections.push(supplierLines.join('\n'))
     }
 
     const rawContext = sections.join('\n\n')
@@ -981,6 +1070,11 @@ ${salesData
 
     // ── Step 5: RAG Faithfulness Evaluation ───────────────────────────────
     const faithfulness = await evaluateFaithfulness(client, context, answer)
+
+    // Adaptive learning: update entity stats with this query's faithfulness
+    if (hasProducts || hasCustomers || hasSuppliers) {
+      updateEntityStats(db, entities, faithfulness.score)
+    }
 
     // Persist messages and update session
     if (sessionId) {
