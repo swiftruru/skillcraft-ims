@@ -162,7 +162,7 @@ declare global {
         getLatest(): Promise<import('./schema').AiForecastLatest | null>
         checkFreshness(): Promise<{ hoursSince: number; newSalesCount: number }>
         previewScope(params: import('./schema').AiForecastParams): Promise<{ count: number }>
-        chat(question: string, sessionId?: number): Promise<{ answer: string; context: string; inputTokens: number; outputTokens: number; followups: string[]; faithfulness: { score: number; note: string }; modelUsed: string }>
+        chat(question: string, sessionId?: number): Promise<{ answer: string; context: string; inputTokens: number; outputTokens: number; followups: string[]; faithfulness: { score: number; note: string }; modelUsed: string; sources: string[] }>
         onChatStream(cb: (text: string) => void): () => void
         getSessions(): Promise<{ id: number; title: string; created_at: string; updated_at: string; preview: string | null }[]>
         getSessionMessages(sessionId: number): Promise<{ id: number; role: 'user' | 'assistant'; content: string; context: string | null; created_at: string }[]>

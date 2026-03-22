@@ -66,6 +66,7 @@ type ChatMessage = {
   followups?: string[]
   faithfulness?: { score: number; note: string }
   modelUsed?: string
+  sources?: string[]
 }
 
 type ConfidenceFilter = 'all' | 'high' | 'low'
@@ -295,9 +296,14 @@ export default function AiInsight(): React.JSX.Element {
         if (last?.role === 'assistant' && last.isStreaming) {
           const accumulated = last.content + text
           const fqIdx = accumulated.indexOf('\n[FQ]')
+          const srcIdx = accumulated.indexOf('\n[SOURCES')
+          const cutIdx = Math.min(
+            fqIdx >= 0 ? fqIdx : Infinity,
+            srcIdx >= 0 ? srcIdx : Infinity
+          )
           msgs[msgs.length - 1] = {
             ...last,
-            content: fqIdx >= 0 ? accumulated.slice(0, fqIdx) : accumulated
+            content: cutIdx < Infinity ? accumulated.slice(0, cutIdx) : accumulated
           }
         }
         return msgs
@@ -305,11 +311,11 @@ export default function AiInsight(): React.JSX.Element {
     })
 
     try {
-      const { answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed } =
+      const { answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed, sources } =
         await window.electronAPI.ai.chat(q, sid)
       setChatMessages((prev) => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed }
+        { role: 'assistant', content: answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed, sources }
       ])
       queryClient.invalidateQueries({ queryKey: ['ai', 'sessions'] })
     } catch (err: unknown) {
@@ -982,6 +988,25 @@ export default function AiInsight(): React.JSX.Element {
                           )}>
                             {msg.modelUsed.includes('sonnet') ? 'Sonnet' : 'Haiku'}
                           </span>
+                        )}
+                        {msg.sources && msg.sources.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-muted-foreground/50">引用：</span>
+                            {msg.sources.map((src) => (
+                              <span
+                                key={src}
+                                className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium', {
+                                  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300': src === '庫存',
+                                  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300': src === '銷售',
+                                  'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300': src === '客戶',
+                                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300': src === '供應商',
+                                  'bg-muted text-muted-foreground': !['庫存', '銷售', '客戶', '供應商'].includes(src)
+                                })}
+                              >
+                                {src}
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </div>
                     )}

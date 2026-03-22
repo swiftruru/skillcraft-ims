@@ -659,7 +659,9 @@ ${salesData
       '如果資料不足以回答，請說明限制，不要捏造數字。\n' +
       '回答請使用繁體中文，條列式整理，簡潔有重點。\n' +
       '在回答最後另起一行，輸出 3 個相關追問（只輸出這一行）：\n' +
-      '[FQ]: 問題1 | 問題2 | 問題3\n\n' +
+      '[FQ]: 問題1 | 問題2 | 問題3\n' +
+      '再另起一行，標注本次回答引用的資料來源（只從「庫存」「銷售」「客戶」「供應商」中選擇，只輸出這一行）：\n' +
+      '[SOURCES: 來源1, 來源2]\n\n' +
       `【最新業務資料】\n${context}${summaryNote}`
 
     const stream = client.messages.stream({
@@ -681,12 +683,19 @@ ${salesData
     const inputTokens = finalMsg.usage.input_tokens
     const outputTokens = finalMsg.usage.output_tokens
 
-    // Parse [FQ]: followup line from answer
+    // Parse [FQ]: followup line and [SOURCES:] from answer
     const fqMatch = fullText.match(/\n?\[FQ\]:\s*(.+?)(?:\n|$)/)
     const followups = fqMatch
       ? fqMatch[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 3)
       : []
-    const answer = fullText.replace(/\n?\[FQ\]:[^\n]*/m, '').trimEnd()
+    const srcMatch = fullText.match(/\n?\[SOURCES:\s*(.+?)(?:\n|$)/i)
+    const sources = srcMatch
+      ? srcMatch[1].split(',').map((s) => s.trim()).filter(Boolean)
+      : []
+    const answer = fullText
+      .replace(/\n?\[FQ\]:[^\n]*/m, '')
+      .replace(/\n?\[SOURCES:[^\n]*/im, '')
+      .trimEnd()
 
     // ── Step 5: RAG Faithfulness Evaluation ───────────────────────────────
     const faithfulness = await evaluateFaithfulness(client, context, answer)
@@ -709,7 +718,7 @@ ${salesData
       }
     }
 
-    return { answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed: selectedModel }
+    return { answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed: selectedModel, sources }
   })
 
   ipcMain.handle('ai:previewScope', (_e, params: ForecastParams = {}) => {
