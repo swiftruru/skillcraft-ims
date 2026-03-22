@@ -168,6 +168,45 @@ async function semanticEntityFallback(
   return result
 }
 
+// ── Cross-turn Entity Memory: resolve pronouns via session history ────────────
+function getSessionEntityNames(
+  db: ReturnType<typeof getDb>,
+  sessionId: number
+): string[] {
+  const names: string[] = []
+
+  // ① From summary_cache (covers older compressed messages)
+  const session = db
+    .prepare('SELECT summary_cache FROM ai_chat_sessions WHERE id = ?')
+    .get(sessionId) as { summary_cache: string | null } | undefined
+  if (session?.summary_cache) {
+    try {
+      const parsed = JSON.parse(session.summary_cache) as { entities?: string[] }
+      names.push(...(parsed.entities ?? []))
+    } catch { /* ignore corrupted cache */ }
+  }
+
+  // ② From recent 5 assistant message contexts — parse 識別實體 lines
+  const recentCtxs = db
+    .prepare(
+      `SELECT context FROM ai_chat_messages
+       WHERE session_id = ? AND role = 'assistant'
+       ORDER BY id DESC LIMIT 5`
+    )
+    .all(sessionId) as { context: string | null }[]
+
+  for (const row of recentCtxs) {
+    if (!row.context) continue
+    const match = row.context.match(/識別實體：(.+)/)
+    if (!match) continue
+    for (const nm of match[1].matchAll(/「([^」]+)」/g)) {
+      names.push(nm[1])
+    }
+  }
+
+  return [...new Set(names)]
+}
+
 // ── Adaptive Context Pruning: trim oversized context with Haiku ──────────────
 async function pruneContext(
   client: Anthropic,
@@ -657,6 +696,21 @@ ${salesData
       entities.products.push(...semantic.products)
       entities.customers.push(...semantic.customers)
       entities.suppliers.push(...semantic.suppliers)
+    }
+
+    // Cross-turn entity memory: pronoun detected + all entity resolution failed → look up session history
+    if (
+      !entities.products.length && !entities.customers.length && !entities.suppliers.length &&
+      sessionId != null &&
+      /他|她|它|那個|此|同樣|這個|一樣|這間|那間|該/.test(rewrittenQ)
+    ) {
+      const sessionNames = getSessionEntityNames(db, sessionId)
+      if (sessionNames.length > 0) {
+        const resolved = resolveEntities(db, sessionNames)
+        entities.products.push(...resolved.products)
+        entities.customers.push(...resolved.customers)
+        entities.suppliers.push(...resolved.suppliers)
+      }
     }
 
     const hasProducts = entities.products.length > 0
