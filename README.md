@@ -15,16 +15,16 @@
 
 > ## 🔍 RAG（Retrieval-Augmented Generation）整合展示
 >
-> 本系統實作一個完整的 RAG 應用流程，並原生整合進桌面 App：
+> 本系統實作一個完整的進階 RAG 管線，並原生整合進桌面 App：
 >
 > | 步驟 | 說明 | 對應實作 |
 > | --- | --- | --- |
-> | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | SQLite 查詢庫存、銷售、訂單、客戶等即時資料 |
-> | **Step 2 Augmented** | 將擷取的資料「增強」為 LLM 上下文 | 格式化為結構化 prompt context |
-> | **Step 3 Generation** | 呼叫 LLM「生成」自然語言回答 | Claude API（claude-haiku-4-5）回答業務問題 |
+> | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | Guard → Query Rewriting → Time Range Detection → Entity Extraction → Adaptive SQLite 查詢 |
+> | **Step 2 Augmented** | 將擷取的資料「增強」為 LLM 上下文 | Multi-model Routing + 格式化 context 注入 system prompt |
+> | **Step 3 Generation** | 呼叫 LLM「生成」自然語言回答 | Claude Haiku / Sonnet 串流輸出 + Faithfulness Scoring + Citation Attribution |
 >
 > 開啟 AI 頁面 → **AI 問答** Tab，即可用中文自由提問你的進銷存資料。
-> 每則回答均可展開「查看本次使用的業務資料」，觀察 Retrieval Context 的完整內容。
+> 每則回答均可展開「查看本次使用的業務資料」，觀察完整 Retrieval Context；引用來源以彩色徽章標注，多欄資料自動渲染為可排序表格。
 
 ## 截圖
 
@@ -269,16 +269,22 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 使用者問題
     │
     ▼
-[Pre-Retrieval Guard]  偵測與進銷存無關的問題，直接拒絕
+[Pre-Retrieval Guard]  偵測與進銷存無關的問題，直接拒絕（含攔截訊息持久化）
     │
     ▼
 [Query Rewriting]      改寫為精確查詢語句（與 Guard 合併為單次 LLM 呼叫）
     │
     ▼
-[Time Range Detection] Regex 解析中文時間詞 → SQLite 日期條件
+[Time Range Detection] Regex 解析中文時間詞 → SQLite 日期條件（不消耗 Token）
     │
     ▼
-[Adaptive Retrieval]   依主題（庫存/銷售/客戶/供應商）動態查詢 SQLite
+[Entity Extraction]    Regex 擷取商品 / 客戶 / 供應商名稱，SQLite LIKE 解析為 ID
+    │
+    ▼
+[Multi-model Routing]  Regex 判斷問題複雜度：簡單查詢 → Haiku，分析趨勢 → Sonnet
+    │
+    ▼
+[Adaptive Retrieval]   依主題（庫存/銷售/客戶/供應商）+ 實體 ID 動態查詢 SQLite
     │
     ▼
 [Augmented Prompt]     查詢結果格式化為結構化 context 注入 system prompt
@@ -288,16 +294,23 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
     │
     ▼
 [Faithfulness Scoring] 評分回答是否忠實於業務資料（0–100）
+    │
+    ▼
+[Citation Attribution] 解析 [SOURCES:] 標記，產生彩色引用來源徽章
 ```
 
 #### 功能特色
 
 - **串流回答**：Claude API 逐字即時輸出，含閃爍游標動畫
 - **多輪對話記憶**：Session 存入 SQLite，重啟 App 歷史保留；側邊欄可管理多個 Session
-- **後續問題建議**：每則回答附帶 3 個 AI 生成的後續問題，點擊即送出
+- **後續問題建議**：每則回答附帶 3 個 AI 生成的後續問題，點擊即送出；重新進入歷史 Session 時建議問題同樣顯示（持久化存入 DB）
+- **引用來源標注**：每則回答以彩色徽章標注引用的資料來源（藍=庫存、綠=銷售、橘=客戶、黃=供應商）
+- **多模型路由**：純查詢問題使用 Haiku（低成本），含分析/趨勢/比較的複雜問題自動升級 Sonnet；回應 metadata 列顯示使用的模型
+- **實體擷取**：自動識別問題中的商品/客戶/供應商名稱，注入精確 SQL `WHERE IN (...)` 條件提升回答準確性
+- **可排序互動表格**：AI 回答含有多欄比較資料時，自動渲染為可點擊欄位標題排序的互動式表格，附複製為 TSV 按鈕
 - **忠實度評分**：每則回答顯示彩色分數徽章（綠 ≥90 / 黃 ≥70 / 紅 <70）與說明
 - **Token 用量顯示**：顯示每次呼叫的 input / output token 消耗
-- **提示詞防護**：非進銷存問題自動攔截，不執行 Retrieval、不消耗 Token
+- **提示詞防護**：非進銷存問題自動攔截，不執行 Retrieval、不消耗主要 Token；攔截訊息同樣存入 Session 歷史
 - **錯誤重試**：API 失敗時顯示錯誤並附「重試」按鈕
 - **Word 匯出**：對話記錄匯出為 `.docx`，Markdown 表格正確渲染為 Word 表格
 - **動態高度**：聊天面板自動填滿視窗剩餘空間，輸入框不超出畫面

@@ -165,7 +165,7 @@ declare global {
         chat(question: string, sessionId?: number): Promise<{ answer: string; context: string; inputTokens: number; outputTokens: number; followups: string[]; faithfulness: { score: number; note: string }; modelUsed: string; sources: string[] }>
         onChatStream(cb: (text: string) => void): () => void
         getSessions(): Promise<{ id: number; title: string; created_at: string; updated_at: string; preview: string | null }[]>
-        getSessionMessages(sessionId: number): Promise<{ id: number; role: 'user' | 'assistant'; content: string; context: string | null; created_at: string }[]>
+        getSessionMessages(sessionId: number): Promise<{ id: number; role: 'user' | 'assistant'; content: string; context: string | null; followups: string[] | null; created_at: string }[]>
         createSession(): Promise<{ id: number }>
         deleteSession(sessionId: number): Promise<{ success: boolean }>
       }

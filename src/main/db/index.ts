@@ -22,6 +22,7 @@ import statusHistorySql from './migrations/017_status_history.sql?raw'
 import aiForecastsSql from './migrations/018_ai_forecasts.sql?raw'
 import orderLineDiscountSql from './migrations/019_order_line_discount.sql?raw'
 import aiChatSessionsSql from './migrations/020_ai_chat_sessions.sql?raw'
+import aiChatFollowupsSql from './migrations/021_ai_chat_followups.sql?raw'
 
 let db: Database.Database | null = null
 
@@ -105,6 +106,7 @@ async function runMigrations(database: Database.Database): Promise<void> {
     { name: '018_ai_forecasts', sql: aiForecastsSql },
     { name: '019_order_line_discount', sql: orderLineDiscountSql },
     { name: '020_ai_chat_sessions', sql: aiChatSessionsSql },
+    { name: '021_ai_chat_followups', sql: aiChatFollowupsSql },
   ]
 
   for (const migration of migrations) {

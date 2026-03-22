@@ -111,9 +111,11 @@ async function preProcessQuestion(
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 150,
       system:
-        '你是進銷存系統的查詢前處理助手。判斷問題是否在業務範疇內（庫存、銷售、採購、客戶、供應商、財務應收應付），並將業務問題改寫成清晰的標準查詢。\n' +
+        '你是進銷存系統的查詢前處理助手。判斷問題是否在業務範疇內，並將業務問題改寫成清晰的標準查詢。\n' +
+        '【業務範疇包含】庫存、銷售、採購、客戶、供應商、財務應收應付，以及關於進銷存/IMS 系統本身概念的說明。\n' +
         '只輸出 JSON，格式：{"inScope": true或false, "rewritten": "改寫後的問題或原問題"}\n' +
-        'inScope 為 false 的例子：寫程式、閒聊、學術問題、與進銷存完全無關的請求。',
+        'inScope 為 false 的例子：寫程式、無關閒聊、純學術/科學問題、與商業業務完全無關的請求。\n' +
+        'inScope 為 true 的例子：進銷存是什麼、庫存管理如何運作、如何看懂應收帳款、以及所有業務資料查詢。',
       messages: [{ role: 'user', content: question }]
     })
     const text = res.content[0].type === 'text' ? res.content[0].text : ''
@@ -371,12 +373,16 @@ ${salesData
 
   ipcMain.handle('ai:getSessionMessages', (_e, sessionId: number) => {
     const db = getDb()
-    return db
+    const rows = db
       .prepare(
-        `SELECT id, role, content, context, created_at
+        `SELECT id, role, content, context, followups, created_at
          FROM ai_chat_messages WHERE session_id = ? ORDER BY id ASC`
       )
-      .all(sessionId)
+      .all(sessionId) as { id: number; role: string; content: string; context: string | null; followups: string | null; created_at: string }[]
+    return rows.map((r) => ({
+      ...r,
+      followups: r.followups ? (JSON.parse(r.followups) as string[]) : null
+    }))
   })
 
   ipcMain.handle('ai:createSession', () => {
@@ -416,14 +422,30 @@ ${salesData
 
     // ── Guard: reject off-topic questions immediately ──────────────────────
     if (!inScope) {
+      const guardAnswer =
+        '抱歉，這個問題超出了 SkillCraft IMS 的業務範疇。\n\n我只能回答與進銷存業務相關的問題，例如：\n- 庫存狀況與低庫存警示\n- 銷售業績與訂單統計\n- 採購管理與待處理事項\n- 客戶應收帳款\n- 供應商應付帳款\n\n請嘗試詢問你的業務資料！'
+      const guardContext = '【問題防護】偵測到問題與進銷存業務無關，已拒絕回答，不執行 Retrieval。'
+      const guardFollowups = ['目前哪些商品庫存不足？', '本月銷售業績如何？', '有哪些待處理的訂單？']
+      if (sessionId) {
+        const isFirst = (db.prepare(`SELECT COUNT(*) as n FROM ai_chat_messages WHERE session_id = ?`).get(sessionId) as { n: number }).n === 0
+        db.prepare(`INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, 'user', ?)`).run(sessionId, question)
+        db.prepare(`INSERT INTO ai_chat_messages (session_id, role, content, context, followups) VALUES (?, 'assistant', ?, ?, ?)`).run(sessionId, guardAnswer, guardContext, JSON.stringify(guardFollowups))
+        if (isFirst) {
+          const title = question.length > 30 ? question.slice(0, 30) + '…' : question
+          db.prepare(`UPDATE ai_chat_sessions SET title = ?, updated_at = datetime('now') WHERE id = ?`).run(title, sessionId)
+        } else {
+          db.prepare(`UPDATE ai_chat_sessions SET updated_at = datetime('now') WHERE id = ?`).run(sessionId)
+        }
+      }
       return {
-        answer:
-          '抱歉，這個問題超出了 SkillCraft IMS 的業務範疇。\n\n我只能回答與進銷存業務相關的問題，例如：\n- 庫存狀況與低庫存警示\n- 銷售業績與訂單統計\n- 採購管理與待處理事項\n- 客戶應收帳款\n- 供應商應付帳款\n\n請嘗試詢問你的業務資料！',
-        context: '【問題防護】偵測到問題與進銷存業務無關，已拒絕回答，不執行 Retrieval。',
+        answer: guardAnswer,
+        context: guardContext,
         inputTokens: 0,
         outputTokens: 0,
-        followups: ['目前哪些商品庫存不足？', '本月銷售業績如何？', '有哪些待處理的訂單？'],
-        faithfulness: { score: 100, note: '問題超出業務範疇，系統防護層已攔截' }
+        followups: guardFollowups,
+        faithfulness: { score: 100, note: '問題超出業務範疇，系統防護層已攔截' },
+        modelUsed: MODEL_HAIKU,
+        sources: []
       }
     }
 
@@ -658,6 +680,7 @@ ${salesData
       '請嚴格根據下方【最新業務資料】回答使用者的問題。\n' +
       '如果資料不足以回答，請說明限制，不要捏造數字。\n' +
       '回答請使用繁體中文，條列式整理，簡潔有重點。\n' +
+      '如果列舉多項商品、客戶或供應商的比較資料（含多個數值欄位），請以 Markdown 表格格式呈現。\n' +
       '在回答最後另起一行，輸出 3 個相關追問（只輸出這一行）：\n' +
       '[FQ]: 問題1 | 問題2 | 問題3\n' +
       '再另起一行，標注本次回答引用的資料來源（只從「庫存」「銷售」「客戶」「供應商」中選擇，只輸出這一行）：\n' +
@@ -706,8 +729,8 @@ ${salesData
       db.prepare(`INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, 'user', ?)`)
         .run(sessionId, question)
       db.prepare(
-        `INSERT INTO ai_chat_messages (session_id, role, content, context) VALUES (?, 'assistant', ?, ?)`
-      ).run(sessionId, answer, context)
+        `INSERT INTO ai_chat_messages (session_id, role, content, context, followups) VALUES (?, 'assistant', ?, ?, ?)`
+      ).run(sessionId, answer, context, JSON.stringify(followups))
       if (isFirstMessage) {
         const title = question.length > 30 ? question.slice(0, 30) + '…' : question
         db.prepare(`UPDATE ai_chat_sessions SET title = ?, updated_at = datetime('now') WHERE id = ?`)

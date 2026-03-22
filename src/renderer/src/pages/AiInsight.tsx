@@ -34,6 +34,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { AiForecastScope, AiForecastItem, AiForecastLatest } from '@/types/schema'
 import { cn } from '@/lib/utils'
 import ProductPickerDialog from '@/components/ai/ProductPickerDialog'
+import { InlineSortableTable } from '@/components/ai/InlineSortableTable'
 
 const QUESTION_POOL = [
   '目前哪些商品庫存不足補貨點？',
@@ -53,6 +54,36 @@ const QUESTION_POOL = [
 function pickRandom(pool: string[], n: number): string[] {
   const shuffled = [...pool].sort(() => Math.random() - 0.5)
   return shuffled.slice(0, n)
+}
+
+function parseMarkdownTable(tableStr: string): { headers: string[]; rows: string[][] } {
+  const lines = tableStr.split('\n').filter((l) => l.trim().startsWith('|'))
+  if (lines.length < 3) return { headers: [], rows: [] }
+  const parseCells = (line: string) =>
+    line.split('|').slice(1, -1).map((c) => c.trim())
+  const headers = parseCells(lines[0])
+  const rows = lines.slice(2).map(parseCells)
+  return { headers, rows }
+}
+
+type ContentSegment = { type: 'text'; content: string } | { type: 'table'; content: string }
+
+function parseContentWithTables(content: string): ContentSegment[] {
+  const tableRegex = /((?:\|[^\n]+\|\n?){3,})/g
+  const segments: ContentSegment[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = tableRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', content: content.slice(lastIndex, match.index) })
+    }
+    segments.push({ type: 'table', content: match[0].trim() })
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < content.length) {
+    segments.push({ type: 'text', content: content.slice(lastIndex) })
+  }
+  return segments.length > 0 ? segments : [{ type: 'text', content }]
 }
 
 type ChatMessage = {
@@ -89,6 +120,30 @@ function formatRelativeTime(iso: string): string {
   const hours = Math.floor(diff / 3600000)
   if (hours < 24) return `${hours} 小時前`
   return `${Math.floor(hours / 24)} 天前`
+}
+
+const mdComponents = {
+  p: ({ children }: { children?: React.ReactNode }) => <p className="leading-relaxed mb-2 last:mb-0">{children}</p>,
+  ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
+  ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
+  li: ({ children }: { children?: React.ReactNode }) => <li className="leading-relaxed">{children}</li>,
+  strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold">{children}</strong>,
+  h1: ({ children }: { children?: React.ReactNode }) => <p className="font-semibold text-base mb-1">{children}</p>,
+  h2: ({ children }: { children?: React.ReactNode }) => <p className="font-semibold mb-1">{children}</p>,
+  h3: ({ children }: { children?: React.ReactNode }) => <p className="font-medium mb-1">{children}</p>,
+  table: ({ children }: { children?: React.ReactNode }) => (
+    <div className="overflow-x-auto mb-2">
+      <table className="text-xs border-collapse w-full">{children}</table>
+    </div>
+  ),
+  th: ({ children }: { children?: React.ReactNode }) => (
+    <th className="border border-border px-2 py-1 bg-muted/40 font-medium text-left">{children}</th>
+  ),
+  td: ({ children }: { children?: React.ReactNode }) => <td className="border border-border px-2 py-1">{children}</td>,
+  code: ({ children }: { children?: React.ReactNode }) => (
+    <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+  ),
+  hr: () => <hr className="border-border my-2" />
 }
 
 export default function AiInsight(): React.JSX.Element {
@@ -190,7 +245,8 @@ export default function AiInsight(): React.JSX.Element {
         sessionMessages.map((m) => ({
           role: m.role,
           content: m.content,
-          context: m.context ?? undefined
+          context: m.context ?? undefined,
+          followups: m.followups ?? undefined
         }))
       )
     }
@@ -318,6 +374,7 @@ export default function AiInsight(): React.JSX.Element {
         { role: 'assistant', content: answer, context, inputTokens, outputTokens, followups, faithfulness, modelUsed, sources }
       ])
       queryClient.invalidateQueries({ queryKey: ['ai', 'sessions'] })
+      if (sid) queryClient.invalidateQueries({ queryKey: ['ai', 'session', sid] })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '查詢失敗，請稍後重試。'
       setChatMessages((prev) => [
@@ -920,30 +977,24 @@ export default function AiInsight(): React.JSX.Element {
                         </div>
                       ) : (
                         <>
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              p: ({ children }) => <p className="leading-relaxed mb-2 last:mb-0">{children}</p>,
-                              ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
-                              ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
-                              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                              h1: ({ children }) => <p className="font-semibold text-base mb-1">{children}</p>,
-                              h2: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
-                              h3: ({ children }) => <p className="font-medium mb-1">{children}</p>,
-                              table: ({ children }) => (
-                                <div className="overflow-x-auto mb-2">
-                                  <table className="text-xs border-collapse w-full">{children}</table>
-                                </div>
-                              ),
-                              th: ({ children }) => <th className="border border-border px-2 py-1 bg-muted/40 font-medium text-left">{children}</th>,
-                              td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
-                              code: ({ children }) => <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
-                              hr: () => <hr className="border-border my-2" />
-                            }}
-                          >
-                            {msg.content}
-                          </ReactMarkdown>
+                          {msg.isStreaming ? (
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={mdComponents}
+                            >
+                              {msg.content}
+                            </ReactMarkdown>
+                          ) : (
+                            parseContentWithTables(msg.content).map((seg, si) =>
+                              seg.type === 'table' ? (
+                                <InlineSortableTable key={si} {...parseMarkdownTable(seg.content)} />
+                              ) : (
+                                <ReactMarkdown key={si} remarkPlugins={[remarkGfm]} components={mdComponents}>
+                                  {seg.content}
+                                </ReactMarkdown>
+                              )
+                            )
+                          )}
                           {msg.isStreaming && (
                             <span className="inline-block w-0.5 h-3.5 bg-foreground/60 ml-0.5 animate-pulse align-text-bottom" />
                           )}
