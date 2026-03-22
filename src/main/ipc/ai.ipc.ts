@@ -152,27 +152,74 @@ async function preProcessQuestion(
   } catch { return { inScope: true, rewritten: question } }
 }
 
-// ── Context Window Management: summarize old history ───────────────────────
+// ── Context Window Management: structured summary with persistent cache ─────
+function formatSummaryNote(
+  parsed: { entities?: string[]; conclusions?: string[]; pending?: string[] },
+  count: number
+): string {
+  const lines: string[] = [`\n\n【對話歷史摘要（已壓縮 ${count} 則舊訊息）】`]
+  if (parsed.entities?.length) lines.push(`- 涉及實體：${parsed.entities.join('、')}`)
+  if (parsed.conclusions?.length) parsed.conclusions.forEach((c) => lines.push(`- ${c}`))
+  if (parsed.pending?.length) lines.push(`- 待確認：${parsed.pending.join('；')}`)
+  return lines.join('\n')
+}
+
 async function buildHistoryWithSummary(
   client: Anthropic,
-  messages: { role: 'user' | 'assistant'; content: string }[]
+  messages: { role: 'user' | 'assistant'; content: string }[],
+  sessionId?: number,
+  db?: ReturnType<typeof getDb>
 ): Promise<{ history: { role: 'user' | 'assistant'; content: string }[]; summaryNote: string }> {
   const KEEP_RECENT = 8
   if (messages.length <= KEEP_RECENT) return { history: messages, summaryNote: '' }
+
+  const older = messages.slice(0, -KEEP_RECENT)
+
+  // ① Use cached summary if it covers at least as many older messages as we have now
+  if (sessionId && db) {
+    const session = db
+      .prepare('SELECT summary_cache, summary_at FROM ai_chat_sessions WHERE id = ?')
+      .get(sessionId) as { summary_cache: string | null; summary_at: number } | undefined
+    if (session?.summary_cache && Number(session.summary_at) >= older.length) {
+      try {
+        const cached = JSON.parse(session.summary_cache) as { entities?: string[]; conclusions?: string[]; pending?: string[] }
+        return { history: messages.slice(-KEEP_RECENT), summaryNote: formatSummaryNote(cached, older.length) }
+      } catch { /* corrupted cache, fall through to regenerate */ }
+    }
+  }
+
+  // ② Call Haiku for structured JSON summary
   try {
-    const older = messages.slice(0, -KEEP_RECENT)
     const transcript = older
-      .map((m) => `${m.role === 'user' ? 'Q' : 'A'}: ${m.content.slice(0, 300)}`)
+      .map((m) => `${m.role === 'user' ? 'Q' : 'A'}: ${m.content.slice(0, 400)}`)
       .join('\n')
     const res = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
-      messages: [{ role: 'user', content: `摘要以下對話的關鍵結論（2-3 句，保留重要數字）：\n${transcript}` }]
+      model: MODEL_HAIKU,
+      max_tokens: 400,
+      system:
+        '你是進銷存系統的對話摘要助手。從以下對話中提取關鍵資訊，只輸出 JSON（不加 markdown code block）：\n' +
+        '{"entities":["提到的商品/客戶/供應商名稱，最多5個"],' +
+        '"conclusions":["已確認的關鍵事實，含數字，最多4條"],' +
+        '"pending":["未解決的問題或待確認事項，最多2條"]}',
+      messages: [{ role: 'user', content: transcript }]
     })
-    const summary = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+    const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+    const match = text.match(/\{[\s\S]*\}/)
+    const parsed = match
+      ? (JSON.parse(match[0]) as { entities?: string[]; conclusions?: string[]; pending?: string[] })
+      : null
+
+    // ③ Persist summary cache to avoid regenerating on next message
+    if (parsed && sessionId && db) {
+      db.prepare('UPDATE ai_chat_sessions SET summary_cache = ?, summary_at = ? WHERE id = ?')
+        .run(JSON.stringify(parsed), older.length, sessionId)
+    }
+
     return {
       history: messages.slice(-KEEP_RECENT),
-      summaryNote: `\n\n【對話歷史摘要（已壓縮 ${older.length} 則舊訊息）】\n${summary}`
+      summaryNote: parsed
+        ? formatSummaryNote(parsed, older.length)
+        : `\n\n【對話歷史摘要（已壓縮 ${older.length} 則舊訊息）】`
     }
   } catch {
     return { history: messages.slice(-KEEP_RECENT), summaryNote: '\n\n（舊對話已自動截斷以控制 token 用量）' }
@@ -703,7 +750,7 @@ ${salesData
           .all(sessionId) as { role: 'user' | 'assistant'; content: string }[])
       : []
 
-    const { history: historyMessages, summaryNote } = await buildHistoryWithSummary(client, rawHistory)
+    const { history: historyMessages, summaryNote } = await buildHistoryWithSummary(client, rawHistory, sessionId, db)
 
     // ── Step 4: Generation — streaming Claude API ──────────────────────────
     const systemPrompt =
