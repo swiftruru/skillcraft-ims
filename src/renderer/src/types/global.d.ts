@@ -197,7 +197,7 @@ declare global {
       updater: {
         checkForUpdates(): Promise<void>
         installUpdate(): Promise<void>
-        onUpdateAvailable(cb: (info: { version: string }) => void): () => void
+        onUpdateAvailable(cb: (info: { version: string; isMac?: boolean }) => void): () => void
         onUpdateNotAvailable(cb: () => void): () => void
         onDownloadProgress(cb: (progress: { percent: number }) => void): () => void
         onUpdateDownloaded(cb: (info: { version: string }) => void): () => void

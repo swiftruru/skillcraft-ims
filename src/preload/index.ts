@@ -250,8 +250,8 @@ const electronAPI = {
   updater: {
     checkForUpdates: () => ipcRenderer.invoke('updater:checkForUpdates'),
     installUpdate: () => ipcRenderer.invoke('updater:install'),
-    onUpdateAvailable: (callback: (info: { version: string }) => void) => {
-      const handler = (_: Electron.IpcRendererEvent, info: { version: string }) => callback(info)
+    onUpdateAvailable: (callback: (info: { version: string; isMac?: boolean }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, info: { version: string; isMac?: boolean }) => callback(info)
       ipcRenderer.on('updater:update-available', handler)
       return () => ipcRenderer.removeListener('updater:update-available', handler)
     },

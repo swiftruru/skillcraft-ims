@@ -592,7 +592,7 @@ type UpdateStatus =
   | { type: 'idle' }
   | { type: 'checking' }
   | { type: 'up-to-date' }
-  | { type: 'available'; version: string }
+  | { type: 'available'; version: string; isMac?: boolean }
   | { type: 'downloading'; percent: number }
   | { type: 'downloaded'; version: string }
   | { type: 'error'; message: string }
@@ -608,7 +608,7 @@ function UpdateCard() {
   useEffect(() => {
     const unsubs = [
       window.electronAPI.updater.onUpdateAvailable((info) =>
-        setStatus({ type: 'available', version: info.version })
+        setStatus({ type: 'available', version: info.version, isMac: info.isMac })
       ),
       window.electronAPI.updater.onUpdateNotAvailable(() =>
         setStatus({ type: 'up-to-date' })
@@ -667,6 +667,17 @@ function UpdateCard() {
         ) : status.type === 'checking' ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" /> 檢查更新中…
+          </div>
+        ) : status.type === 'available' && status.isMac ? (
+          <div className="space-y-2">
+            <p className="text-sm text-primary flex items-center gap-1.5">
+              <Download className="w-4 h-4" />
+              發現新版本 <span className="font-mono font-semibold">v{status.version}</span>
+            </p>
+            <Button size="sm" onClick={handleInstall} className="gap-2">
+              <Download className="w-3.5 h-3.5" />
+              前往下載頁面
+            </Button>
           </div>
         ) : status.type === 'available' ? (
           <div className="flex items-center gap-2 text-sm text-primary">

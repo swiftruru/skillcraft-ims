@@ -180,16 +180,25 @@ function setupAutoUpdater(win: BrowserWindow): void {
   })
   ipcMain.handle('updater:install', () => {
     if (is.dev) return
-    autoUpdater.quitAndInstall(false, true)
+    // macOS: unsigned builds cannot pass ShipIt validation — open GitHub releases instead
+    if (process.platform === 'darwin') {
+      shell.openExternal('https://github.com/swiftruru/skillcraft-ims/releases/latest')
+    } else {
+      autoUpdater.quitAndInstall(false, true)
+    }
   })
 
   if (is.dev) return // skip autoUpdater events & startup check in dev mode
 
-  autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
+  // macOS: skip auto-download since ShipIt cannot install unsigned updates
+  autoUpdater.autoDownload = process.platform !== 'darwin'
+  autoUpdater.autoInstallOnAppQuit = process.platform !== 'darwin'
 
   autoUpdater.on('update-available', (info) => {
-    win.webContents.send('updater:update-available', { version: info.version })
+    win.webContents.send('updater:update-available', {
+      version: info.version,
+      isMac: process.platform === 'darwin'
+    })
   })
   autoUpdater.on('update-not-available', () => {
     win.webContents.send('updater:update-not-available')
