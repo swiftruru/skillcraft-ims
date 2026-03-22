@@ -22,7 +22,6 @@ const config: Configuration = {
     identity: null
   },
   win: {
-    artifactName: 'SkillCraft-IMS-Setup-${version}.${ext}',
     target: [
       { target: 'nsis', arch: ['x64'] },
       { target: 'portable', arch: ['x64'] }
@@ -34,6 +33,7 @@ const config: Configuration = {
     category: 'Office'
   },
   nsis: {
+    artifactName: 'SkillCraft-IMS-Setup-${version}.${ext}',
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     installerIcon: 'resources/icon.ico',
