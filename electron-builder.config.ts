@@ -22,6 +22,7 @@ const config: Configuration = {
     identity: null
   },
   win: {
+    artifactName: 'SkillCraft-IMS-Setup-${version}.${ext}',
     target: [
       { target: 'nsis', arch: ['x64'] },
       { target: 'portable', arch: ['x64'] }
