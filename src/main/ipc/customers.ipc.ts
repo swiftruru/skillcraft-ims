@@ -41,4 +41,24 @@ export function registerCustomersIpc(): void {
     const paidAmount = orders.filter((o) => o.payment_status === 'paid').reduce((sum, o) => sum + o.total_amount, 0)
     return { orders, totalAmount, paidAmount, balance: totalAmount - paidAmount }
   })
+
+  ipcMain.handle('customers:getPointsLog', (_e, customerId: number) => {
+    return getDb().prepare(`
+      SELECT l.*, s.order_no
+      FROM customer_points_log l
+      LEFT JOIN sales_orders s ON l.ref_order_id = s.id
+      WHERE l.customer_id = ?
+      ORDER BY l.created_at DESC
+      LIMIT 50
+    `).all(customerId)
+  })
+
+  ipcMain.handle('customers:adjustPoints', (_e, customerId: number, amount: number, note: string) => {
+    const db = getDb()
+    const customer = db.prepare(`SELECT points_balance FROM customers WHERE id = ?`).get(customerId) as { points_balance: number }
+    const newBalance = Math.max(0, customer.points_balance + amount)
+    db.prepare(`UPDATE customers SET points_balance = ? WHERE id = ?`).run(newBalance, customerId)
+    db.prepare(`INSERT INTO customer_points_log (customer_id, type, amount, note) VALUES (?, 'adjusted', ?, ?)`).run(customerId, amount, note)
+    return { points_balance: newBalance }
+  })
 }

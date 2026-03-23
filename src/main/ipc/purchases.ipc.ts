@@ -93,4 +93,50 @@ export function registerPurchasesIpc(): void {
     db.prepare(`UPDATE purchase_orders SET notes=? WHERE id=?`).run(notes, id)
     return PurchaseModel.findById(id)
   })
+
+  // --- Purchase Templates ---
+
+  ipcMain.handle('purchases:getTemplates', () => {
+    const db = getDb()
+    const templates = db.prepare(`
+      SELECT t.*, s.name as supplier_name
+      FROM purchase_templates t
+      LEFT JOIN suppliers s ON t.supplier_id = s.id
+      ORDER BY t.created_at DESC
+    `).all() as Record<string, unknown>[]
+    return templates.map((t) => ({
+      ...t,
+      items: db.prepare(`
+        SELECT ti.*, p.name as product_name, p.sku as product_sku
+        FROM purchase_template_items ti
+        LEFT JOIN products p ON ti.product_id = p.id
+        WHERE ti.template_id = ?
+      `).all(t.id)
+    }))
+  })
+
+  ipcMain.handle('purchases:createTemplate', (_e, data: {
+    name: string
+    supplier_id: number | null
+    notes: string | null
+    items: { product_id: number; quantity: number; unit_price: number; discount_pct?: number }[]
+  }) => {
+    const db = getDb()
+    const result = db.prepare(
+      `INSERT INTO purchase_templates (name, supplier_id, notes) VALUES (?, ?, ?)`
+    ).run(data.name, data.supplier_id, data.notes)
+    const id = result.lastInsertRowid as number
+    for (const item of data.items) {
+      db.prepare(`
+        INSERT INTO purchase_template_items (template_id, product_id, quantity, unit_price, discount_pct)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(id, item.product_id, item.quantity, item.unit_price, item.discount_pct ?? 0)
+    }
+    return { id }
+  })
+
+  ipcMain.handle('purchases:deleteTemplate', (_e, id: number) => {
+    getDb().prepare(`DELETE FROM purchase_templates WHERE id = ?`).run(id)
+    return { success: true }
+  })
 }

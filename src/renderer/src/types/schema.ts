@@ -43,6 +43,7 @@ export interface Customer {
   address: string | null
   notes: string | null
   credit_limit: number
+  points_balance: number
   created_at: string
 }
 
@@ -200,6 +201,7 @@ export interface AppSettings {
   companyAddress: string
   companyPhone: string
   claudeApiKey: string
+  points_rate: string
 }
 
 export type AiForecastScope = 'smart' | 'low_stock' | 'top_sales' | 'custom'

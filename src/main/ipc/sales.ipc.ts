@@ -48,6 +48,34 @@ function notifyLowStockAfterSale(soldProductIds: number[]): void {
   }
 }
 
+function awardPoints(orderId: number, customerId: number, totalAmount: number): void {
+  try {
+    const db = getDb()
+    const rateSetting = db.prepare(`SELECT value FROM settings WHERE key = 'points_rate'`).get() as { value: string } | undefined
+    const rate = parseFloat(rateSetting?.value ?? '100')
+    if (rate <= 0) return
+    const points = Math.floor(totalAmount / rate)
+    if (points <= 0) return
+    db.prepare(`UPDATE customers SET points_balance = points_balance + ? WHERE id = ?`).run(points, customerId)
+    db.prepare(`INSERT INTO customer_points_log (customer_id, type, amount, ref_order_id, note) VALUES (?, 'earned', ?, ?, ?)`).run(customerId, points, orderId, '訂單完成獲得')
+    db.prepare(`UPDATE sales_orders SET points_earned = ? WHERE id = ?`).run(points, orderId)
+  } catch { /* 靜默忽略點數錯誤，不影響主流程 */ }
+}
+
+function revokePoints(orderId: number, customerId: number): void {
+  try {
+    const db = getDb()
+    const order = db.prepare(`SELECT points_earned FROM sales_orders WHERE id = ?`).get(orderId) as { points_earned: number } | undefined
+    const earned = order?.points_earned ?? 0
+    if (earned <= 0) return
+    const customer = db.prepare(`SELECT points_balance FROM customers WHERE id = ?`).get(customerId) as { points_balance: number }
+    const newBalance = Math.max(0, customer.points_balance - earned)
+    db.prepare(`UPDATE customers SET points_balance = ? WHERE id = ?`).run(newBalance, customerId)
+    db.prepare(`INSERT INTO customer_points_log (customer_id, type, amount, ref_order_id, note) VALUES (?, 'redeemed', ?, ?, ?)`).run(customerId, -earned, orderId, '退貨扣除')
+    db.prepare(`UPDATE sales_orders SET points_earned = 0 WHERE id = ?`).run(orderId)
+  } catch { /* 靜默忽略 */ }
+}
+
 function recordSaleHistory(orderId: number, fromStatus: string | null, toStatus: string, note?: string) {
   const db = getDb()
   db.prepare(
@@ -73,6 +101,7 @@ export function registerSalesIpc(): void {
       if (result) {
         notifyLowStockAfterSale(soldProductIds)
         if (order) recordSaleHistory(id, order.status, 'completed')
+        if (order?.customer_id) awardPoints(id, order.customer_id, order.total_amount)
       }
       return { success: true, data: result }
     } catch (err: unknown) {
@@ -89,7 +118,10 @@ export function registerSalesIpc(): void {
     try {
       const order = SaleModel.findById(id)
       const result = SaleModel.return(id)
-      if (order) recordSaleHistory(id, order.status, 'returned')
+      if (order) {
+        recordSaleHistory(id, order.status, 'returned')
+        if (order.customer_id) revokePoints(id, order.customer_id)
+      }
       return { success: true, data: result }
     } catch (err: unknown) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -139,6 +171,7 @@ export function registerSalesIpc(): void {
         if (result) {
           notifyLowStockAfterSale((order.items ?? []).map((i) => i.product_id))
           recordSaleHistory(id, order.status, 'completed')
+          if (order.customer_id) awardPoints(id, order.customer_id, order.total_amount)
           completed++
         } else { skipped++ }
       } catch { skipped++ }

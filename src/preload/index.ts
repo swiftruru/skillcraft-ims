@@ -50,7 +50,9 @@ const electronAPI = {
     delete: (id: number) => ipcRenderer.invoke('customers:delete', id),
     getOrders: (customerId: number) => ipcRenderer.invoke('customers:getOrders', customerId),
     getOutstanding: (customerId: number) => ipcRenderer.invoke('customers:getOutstanding', customerId),
-    getStatement: (customerId: number, dateFrom: string, dateTo: string) => ipcRenderer.invoke('customers:getStatement', customerId, dateFrom, dateTo)
+    getStatement: (customerId: number, dateFrom: string, dateTo: string) => ipcRenderer.invoke('customers:getStatement', customerId, dateFrom, dateTo),
+    getPointsLog: (id: number) => ipcRenderer.invoke('customers:getPointsLog', id),
+    adjustPoints: (id: number, amount: number, note: string) => ipcRenderer.invoke('customers:adjustPoints', id, amount, note)
   },
 
   // Purchases
@@ -68,7 +70,15 @@ const electronAPI = {
     batchReceive: (ids: number[]) => ipcRenderer.invoke('purchases:batchReceive', ids),
     batchCancel: (ids: number[]) => ipcRenderer.invoke('purchases:batchCancel', ids),
     getStatusHistory: (orderId: number) => ipcRenderer.invoke('purchases:getStatusHistory', orderId),
-    updateNotes: (id: number, notes: string) => ipcRenderer.invoke('purchases:updateNotes', id, notes)
+    updateNotes: (id: number, notes: string) => ipcRenderer.invoke('purchases:updateNotes', id, notes),
+    getTemplates: () => ipcRenderer.invoke('purchases:getTemplates'),
+    createTemplate: (data: {
+      name: string
+      supplier_id: number | null
+      notes: string | null
+      items: { product_id: number; quantity: number; unit_price: number; discount_pct?: number }[]
+    }) => ipcRenderer.invoke('purchases:createTemplate', data),
+    deleteTemplate: (id: number) => ipcRenderer.invoke('purchases:deleteTemplate', id)
   },
 
   // Sales

@@ -4,7 +4,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Wand2, AlertTriangle, GripVertical } from 'lucide-react'
+import { Plus, Trash2, Wand2, AlertTriangle, GripVertical, BookTemplate, Save } from 'lucide-react'
 import { StepperInput } from '@/components/ui/StepperInput'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
@@ -19,6 +19,8 @@ import {
 import { CreatableSelect } from '@/components/ui/CreatableSelect'
 import type { Product, Supplier } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
+import { useToast } from '@/components/ui/use-toast'
+import { PurchaseTemplateDialog, type PurchaseTemplate } from './PurchaseTemplateDialog'
 
 const schema = z.object({
   supplier_id: z.coerce.number().nullable(),
@@ -70,9 +72,13 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
     }
   })
 
-  const { fields, append, remove, move } = useFieldArray({ control, name: 'items' })
+  const { fields, append, remove, move, replace } = useFieldArray({ control, name: 'items' })
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const { toast } = useToast()
 
   // Rule 69: Tab auto-add row — refs for first select trigger in each row
   const firstSelectRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -158,8 +164,9 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
 
   const fillMock = () => {
     const firstProduct = products?.[0]
+    const mockSupplier = suppliers?.find((s) => (s.credit_limit ?? 0) === 0) ?? suppliers?.find((s) => (s.credit_limit ?? 0) > 0) ?? null
     reset({
-      supplier_id: suppliers?.[0]?.id ?? null,
+      supplier_id: mockSupplier?.id ?? null,
       order_date: today,
       payment_terms: 30,
       notes: '測試採購單，請確認品項後送出',
@@ -176,6 +183,38 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
     if (product) {
       setValue(`items.${index}.unit_price`, product.buy_price)
     }
+  }
+
+  const handleLoadTemplate = (tpl: PurchaseTemplate) => {
+    setValue('supplier_id', tpl.supplier_id ?? null, { shouldDirty: true })
+    setValue('notes', tpl.notes ?? '', { shouldDirty: true })
+    replace(tpl.items.map((item) => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      discount_pct: item.discount_pct
+    })))
+    setTemplateDialogOpen(false)
+  }
+
+  const handleSaveTemplate = async () => {
+    const name = templateName.trim()
+    if (!name) return
+    const values = watch() as FormValues & { supplier_id: number | null }
+    await window.electronAPI.purchases.createTemplate({
+      name,
+      supplier_id: values.supplier_id ?? null,
+      notes: values.notes ?? null,
+      items: values.items.filter((item) => item.product_id > 0).map((item) => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount_pct: item.discount_pct ?? 0
+      }))
+    })
+    toast({ title: `已儲存範本：${name}`, variant: 'success' })
+    setTemplateName('')
+    setSaveTemplateOpen(false)
   }
 
   return (
@@ -209,7 +248,19 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
           )}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5 col-span-1">
-              <Label>{tf.supplierLabel}</Label>
+              <div className="flex items-center justify-between">
+                <Label>{tf.supplierLabel}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground px-1.5"
+                  onClick={() => setTemplateDialogOpen(true)}
+                >
+                  <BookTemplate className="w-3 h-3" />
+                  載入範本
+                </Button>
+              </div>
               <CreatableSelect
                 options={(suppliers ?? []).map((s) => ({ value: String(s.id), label: s.name }))}
                 value={watch('supplier_id') != null ? String(watch('supplier_id')) : ''}
@@ -301,7 +352,10 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
                   onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
                 >
                   <GripVertical className="w-4 h-4 text-muted-foreground/40 hover:text-muted-foreground cursor-grab shrink-0" aria-hidden="true" />
-                  <Select onValueChange={(v) => handleProductChange(i, v)}>
+                  <Select
+                    value={watch(`items.${i}.product_id`) > 0 ? String(watch(`items.${i}.product_id`)) : ''}
+                    onValueChange={(v) => handleProductChange(i, v)}
+                  >
                     <SelectTrigger
                       className="h-9"
                       ref={(el) => { firstSelectRefs.current[i] = el }}
@@ -419,6 +473,16 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
             <Button type="button" variant="outline" onClick={fillMock} className="mr-auto gap-1.5">
               <Wand2 className="w-3.5 h-3.5" />{t.common.mockData}
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() => { setTemplateName(''); setSaveTemplateOpen(true) }}
+            >
+              <Save className="w-3.5 h-3.5" />
+              另存為範本
+            </Button>
             <Button type="button" variant="outline" onClick={handleClose}>{t.common.cancel}</Button>
             <Button type="submit" disabled={isSubmitting || mutation.isPending || creditExceeded}>{tf.submitCreate}</Button>
           </DialogFooter>
@@ -440,6 +504,37 @@ export function PurchaseForm({ open, onOpenChange, initialData }: { open: boolea
           <Button variant="destructive" onClick={() => { setConfirmLeave(false); reset(); onOpenChange(false) }}>
             {t.unsavedChanges.discard}
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Template selection dialog */}
+    <PurchaseTemplateDialog
+      open={templateDialogOpen}
+      onOpenChange={setTemplateDialogOpen}
+      onSelect={handleLoadTemplate}
+    />
+
+    {/* Save as template dialog */}
+    <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>另存為範本</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-1.5">
+          <Label htmlFor="template-name">範本名稱</Label>
+          <Input
+            id="template-name"
+            placeholder="例：每週固定補貨"
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTemplate() } }}
+            autoFocus
+          />
+        </div>
+        <DialogFooter className="gap-2 mt-2">
+          <Button variant="outline" onClick={() => setSaveTemplateOpen(false)}>取消</Button>
+          <Button onClick={handleSaveTemplate} disabled={!templateName.trim()}>儲存</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

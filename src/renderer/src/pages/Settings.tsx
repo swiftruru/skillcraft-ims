@@ -322,6 +322,9 @@ export default function Settings() {
       {/* AI Settings */}
       <AiSettingsCard settings={settings} onSaved={() => queryClient.invalidateQueries({ queryKey: ['settings'] })} />
 
+      {/* Points Settings */}
+      <PointsSettingsCard settings={settings} onSaved={() => queryClient.invalidateQueries({ queryKey: ['settings'] })} />
+
       {/* DB Info */}
       <Card>
         <CardHeader>
@@ -709,6 +712,69 @@ function UpdateCard() {
             </Button>
           </div>
         ) : null}
+      </CardContent>
+    </Card>
+  )
+}
+
+function PointsSettingsCard({ settings, onSaved }: { settings: AppSettings | undefined; onSaved: () => void }) {
+  const [rate, setRate] = useState('')
+  const [saveStatus, setSaveStatus] = useState<Status>('idle')
+
+  useEffect(() => {
+    setRate(settings?.points_rate ?? '100')
+  }, [settings?.points_rate])
+
+  const handleSave = async () => {
+    setSaveStatus('loading')
+    try {
+      await window.electronAPI.settings.set('points_rate', rate.trim() || '100')
+      onSaved()
+      setSaveStatus('success')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">客戶積分設定</CardTitle>
+        <CardDescription>
+          設定消費積點的匯率，銷售單完成後自動依金額累積點數給客戶。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="points_rate">積分匯率（每 NT$X = 1 點）</Label>
+          <Input
+            id="points_rate"
+            type="number"
+            min={0}
+            className="max-w-xs"
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            預設 100（每消費 NT$100 得 1 點）。設為 0 可停用積分功能。
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button size="sm" onClick={handleSave} disabled={saveStatus === 'loading'}>
+            {saveStatus === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : '儲存'}
+          </Button>
+          {saveStatus === 'success' && (
+            <span className="text-xs text-green-400 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> 已儲存
+            </span>
+          )}
+          {saveStatus === 'error' && (
+            <span className="text-xs text-red-400 flex items-center gap-1">
+              <XCircle className="w-3 h-3" /> 儲存失敗
+            </span>
+          )}
+        </div>
       </CardContent>
     </Card>
   )
