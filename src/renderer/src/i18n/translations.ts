@@ -252,7 +252,10 @@ export const translations = {
       searchPlaceholder: '搜尋供應商...',
       emptyMessage: '沒有供應商',
       deleteTitle: '刪除供應商',
-      deleteDesc: '確定刪除此供應商？'
+      deleteDesc: '確定刪除此供應商？',
+      batchDelete: '批次刪除',
+      batchDeleteTitle: (_n: number) => '批次刪除供應商',
+      batchDeleteDesc: (n: number) => `確定要刪除選取的 ${n} 位供應商嗎？此操作不可撤銷。`
     },
     customers: {
       name: '名稱',
@@ -264,7 +267,10 @@ export const translations = {
       searchPlaceholder: '搜尋客戶...',
       emptyMessage: '沒有客戶',
       deleteTitle: '刪除客戶',
-      deleteDesc: '確定刪除此客戶？'
+      deleteDesc: '確定刪除此客戶？',
+      batchDelete: '批次刪除',
+      batchDeleteTitle: (_n: number) => '批次刪除客戶',
+      batchDeleteDesc: (n: number) => `確定要刪除選取的 ${n} 位客戶嗎？此操作不可撤銷。`
     },
     reports: {
       salesTrend: '銷售趨勢',
@@ -566,9 +572,17 @@ export const translations = {
       goProducts: '前往商品管理',
       goPurchases: '前往採購管理',
       goSales: '前往銷售管理',
+      goSuppliers: '前往供應商管理',
+      goCustomers: '前往客戶管理',
+      goReceivables: '前往帳款管理',
       goReports: '前往報表分析',
+      goStockTake: '前往盤點作業',
+      goInventoryHistory: '前往庫存異動',
       goSettings: '前往系統設定',
-      newItem: '新增（目前頁面）'
+      newItem: '新增（目前頁面）',
+      customizeShortcuts: '自訂快捷鍵',
+      pageSpecific: '目前頁面操作',
+      noPageShortcuts: '此頁面無額外快捷鍵'
     },
     ai: {
       title: 'AI 需求預測',
@@ -870,7 +884,10 @@ export const translations = {
       searchPlaceholder: 'Search suppliers...',
       emptyMessage: 'No suppliers',
       deleteTitle: 'Delete Supplier',
-      deleteDesc: 'Delete this supplier?'
+      deleteDesc: 'Delete this supplier?',
+      batchDelete: 'Batch Delete',
+      batchDeleteTitle: (_n: number) => 'Delete Suppliers',
+      batchDeleteDesc: (n: number) => `Delete ${n} selected suppliers? This cannot be undone.`
     },
     customers: {
       name: 'Name',
@@ -882,7 +899,10 @@ export const translations = {
       searchPlaceholder: 'Search customers...',
       emptyMessage: 'No customers',
       deleteTitle: 'Delete Customer',
-      deleteDesc: 'Delete this customer?'
+      deleteDesc: 'Delete this customer?',
+      batchDelete: 'Batch Delete',
+      batchDeleteTitle: (_n: number) => 'Delete Customers',
+      batchDeleteDesc: (n: number) => `Delete ${n} selected customers? This cannot be undone.`
     },
     reports: {
       salesTrend: 'Sales Trend',
@@ -1184,9 +1204,17 @@ export const translations = {
       goProducts: 'Go to Products',
       goPurchases: 'Go to Purchases',
       goSales: 'Go to Sales',
+      goSuppliers: 'Go to Suppliers',
+      goCustomers: 'Go to Customers',
+      goReceivables: 'Go to Receivables',
       goReports: 'Go to Reports',
+      goStockTake: 'Go to Stock Take',
+      goInventoryHistory: 'Go to Inventory History',
       goSettings: 'Go to Settings',
-      newItem: 'New (current page)'
+      newItem: 'New (current page)',
+      customizeShortcuts: 'Customize Shortcuts',
+      pageSpecific: 'Current Page',
+      noPageShortcuts: 'No extra shortcuts on this page'
     },
     ai: {
       title: 'AI Demand Forecast',

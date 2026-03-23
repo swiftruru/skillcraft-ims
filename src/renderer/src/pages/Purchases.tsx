@@ -290,7 +290,7 @@ export default function Purchases() {
         <CopyButton value={String(v)} />
       </div>
     )},
-    { key: 'supplier_name', label: p.supplier, sortable: true, render: (v, row) => {
+    { key: 'supplier_name', label: p.supplier, sortable: true, hideable: true, render: (v, row) => {
       const order = row as unknown as PurchaseOrder
       const supplier = (suppliers ?? []).find((s) => s.id === order.supplier_id)
       if (!supplier || !String(v)) return <span>{String(v ?? '—')}</span>
@@ -315,7 +315,7 @@ export default function Purchases() {
         </HoverCard>
       )
     }},
-    { key: 'order_date', label: p.orderDate, sortable: true, render: (v) => formatDate(String(v)) },
+    { key: 'order_date', label: p.orderDate, sortable: true, hideable: true, render: (v) => formatDate(String(v)) },
     {
       key: 'status',
       label: t.common.status,

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, Trash2, Wand2, Eye, AlignJustify, List, LayoutList, type LucideIcon } from 'lucide-react'
+import { Plus, Edit2, Trash2, Wand2, Eye, AlignJustify, List, LayoutList, Download, type LucideIcon } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable, type Column, type ContextMenuItem } from '@/components/common/DataTable'
 import { SearchWithHistory } from '@/components/common/SearchWithHistory'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -44,6 +45,8 @@ export default function Customers() {
   const [density, setDensity] = useState<'compact' | 'normal' | 'relaxed'>(() =>
     (localStorage.getItem('ims-dt-density-customers') as 'compact' | 'normal' | 'relaxed') ?? 'normal'
   )
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
 
   useEffect(() => {
     const handler = () => { setEditCustomer(null); reset({ name: '', contact: '', phone: '', email: '', address: '', notes: '', credit_limit: 0 }); setFormOpen(true) }
@@ -84,6 +87,41 @@ export default function Customers() {
       })
     }
   })
+  const batchDeleteMutation = useMutation({
+    mutationFn: (ids: number[]) => window.electronAPI.customers.batchDelete(ids),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
+      setSelectedIds(new Set())
+      setBatchDeleteOpen(false)
+      toast({ title: `已刪除選取的客戶` })
+    }
+  })
+
+  const allIds = (customers ?? []).map((cust) => cust.id)
+  const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
+  const toggleAll = () => allSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(allIds))
+  const toggleOne = (id: number) => setSelectedIds((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const exportSelected = () => {
+    const rows = (customers ?? []).filter((item) => selectedIds.has(item.id))
+    const header = '客戶名稱,聯絡人,電話,Email,地址,信用額度,點數餘額'
+    const lines = rows.map((item) =>
+      [
+        `"${item.name}"`, item.contact ?? '', item.phone ?? '',
+        item.email ?? '', `"${item.address ?? ''}"`,
+        item.credit_limit, item.points_balance
+      ].join(',')
+    )
+    const csv = '\uFEFF' + [header, ...lines].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'customers.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const MOCK_CUSTOMERS = [
     { name: '中小型電商公司', contact: '王經理', phone: '02-8765-4321', email: 'wang@ecom.tw', address: '台北市信義區松仁路100號', notes: '' },
@@ -109,16 +147,29 @@ export default function Customers() {
   }
 
   const columns: Column<Customer>[] = [
+    {
+      key: '__check__' as keyof Customer,
+      label: '',
+      className: 'w-10',
+      render: (_v, row) => (
+        <Checkbox
+          checked={selectedIds.has((row as unknown as Customer).id)}
+          onCheckedChange={() => toggleOne((row as unknown as Customer).id)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+      header: () => <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+    },
     { key: 'name', label: c.name, sortable: true, render: (v, row) => (
       <button className="text-left hover:text-primary hover:underline transition-colors" onClick={() => setDetailCustomer(row as unknown as Customer)}>
         {String(v)}
       </button>
     )},
-    { key: 'contact', label: c.contact, sortable: true },
-    { key: 'phone', label: c.phone, sortable: true },
-    { key: 'email', label: c.email, sortable: true },
-    { key: 'address', label: c.address, sortable: true },
-    { key: 'credit_limit', label: '信用額度', sortable: true, render: (v) => (Number(v) > 0 ? formatCurrency(Number(v)) : <span className="text-muted-foreground">—</span>) },
+    { key: 'contact', label: c.contact, sortable: true, hideable: true },
+    { key: 'phone', label: c.phone, sortable: true, hideable: true },
+    { key: 'email', label: c.email, sortable: true, hideable: true },
+    { key: 'address', label: c.address, sortable: true, hideable: true },
+    { key: 'credit_limit', label: '信用額度', sortable: true, hideable: true, render: (v) => (Number(v) > 0 ? formatCurrency(Number(v)) : <span className="text-muted-foreground">—</span>) },
   ]
 
   return (
@@ -157,12 +208,13 @@ export default function Customers() {
         {search ? `找到 ${(customers ?? []).length} 筆結果` : ''}
       </div>
       <div className="rounded-lg border border-border bg-card" aria-busy={isLoading} aria-label="客戶列表">
-        {isLoading ? <TableSkeleton rows={8} cols={6} /> : (
+        {isLoading ? <TableSkeleton rows={8} cols={7} /> : (
           <DataTable
             tableLabel="客戶列表"
             data={(customers ?? []) as unknown as Record<string, unknown>[]}
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             keyField="id"
+            storageKey="customers"
             emptyMessage={c.emptyMessage}
             onRowFocus={(row) => setDetailCustomer(row as unknown as Customer)}
             flashRowId={flashId}
@@ -218,6 +270,26 @@ export default function Customers() {
       </Dialog>
       <ConfirmDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)} title={c.deleteTitle} description={c.deleteDesc} onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete)} />
       <CustomerDetailDialog customer={detailCustomer} open={detailCustomer !== null} onOpenChange={(open) => !open && setDetailCustomer(null)} />
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-card border border-border rounded-xl shadow-2xl px-4 py-2.5">
+          <span className="text-sm text-muted-foreground">已選 {selectedIds.size} 位</span>
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={exportSelected}>
+            <Download className="w-3.5 h-3.5" />匯出選取
+          </Button>
+          <Button size="sm" variant="destructive" className="gap-1.5 text-xs h-8" onClick={() => setBatchDeleteOpen(true)}>
+            <Trash2 className="w-3.5 h-3.5" />{c.batchDelete}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>{t.common.cancel}</Button>
+        </div>
+      )}
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onOpenChange={setBatchDeleteOpen}
+        title={c.batchDeleteTitle(selectedIds.size)}
+        description={c.batchDeleteDesc(selectedIds.size)}
+        onConfirm={() => batchDeleteMutation.mutate(Array.from(selectedIds))}
+      />
     </div>
   )
 }

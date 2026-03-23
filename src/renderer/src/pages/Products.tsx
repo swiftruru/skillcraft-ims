@@ -251,7 +251,7 @@ export default function Products() {
         </div>
       )
     }},
-    { key: 'category', label: p.category, sortable: true, render: (v) => {
+    { key: 'category', label: p.category, sortable: true, hideable: true, render: (v) => {
       const active = categoryFilter === String(v)
       const colors = categoryColor(String(v))
       return (

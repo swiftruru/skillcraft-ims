@@ -338,7 +338,7 @@ export default function Sales() {
         <CopyButton value={String(v)} />
       </div>
     )},
-    { key: 'customer_name', label: s.customer, sortable: true, render: (v, row) => {
+    { key: 'customer_name', label: s.customer, sortable: true, hideable: true, render: (v, row) => {
       const order = row as unknown as SalesOrder
       const customer = (customers ?? []).find((c) => c.id === order.customer_id)
       if (!customer || !String(v)) return <span>{String(v ?? '—')}</span>
@@ -363,7 +363,7 @@ export default function Sales() {
         </HoverCard>
       )
     }},
-    { key: 'order_date', label: s.orderDate, sortable: true, render: (v) => formatDate(String(v)) },
+    { key: 'order_date', label: s.orderDate, sortable: true, hideable: true, render: (v) => formatDate(String(v)) },
     {
       key: 'status',
       label: t.common.status,

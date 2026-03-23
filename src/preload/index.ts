@@ -38,7 +38,8 @@ const electronAPI = {
     delete: (id: number) => ipcRenderer.invoke('suppliers:delete', id),
     getOrders: (supplierId: number) => ipcRenderer.invoke('suppliers:getOrders', supplierId),
     getOutstanding: (supplierId: number) => ipcRenderer.invoke('suppliers:getOutstanding', supplierId),
-    getStatement: (supplierId: number, dateFrom: string, dateTo: string) => ipcRenderer.invoke('suppliers:getStatement', supplierId, dateFrom, dateTo)
+    getStatement: (supplierId: number, dateFrom: string, dateTo: string) => ipcRenderer.invoke('suppliers:getStatement', supplierId, dateFrom, dateTo),
+    batchDelete: (ids: number[]) => ipcRenderer.invoke('suppliers:batchDelete', ids)
   },
 
   // Customers
@@ -52,7 +53,8 @@ const electronAPI = {
     getOutstanding: (customerId: number) => ipcRenderer.invoke('customers:getOutstanding', customerId),
     getStatement: (customerId: number, dateFrom: string, dateTo: string) => ipcRenderer.invoke('customers:getStatement', customerId, dateFrom, dateTo),
     getPointsLog: (id: number) => ipcRenderer.invoke('customers:getPointsLog', id),
-    adjustPoints: (id: number, amount: number, note: string) => ipcRenderer.invoke('customers:adjustPoints', id, amount, note)
+    adjustPoints: (id: number, amount: number, note: string) => ipcRenderer.invoke('customers:adjustPoints', id, amount, note),
+    batchDelete: (ids: number[]) => ipcRenderer.invoke('customers:batchDelete', ids)
   },
 
   // Purchases

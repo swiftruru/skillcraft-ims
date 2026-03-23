@@ -61,4 +61,15 @@ export function registerCustomersIpc(): void {
     db.prepare(`INSERT INTO customer_points_log (customer_id, type, amount, note) VALUES (?, 'adjusted', ?, ?)`).run(customerId, amount, note)
     return { points_balance: newBalance }
   })
+
+  ipcMain.handle('customers:batchDelete', (_e, ids: number[]) => {
+    const db = getDb()
+    const stmt = db.prepare(`DELETE FROM customers WHERE id = ?`)
+    let deleted = 0
+    for (const id of ids) {
+      stmt.run(id)
+      deleted++
+    }
+    return { deleted }
+  })
 }

@@ -41,4 +41,15 @@ export function registerSuppliersIpc(): void {
     const paidAmount = orders.filter((o) => o.payment_status === 'paid').reduce((sum, o) => sum + o.total_amount, 0)
     return { orders, totalAmount, paidAmount, balance: totalAmount - paidAmount }
   })
+
+  ipcMain.handle('suppliers:batchDelete', (_e, ids: number[]) => {
+    const db = getDb()
+    const stmt = db.prepare(`DELETE FROM suppliers WHERE id = ?`)
+    let deleted = 0
+    for (const id of ids) {
+      stmt.run(id)
+      deleted++
+    }
+    return { deleted }
+  })
 }
