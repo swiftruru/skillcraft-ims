@@ -198,7 +198,9 @@ const electronAPI = {
   // PDF print
   print: {
     pdf: (opts: { type: 'sales' | 'purchase'; id: number }) => ipcRenderer.invoke('print:pdf', opts),
-    exportMonthlyPdf: (opts: { year: number; month: number }) => ipcRenderer.invoke('reports:exportMonthlyPdf', opts)
+    exportMonthlyPdf: (opts: { year: number; month: number }) => ipcRenderer.invoke('reports:exportMonthlyPdf', opts),
+    labels: (productIds: number[], opts?: { showPrice?: boolean }) =>
+      ipcRenderer.invoke('print:labels', { productIds, ...opts })
   },
 
   // Shell

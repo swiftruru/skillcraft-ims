@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useFocusReturn } from '@/lib/useFocusReturn'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, FileDown, Target, type LucideIcon } from 'lucide-react'
+import { Plus, Edit2, Trash2, AlertTriangle, SlidersHorizontal, History, Download, Upload, ShoppingCart, Package, Pencil, LayoutGrid, Table2, AlignJustify, List, LayoutList, FileDown, Target, Tag, type LucideIcon } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -401,6 +401,15 @@ export default function Products() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            title="列印標籤"
+            onClick={(e) => { e.stopPropagation(); window.electronAPI.print.labels([row.id as number]) }}
+          >
+            <Tag className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
             title={p.adjustInventory}
             onClick={() => setAdjustProduct(row as unknown as Product)}
           >
@@ -775,6 +784,15 @@ export default function Products() {
             }}
           >
             <FileDown className="w-3.5 h-3.5" />匯出選取
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs h-8"
+            onClick={() => window.electronAPI.print.labels(Array.from(selectedIds))}
+          >
+            <Tag className="w-3.5 h-3.5" />
+            列印標籤 ({selectedIds.size})
           </Button>
           <Button
             variant="destructive"

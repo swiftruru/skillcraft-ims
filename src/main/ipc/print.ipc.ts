@@ -1,5 +1,6 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { writeFileSync } from 'fs'
+import QRCode from 'qrcode'
 import { getDb } from '../db'
 
 interface OrderRow {
@@ -458,4 +459,85 @@ export function registerPrintIpc(): void {
     writeFileSync(filePath, pdfBuffer)
     return { success: true, filePath }
   })
+
+  // ── Product Label PDF ─────────────────────────────────────────────────────
+  ipcMain.handle(
+    'print:labels',
+    async (_e, opts: { productIds: number[]; showPrice?: boolean }) => {
+      const db = getDb()
+      const products = opts.productIds
+        .map((id) =>
+          db
+            .prepare(`SELECT sku, name, sell_price FROM products WHERE id = ?`)
+            .get(id)
+        )
+        .filter(Boolean) as { sku: string; name: string; sell_price: number }[]
+
+      if (products.length === 0) return { success: false }
+
+      const labelItems = await Promise.all(
+        products.map(async (p) => {
+          const qrSvg = await QRCode.toString(p.sku, {
+            type: 'svg',
+            margin: 0,
+            width: 88,
+            color: { dark: '#000000', light: '#FFFFFF' }
+          })
+          const priceHtml =
+            opts.showPrice !== false
+              ? `<div class="price">NT$ ${Number(p.sell_price).toLocaleString()}</div>`
+              : ''
+          const nameShort = p.name.length > 14 ? p.name.slice(0, 13) + '\u2026' : p.name
+          return `<div class="label">
+            <div class="qr">${qrSvg}</div>
+            <div class="info">
+              <div class="name">${nameShort}</div>
+              <div class="sku">${p.sku}</div>
+              ${priceHtml}
+            </div>
+          </div>`
+        })
+      )
+
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; }
+  .page { display: grid; grid-template-columns: repeat(4, 47.5mm); gap: 3mm; padding: 8mm; }
+  .label {
+    width: 47.5mm; height: 30mm; border: 0.5pt solid #999; border-radius: 2pt;
+    display: flex; align-items: center; padding: 2mm; gap: 2mm;
+    page-break-inside: avoid; overflow: hidden;
+  }
+  .qr { width: 24mm; min-width: 24mm; }
+  .qr svg { width: 100%; height: auto; display: block; }
+  .info { flex: 1; overflow: hidden; }
+  .name  { font-size: 7.5pt; font-weight: bold; line-height: 1.2; margin-bottom: 1.5mm; word-break: break-all; }
+  .sku   { font-size: 6.5pt; color: #555; margin-bottom: 1mm; }
+  .price { font-size: 8pt; font-weight: bold; color: #1d4ed8; }
+  @media print { @page { size: A4; margin: 0; } }
+</style></head>
+<body><div class="page">${labelItems.join('')}</div></body></html>`
+
+      const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true } })
+      await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      await new Promise<void>((r) => setTimeout(r, 400))
+
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: '儲存商品標籤 PDF',
+        defaultPath: `product-labels-${new Date().toISOString().slice(0, 10)}.pdf`,
+        filters: [{ name: 'PDF 檔案', extensions: ['pdf'] }]
+      })
+
+      if (canceled || !filePath) {
+        win.destroy()
+        return { success: false }
+      }
+
+      const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' })
+      win.destroy()
+      writeFileSync(filePath, pdf)
+      return { success: true, filePath }
+    }
+  )
 }
