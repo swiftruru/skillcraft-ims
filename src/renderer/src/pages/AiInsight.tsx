@@ -139,6 +139,7 @@ type ChatMessage = {
   faithfulness?: { score: number; note: string }
   modelUsed?: string
   sources?: string[]
+  createdAt?: string
 }
 
 type ConfidenceFilter = 'all' | 'high' | 'low'
@@ -321,7 +322,15 @@ export default function AiInsight(): React.JSX.Element {
           content: m.content,
           context: m.context ?? undefined,
           followups: m.followups ?? undefined,
-          sources: m.sources ?? undefined
+          sources: m.sources ?? undefined,
+          faithfulness:
+            m.faithfulness_score != null
+              ? { score: m.faithfulness_score, note: '' }
+              : undefined,
+          modelUsed: m.model_used ?? undefined,
+          inputTokens: m.input_tokens ?? undefined,
+          outputTokens: m.output_tokens ?? undefined,
+          createdAt: m.created_at ?? undefined
         }))
       )
     }

@@ -248,7 +248,18 @@ export function registerExportIpc(): void {
     'export:aiChat',
     async (
       _e,
-      messages: { role: 'user' | 'assistant'; content: string; context?: string }[]
+      messages: {
+        role: 'user' | 'assistant'
+        content: string
+        context?: string
+        faithfulness?: { score: number; note: string }
+        modelUsed?: string
+        inputTokens?: number
+        outputTokens?: number
+        createdAt?: string
+        sources?: string[]
+        followups?: string[]
+      }[]
     ) => {
       const { filePath } = await dialog.showSaveDialog({
         defaultPath: `skillcraft-ai-chat-${new Date().toISOString().slice(0, 10)}.docx`,
@@ -350,17 +361,58 @@ export function registerExportIpc(): void {
         return elements
       }
 
+      // ── Cover page stats ────────────────────────────────────────────────────
+      const assistantMsgs = messages.filter((m) => m.role === 'assistant')
+      const userMsgs = messages.filter((m) => m.role === 'user')
+      const faithScores = assistantMsgs
+        .map((m) => m.faithfulness?.score)
+        .filter((s): s is number => s != null)
+      const avgFaith =
+        faithScores.length > 0
+          ? Math.round(faithScores.reduce((a, b) => a + b, 0) / faithScores.length)
+          : null
+      const faithLabel = (score: number): string =>
+        score >= 90 ? '優秀' : score >= 70 ? '良好' : '需改善'
+
       const children: (Paragraph | Table)[] = [
+        // Cover page
+        new Paragraph({ text: '' }),
+        new Paragraph({ text: '' }),
         new Paragraph({
-          text: 'SkillCraft IMS — AI 問答對話紀錄',
+          text: 'SkillCraft IMS',
           heading: HeadingLevel.HEADING_1,
           alignment: AlignmentType.CENTER
         }),
         new Paragraph({
-          children: [new TextRun({ text: `匯出時間：${dateStr}`, color: '888888', size: 20 })],
+          children: [new TextRun({ text: 'AI 對話報告', bold: true, size: 36, color: '334155' })],
           alignment: AlignmentType.CENTER
         }),
         new Paragraph({ text: '' }),
+        new Paragraph({ text: '' }),
+        new Paragraph({
+          children: [new TextRun({ text: `導出日期：${dateStr}`, size: 24, color: '64748B' })],
+          alignment: AlignmentType.CENTER
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `對話輪數：${userMsgs.length} 問 / ${assistantMsgs.length} 答`, size: 24, color: '64748B' })],
+          alignment: AlignmentType.CENTER
+        }),
+        ...(avgFaith != null
+          ? [new Paragraph({
+              children: [new TextRun({ text: `平均忠實度：${avgFaith}%（${faithLabel(avgFaith)}）`, size: 24, color: '64748B' })],
+              alignment: AlignmentType.CENTER
+            })]
+          : []),
+        new Paragraph({ text: '' }),
+        new Paragraph({ text: '' }),
+        new Paragraph({
+          border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: 'CBD5E1' } },
+          text: '',
+          alignment: AlignmentType.CENTER
+        }),
+        // Page break into content
+        new Paragraph({ text: '', pageBreakBefore: true }),
+        // RAG flow note
         new Paragraph({
           children: [
             new TextRun({ text: 'RAG 流程說明：', bold: true }),
@@ -396,10 +448,66 @@ export function registerExportIpc(): void {
             })
           )
         } else {
+          // Metadata bar: timestamp | model | faithfulness | tokens
+          const metaParts: string[] = []
+          if (msg.createdAt) {
+            const d = new Date(msg.createdAt)
+            const ts = d.toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+            metaParts.push(`📅 ${ts}`)
+          }
+          if (msg.modelUsed) metaParts.push(`🤖 ${msg.modelUsed}`)
+          if (msg.faithfulness != null) metaParts.push(`🎯 忠實度 ${msg.faithfulness.score}%`)
+          if (msg.inputTokens != null || msg.outputTokens != null) {
+            const inp = msg.inputTokens?.toLocaleString() ?? '—'
+            const out = msg.outputTokens?.toLocaleString() ?? '—'
+            metaParts.push(`📊 輸入 ${inp} / 輸出 ${out} tokens`)
+          }
+          if (metaParts.length > 0) {
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: metaParts.join('   |   '), size: 18, color: '94A3B8' })],
+                shading: { type: ShadingType.SOLID, color: 'F8FAFC' },
+                indent: { left: 180 }
+              })
+            )
+          }
+
           // Render markdown content (with table support)
           for (const el of mdToDocxElements(msg.content)) {
             children.push(el)
           }
+
+          // Sources
+          if (msg.sources && msg.sources.length > 0) {
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: '引用來源：', italics: true, size: 18, color: '64748B' }),
+                  new TextRun({ text: msg.sources.join('、'), italics: true, size: 18, color: '64748B' })
+                ],
+                indent: { left: 360 }
+              })
+            )
+          }
+
+          // Follow-up suggestions
+          if (msg.followups && msg.followups.length > 0) {
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: '▸ 建議延伸問題', size: 18, color: '94A3B8', italics: true })],
+                indent: { left: 360 }
+              })
+            )
+            for (const fq of msg.followups) {
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: `• ${fq}`, size: 18, color: '94A3B8' })],
+                  indent: { left: 540 }
+                })
+              )
+            }
+          }
+
           // Retrieval context as a collapsed table
           if (msg.context) {
             children.push(new Paragraph({ text: '' }))
@@ -441,6 +549,17 @@ export function registerExportIpc(): void {
           children.push(new Paragraph({ text: '' }))
         }
       }
+
+      // Faithfulness legend at the end
+      children.push(new Paragraph({ text: '' }))
+      children.push(new Paragraph({ text: '' }))
+      children.push(
+        new Paragraph({
+          border: { top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' } },
+          children: [new TextRun({ text: '忠實度評分說明：≥ 90% 優秀 · 70–89% 良好 · < 70% 需改善', size: 18, color: '94A3B8', italics: true })],
+          alignment: AlignmentType.CENTER
+        })
+      )
 
       const doc = new Document({
         sections: [{ children }],

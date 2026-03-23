@@ -978,10 +978,16 @@ ${salesData
     const db = getDb()
     const rows = db
       .prepare(
-        `SELECT id, role, content, context, followups, sources, created_at
+        `SELECT id, role, content, context, followups, sources, created_at,
+                faithfulness_score, model_used, input_tokens, output_tokens
          FROM ai_chat_messages WHERE session_id = ? ORDER BY id ASC`
       )
-      .all(sessionId) as { id: number; role: string; content: string; context: string | null; followups: string | null; sources: string | null; created_at: string }[]
+      .all(sessionId) as {
+        id: number; role: string; content: string; context: string | null
+        followups: string | null; sources: string | null; created_at: string
+        faithfulness_score: number | null; model_used: string | null
+        input_tokens: number | null; output_tokens: number | null
+      }[]
     return rows.map((r) => ({
       ...r,
       followups: r.followups ? (JSON.parse(r.followups) as string[]) : null,

@@ -19,13 +19,13 @@
 >
 > | 步驟 | 說明 | 對應實作 |
 > | --- | --- | --- |
-> | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | Guard → Query Rewriting → Time Range Detection → **Query Expansion** → Entity Extraction → **Semantic Entity Fallback** → Adaptive SQLite 查詢 |
+> | **Step 1 Retrieval** | 從資料庫「擷取」相關業務資料 | Guard → Query Rewriting → Time Range Detection → **Query Decomposition**（複合問題並行拆解）→ **Query Expansion** → Entity Extraction → **Semantic Entity Fallback** → **Adaptive Retrieval with Entity Feedback**（實體反饋自適應擴展查詢） |
 > | **Step 2 Augmented** | 將擷取的資料「增強」為 LLM 上下文 | Multi-model Routing（Haiku / Sonnet）+ **Adaptive Context Pruning** + 格式化 context 注入 system prompt + **結構化多輪摘要快取** |
 > | **Step 3 Generation** | 呼叫 LLM「生成」自然語言回答 | Claude 串流輸出 + Faithfulness Scoring + Citation Attribution + Followup 建議持久化 |
 >
 > 開啟 AI 頁面 → **AI 問答** Tab，即可用中文自由提問你的進銷存資料。
 > 每則回答均可展開「查看本次使用的業務資料」，觀察完整 Retrieval Context；引用來源以彩色徽章標注，多欄資料自動渲染為可排序表格。
-> **品質分析** Tab 提供歷史忠實度分佈、模型使用比例、Guard 攔截率、近 7 天問答趨勢等 KPI 儀表板。
+> **品質分析** Tab 提供 KPI 儀表板（問答數、忠實度、Guard 攔截率、Token 用量）、**14 天忠實度趨勢折線圖**、**實體查詢熱點排行**（Top 5 商品/客戶/供應商 + avg faithfulness badge）、**低分問答 Review 清單**（faithfulness < 70 可點擊展開）等完整的 RAG 健康診斷工具。
 
 ## 截圖
 
@@ -270,42 +270,55 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 使用者問題
     │
     ▼
-[Pre-Retrieval Guard]  偵測與進銷存無關的問題，直接拒絕（含攔截訊息持久化）
+[Pre-Retrieval Guard]     偵測與進銷存無關的問題，直接拒絕（含攔截訊息持久化）
     │
     ▼
-[Query Rewriting]      改寫為精確查詢語句（與 Guard 合併為單次 LLM 呼叫）
+[Query Rewriting]         改寫為精確查詢語句（與 Guard 合併為單次 LLM 呼叫）
     │
     ▼
-[Time Range Detection] Regex 解析中文時間詞 → SQLite 日期條件（不消耗 Token）
+[Time Range Detection]    Regex 解析中文時間詞 → SQLite 日期條件（不消耗 Token）
     │
     ▼
-[Entity Extraction]    Regex 擷取商品 / 客戶 / 供應商名稱，SQLite LIKE 解析為 ID
+[Query Decomposition]     Heuristic Regex + Haiku 偵測複合問題
+                          → 拆解為子問題，以 Promise.all 並行執行以下步驟
+    │
+    ▼（各子問題並行）
+[Query Expansion]         Haiku 產生同義詞，擴大 SQLite LIKE 命中率
     │
     ▼
-[Semantic Fallback]    LIKE 全部失配時，送 Haiku 比對實際實體清單（縮寫 / 別名 / 拼字相似）
-                       成功對應後寫入 entity_aliases 快取，下次相同縮寫直接查表，不再呼叫 API
+[Entity Extraction]       Regex 擷取商品 / 客戶 / 供應商名稱，SQLite LIKE 解析為 ID
     │
     ▼
-[Multi-model Routing]  Regex 判斷問題複雜度：簡單查詢 → Haiku，分析趨勢 → Sonnet
+[Semantic Fallback]       LIKE 全部失配時，送 Haiku 比對實際實體清單（縮寫 / 別名 / 拼字相似）
+                          成功對應後寫入 entity_aliases 快取，下次相同縮寫直接查表，不再呼叫 API
     │
     ▼
-[Adaptive Retrieval]   依主題（庫存/銷售/客戶/供應商）+ 實體 ID 動態查詢 SQLite
+[Adaptive Retrieval]      依主題（庫存/銷售/客戶/供應商）+ 實體 ID 動態查詢 SQLite
+  + Entity Feedback        實體被問 ≥ 2 次且平均忠實度 < 70 時，自動擴展為深度查詢
+                          （90 天銷售趨勢、近期採購/銷售明細），並更新 ai_entity_stats 統計
+    │
+    ▼（合併所有子問題 context，以標題標注子問題歸屬）
+[Multi-model Routing]     Regex 判斷問題複雜度：簡單查詢 → Haiku，分析趨勢 → Sonnet
     │
     ▼
-[Context Pruning]      Context 超過 2,500 字元時，以 Haiku 剪裁至最相關條目
-                       正常查詢不觸發（零額外消耗）；多主題 + 多實體大量命中時自動啟動
+[Context Pruning]         Context 超過 2,500 字元時，以 Haiku 剪裁至最相關條目
+                          正常查詢不觸發（零額外消耗）；多主題 + 多實體大量命中時自動啟動
     │
     ▼
-[Augmented Prompt]     查詢結果格式化為結構化 context 注入 system prompt
+[Augmented Prompt]        查詢結果格式化為結構化 context 注入 system prompt
     │
     ▼
-[Streaming Generation] Claude API 串流輸出，逐字即時顯示
+[Streaming Generation]    Claude API 串流輸出，逐字即時顯示
     │
     ▼
-[Faithfulness Scoring] 評分回答是否忠實於業務資料（0–100）
+[Faithfulness Scoring]    評分回答是否忠實於業務資料（0–100）
     │
     ▼
-[Citation Attribution] 解析 [SOURCES:] 標記，產生彩色引用來源徽章
+[Citation Attribution]    解析 [SOURCES:] 標記，產生彩色引用來源徽章
+    │
+    ▼
+[Entity Stats Update]     更新 ai_entity_stats（query_count + faith_sum），
+                          供下次 Adaptive Retrieval Entity Feedback 判斷使用
 ```
 
 #### 功能特色
@@ -317,12 +330,14 @@ description: 當使用者要求新增或修改 React 元件、頁面、表單或
 - **多模型路由**：純查詢問題使用 Haiku（低成本），含分析/趨勢/比較的複雜問題自動升級 Sonnet；回應 metadata 列顯示使用的模型
 - **實體擷取 + 語意消歧義**：自動識別問題中的商品/客戶/供應商名稱；LIKE 全部失配時啟動語意 fallback，以 Haiku 比對資料庫中的實際實體清單（支援縮寫、別名、拼字相似），對應結果持久化為 alias 快取，下次相同縮寫零 API 消耗直接命中
 - **自適應 Context 剪裁**：擷取資料量過大時（> 2,500 字元），自動以 Haiku 剪裁至與問題最相關的條目，避免稀釋回答焦點與截斷生成；正常查詢不觸發，零額外 API 消耗
+- **複合問題拆解（Query Decomposition）**：偵測含「和」「以及」「分別」等連接詞的複合問題，自動拆解為子問題並以 `Promise.all` 並行執行 Retrieval；各子問題 context 以區塊標題標注後合併，回答完整度大幅提升
+- **實體反饋自適應檢索（Entity Feedback Adaptive Retrieval）**：追蹤各商品/客戶/供應商的查詢次數與累積忠實度（`ai_entity_stats`）；同一實體被問 ≥ 2 次且平均忠實度 < 70 時，自動切換為深度查詢（90 天銷售趨勢、近期採購/銷售明細），讓 RAG 在使用中持續自我改善
 - **可排序互動表格**：AI 回答含有多欄比較資料時，自動渲染為可點擊欄位標題排序的互動式表格，附複製為 TSV 按鈕
 - **忠實度評分**：每則回答顯示彩色分數徽章（綠 ≥90 / 黃 ≥70 / 紅 <70）與說明
 - **Token 用量顯示**：顯示每次呼叫的 input / output token 消耗
 - **提示詞防護**：非進銷存問題自動攔截，不執行 Retrieval、不消耗主要 Token；攔截訊息同樣存入 Session 歷史
 - **錯誤重試**：API 失敗時顯示錯誤並附「重試」按鈕
-- **Word 匯出**：對話記錄匯出為 `.docx`，Markdown 表格正確渲染為 Word 表格
+- **Word 報告匯出**：對話記錄匯出為 `.docx`，包含封面頁（導出日期、對話輪數、平均忠實度評級）、每則 AI 回答的 metadata 列（時間戳、模型名稱、忠實度分數、input/output token 數量）、引用來源、延伸問題；Markdown 表格正確渲染為 Word 表格
 - **動態高度**：聊天面板自動填滿視窗剩餘空間，輸入框不超出畫面
 - **⌘/Ctrl+Enter 送出**，Enter 換行
 

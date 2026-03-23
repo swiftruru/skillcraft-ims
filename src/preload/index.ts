@@ -151,7 +151,18 @@ const electronAPI = {
     adjustments: () => ipcRenderer.invoke('export:adjustments'),
     report: (days?: number) => ipcRenderer.invoke('export:report', days),
     aiReport: () => ipcRenderer.invoke('export:aiReport'),
-    aiChat: (messages: { role: 'user' | 'assistant'; content: string; context?: string }[]) =>
+    aiChat: (messages: {
+        role: 'user' | 'assistant'
+        content: string
+        context?: string
+        faithfulness?: { score: number; note: string }
+        modelUsed?: string
+        inputTokens?: number
+        outputTokens?: number
+        createdAt?: string
+        sources?: string[]
+        followups?: string[]
+      }[]) =>
       ipcRenderer.invoke('export:aiChat', messages)
   },
 
