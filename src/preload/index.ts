@@ -224,7 +224,9 @@ const electronAPI = {
     getSessionMessages: (sessionId: number) => ipcRenderer.invoke('ai:getSessionMessages', sessionId),
     createSession: () => ipcRenderer.invoke('ai:createSession'),
     deleteSession: (sessionId: number) => ipcRenderer.invoke('ai:deleteSession', sessionId),
-    getQualityStats: () => ipcRenderer.invoke('ai:getQualityStats')
+    getQualityStats: () => ipcRenderer.invoke('ai:getQualityStats'),
+    getEntityStats: () => ipcRenderer.invoke('ai:getEntityStats'),
+    getLowFaithMessages: () => ipcRenderer.invoke('ai:getLowFaithMessages')
   },
 
   // Notifications

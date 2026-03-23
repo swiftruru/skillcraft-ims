@@ -1,0 +1,1 @@
+ALTER TABLE ai_chat_messages ADD COLUMN is_compound INTEGER NOT NULL DEFAULT 0;

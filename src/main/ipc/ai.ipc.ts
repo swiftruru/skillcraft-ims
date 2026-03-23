@@ -1186,8 +1186,8 @@ ${salesData
       db.prepare(`INSERT INTO ai_chat_messages (session_id, role, content) VALUES (?, 'user', ?)`)
         .run(sessionId, question)
       db.prepare(
-        `INSERT INTO ai_chat_messages (session_id, role, content, context, followups, faithfulness_score, model_used, input_tokens, output_tokens, sources) VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(sessionId, answer, context, JSON.stringify(followups), faithfulness.score, selectedModel, inputTokens, outputTokens, JSON.stringify(sources))
+        `INSERT INTO ai_chat_messages (session_id, role, content, context, followups, faithfulness_score, model_used, input_tokens, output_tokens, sources, is_compound) VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(sessionId, answer, context, JSON.stringify(followups), faithfulness.score, selectedModel, inputTokens, outputTokens, JSON.stringify(sources), isCompound ? 1 : 0)
       if (isFirstMessage) {
         const title = question.length > 30 ? question.slice(0, 30) + '…' : question
         db.prepare(`UPDATE ai_chat_sessions SET title = ?, updated_at = datetime('now') WHERE id = ?`)
@@ -1215,7 +1215,8 @@ ${salesData
         COUNT(*) FILTER (WHERE role='assistant' AND model_used LIKE '%sonnet%' AND input_tokens > 0) AS sonnetCount,
         COUNT(*) FILTER (WHERE role='assistant' AND faithfulness_score >= 90 AND input_tokens > 0) AS faithHigh,
         COUNT(*) FILTER (WHERE role='assistant' AND faithfulness_score >= 70 AND faithfulness_score < 90 AND input_tokens > 0) AS faithMid,
-        COUNT(*) FILTER (WHERE role='assistant' AND faithfulness_score < 70 AND input_tokens > 0) AS faithLow
+        COUNT(*) FILTER (WHERE role='assistant' AND faithfulness_score < 70 AND input_tokens > 0) AS faithLow,
+        COUNT(*) FILTER (WHERE role='assistant' AND is_compound = 1 AND input_tokens > 0) AS decompoundCount
       FROM ai_chat_messages
     `).get() as Record<string, number>
 
@@ -1236,7 +1237,60 @@ ${salesData
       GROUP BY DATE(created_at) ORDER BY date ASC
     `).all() as { date: string; count: number }[]
 
-    return { ...totals, sourceCounts, daily }
+    const faithTrend = db.prepare(`
+      SELECT DATE(created_at) as date,
+             ROUND(AVG(faithfulness_score), 1) as avg_faith
+      FROM ai_chat_messages
+      WHERE role = 'assistant' AND input_tokens > 0
+        AND created_at >= DATE('now', '-13 days')
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `).all() as { date: string; avg_faith: number }[]
+
+    return { ...totals, sourceCounts, daily, faithTrend }
+  })
+
+  // ── Entity Hotspot Stats ─────────────────────────────────────────────────
+  ipcMain.handle('ai:getEntityStats', () => {
+    const db = getDb()
+    type EntityRow = { entity_type: string; name: string; query_count: number; avg_faith: number; last_queried: number }
+    const products = db.prepare(`
+      SELECT 'product' as entity_type, p.name, s.query_count,
+             ROUND(CAST(s.faith_sum AS REAL) / s.query_count, 1) as avg_faith,
+             s.last_queried
+      FROM ai_entity_stats s JOIN products p ON s.entity_id = p.id
+      WHERE s.entity_type = 'product'
+      ORDER BY s.query_count DESC LIMIT 5
+    `).all() as EntityRow[]
+    const customers = db.prepare(`
+      SELECT 'customer' as entity_type, c.name, s.query_count,
+             ROUND(CAST(s.faith_sum AS REAL) / s.query_count, 1) as avg_faith,
+             s.last_queried
+      FROM ai_entity_stats s JOIN customers c ON s.entity_id = c.id
+      WHERE s.entity_type = 'customer'
+      ORDER BY s.query_count DESC LIMIT 5
+    `).all() as EntityRow[]
+    const suppliers = db.prepare(`
+      SELECT 'supplier' as entity_type, s2.name, s.query_count,
+             ROUND(CAST(s.faith_sum AS REAL) / s.query_count, 1) as avg_faith,
+             s.last_queried
+      FROM ai_entity_stats s JOIN suppliers s2 ON s.entity_id = s2.id
+      WHERE s.entity_type = 'supplier'
+      ORDER BY s.query_count DESC LIMIT 5
+    `).all() as EntityRow[]
+    return { products, customers, suppliers }
+  })
+
+  // ── Low Faithfulness Message Review ──────────────────────────────────────
+  ipcMain.handle('ai:getLowFaithMessages', () => {
+    const db = getDb()
+    return db.prepare(`
+      SELECT m.id, m.content, m.faithfulness_score, m.created_at, ses.title
+      FROM ai_chat_messages m
+      JOIN ai_chat_sessions ses ON m.session_id = ses.id
+      WHERE m.role = 'assistant' AND m.faithfulness_score < 70 AND m.input_tokens > 0
+      ORDER BY m.created_at DESC LIMIT 20
+    `).all() as { id: number; content: string; faithfulness_score: number; created_at: string; title: string }[]
   })
 
   ipcMain.handle('ai:previewScope', (_e, params: ForecastParams = {}) => {

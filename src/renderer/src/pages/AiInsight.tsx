@@ -28,6 +28,8 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -214,6 +216,7 @@ export default function AiInsight(): React.JSX.Element {
   const [exportPending, setExportPending] = useState(false)
   const [exportChatPending, setExportChatPending] = useState(false)
   const [applyConfirmOpen, setApplyConfirmOpen] = useState(false)
+  const [expandedLowIds, setExpandedLowIds] = useState<Set<number>>(new Set())
 
   // Chat (RAG) state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -247,6 +250,18 @@ export default function AiInsight(): React.JSX.Element {
   const { data: qualityStats } = useQuery({
     queryKey: ['ai', 'qualityStats'],
     queryFn: () => window.electronAPI.ai.getQualityStats(),
+    enabled: activeTab === 'quality',
+    staleTime: 0
+  })
+  const { data: entityStats } = useQuery({
+    queryKey: ['ai', 'entityStats'],
+    queryFn: () => window.electronAPI.ai.getEntityStats(),
+    enabled: activeTab === 'quality',
+    staleTime: 0
+  })
+  const { data: lowFaithMsgs } = useQuery({
+    queryKey: ['ai', 'lowFaithMessages'],
+    queryFn: () => window.electronAPI.ai.getLowFaithMessages(),
     enabled: activeTab === 'quality',
     staleTime: 0
   })
@@ -1238,6 +1253,9 @@ export default function AiInsight(): React.JSX.Element {
             const pct = (n: number) => faithTotal > 0 ? Math.round((n / faithTotal) * 100) : 0
             const haikuPct = totalAnswered > 0 ? Math.round((qs.haikuCount / totalAnswered) * 100) : 0
             const sourceMax = Math.max(...Object.values(qs.sourceCounts), 1)
+            const decompoundPct = faithTotal > 0 ? Math.round((qs.decompoundCount / faithTotal) * 100) : 0
+            const faithBadge = (score: number) =>
+              score >= 90 ? 'bg-green-100 text-green-700' : score >= 70 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
 
             return (
               <>
@@ -1247,18 +1265,19 @@ export default function AiInsight(): React.JSX.Element {
                     { label: '總問答數', value: qs.totalQuestions, sub: `含 ${qs.guardBlocked} 次攔截` },
                     { label: '平均忠實度', value: qs.avgFaithfulness != null ? `${qs.avgFaithfulness} / 100` : '—', sub: faithTotal > 0 ? `共 ${faithTotal} 則回答` : '尚無資料' },
                     { label: 'Guard 攔截率', value: `${guardRate}%`, sub: `${qs.guardBlocked} / ${qs.totalQuestions} 次` },
-                    { label: '平均 Token / 回答', value: qs.avgInputTokens != null ? `${Math.round(Number(qs.avgInputTokens)).toLocaleString()}` : '—', sub: qs.avgOutputTokens != null ? `輸出 ${Math.round(Number(qs.avgOutputTokens))} tokens` : '' }
-                  ].map(({ label, value, sub }) => (
+                    { label: '平均 Token / 回答', value: qs.avgInputTokens != null ? `${Math.round(Number(qs.avgInputTokens)).toLocaleString()}` : '—', sub: qs.avgOutputTokens != null ? `輸出 ${Math.round(Number(qs.avgOutputTokens))} tokens` : '', extra: `複合拆解 ${qs.decompoundCount} 次（${decompoundPct}%）` }
+                  ].map(({ label, value, sub, extra }) => (
                     <Card key={label} className="p-4">
                       <p className="text-xs text-muted-foreground mb-1">{label}</p>
                       <p className="text-2xl font-bold tabular-nums">{value}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+                      {extra && <p className="text-xs text-muted-foreground mt-0.5">· {extra}</p>}
                     </Card>
                   ))}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Left column: bar stats */}
+                  {/* Left column: stats */}
                   <div className="space-y-4">
                     {/* Faithfulness distribution */}
                     <Card className="p-4">
@@ -1314,30 +1333,113 @@ export default function AiInsight(): React.JSX.Element {
                         ))}
                       </div>
                     </Card>
+
+                    {/* Entity hotspot */}
+                    {entityStats && (entityStats.products.length > 0 || entityStats.customers.length > 0 || entityStats.suppliers.length > 0) && (
+                      <Card className="p-4">
+                        <p className="text-sm font-medium mb-3">實體查詢熱點</p>
+                        <div className="space-y-3">
+                          {([
+                            { label: '商品', rows: entityStats.products },
+                            { label: '客戶', rows: entityStats.customers },
+                            { label: '供應商', rows: entityStats.suppliers }
+                          ] as { label: string; rows: { name: string; query_count: number; avg_faith: number }[] }[])
+                            .filter(({ rows }) => rows.length > 0)
+                            .map(({ label, rows }) => (
+                              <div key={label}>
+                                <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                                <div className="space-y-1">
+                                  {rows.map((r) => (
+                                    <div key={r.name} className="flex items-center gap-2">
+                                      <span className="text-xs flex-1 truncate">{r.name}</span>
+                                      <span className="text-xs text-muted-foreground tabular-nums">{r.query_count} 次</span>
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium tabular-nums ${faithBadge(r.avg_faith)}`}>{r.avg_faith}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      </Card>
+                    )}
                   </div>
 
-                  {/* Right column: 7-day trend */}
-                  <Card className="p-4">
-                    <p className="text-sm font-medium mb-3">近 7 天問答趨勢</p>
-                    {qs.daily.length === 0 ? (
-                      <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">尚無資料</div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={240}>
-                        <BarChart data={qs.daily} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                          <Tooltip
-                            contentStyle={{ fontSize: 12 }}
-                            formatter={(v: number) => [`${v} 次`, '問答數']}
-                            labelFormatter={(l) => `日期：${l}`}
-                          />
-                          <Bar dataKey="count" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </Card>
+                  {/* Right column: charts */}
+                  <div className="space-y-4">
+                    <Card className="p-4">
+                      <p className="text-sm font-medium mb-3">近 7 天問答趨勢</p>
+                      {qs.daily.length === 0 ? (
+                        <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">尚無資料</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={180}>
+                          <BarChart data={qs.daily} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                            <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+                            <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                            <Tooltip
+                              contentStyle={{ fontSize: 12 }}
+                              formatter={(v: number) => [`${v} 次`, '問答數']}
+                              labelFormatter={(l) => `日期：${l}`}
+                            />
+                            <Bar dataKey="count" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </Card>
+
+                    <Card className="p-4">
+                      <p className="text-sm font-medium mb-3">近 14 天忠實度趨勢</p>
+                      {qs.faithTrend.length === 0 ? (
+                        <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">尚無資料</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={160}>
+                          <LineChart data={qs.faithTrend} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                            <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+                            <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
+                            <Tooltip
+                              contentStyle={{ fontSize: 12 }}
+                              formatter={(v: number) => [`${v}`, '平均忠實度']}
+                              labelFormatter={(l) => `日期：${l}`}
+                            />
+                            <Line type="monotone" dataKey="avg_faith" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      )}
+                    </Card>
+                  </div>
                 </div>
+
+                {/* Low faithfulness review */}
+                {lowFaithMsgs && lowFaithMsgs.length > 0 && (
+                  <Card className="p-4">
+                    <p className="text-sm font-medium mb-3">低忠實度問答 Review（&lt; 70）— 共 {lowFaithMsgs.length} 則</p>
+                    <div className="space-y-2">
+                      {lowFaithMsgs.map((m) => {
+                        const isExpanded = expandedLowIds.has(m.id)
+                        return (
+                          <div
+                            key={m.id}
+                            className="flex flex-col gap-1 border rounded-md px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => setExpandedLowIds((prev) => {
+                              const next = new Set(prev)
+                              if (next.has(m.id)) next.delete(m.id); else next.add(m.id)
+                              return next
+                            })}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium tabular-nums shrink-0 ${faithBadge(m.faithfulness_score)}`}>{m.faithfulness_score}</span>
+                              <span className="text-xs flex-1 truncate">{isExpanded ? m.content : m.content.slice(0, 60) + (m.content.length > 60 ? '…' : '')}</span>
+                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5 shrink-0 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">對話：{m.title} · {m.created_at.slice(0, 10)}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </Card>
+                )}
               </>
             )
           })()}
