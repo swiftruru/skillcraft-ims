@@ -23,6 +23,13 @@ import aiForecastsSql from './migrations/018_ai_forecasts.sql?raw'
 import orderLineDiscountSql from './migrations/019_order_line_discount.sql?raw'
 import aiChatSessionsSql from './migrations/020_ai_chat_sessions.sql?raw'
 import aiChatFollowupsSql from './migrations/021_ai_chat_followups.sql?raw'
+import aiChatStatsSql from './migrations/022_ai_chat_stats.sql?raw'
+import aiChatSummaryCacheSql from './migrations/023_ai_chat_summary_cache.sql?raw'
+import entityAliasesSql from './migrations/024_entity_aliases.sql?raw'
+import aiEntityStatsSql from './migrations/025_ai_entity_stats.sql?raw'
+import aiMessageCompoundSql from './migrations/026_ai_message_compound.sql?raw'
+import purchaseTemplatesSql from './migrations/027_purchase_templates.sql?raw'
+import customerPointsSql from './migrations/028_customer_points.sql?raw'
 
 let db: Database.Database | null = null
 
@@ -107,6 +114,13 @@ async function runMigrations(database: Database.Database): Promise<void> {
     { name: '019_order_line_discount', sql: orderLineDiscountSql },
     { name: '020_ai_chat_sessions', sql: aiChatSessionsSql },
     { name: '021_ai_chat_followups', sql: aiChatFollowupsSql },
+    { name: '022_ai_chat_stats', sql: aiChatStatsSql },
+    { name: '023_ai_chat_summary_cache', sql: aiChatSummaryCacheSql },
+    { name: '024_entity_aliases', sql: entityAliasesSql },
+    { name: '025_ai_entity_stats', sql: aiEntityStatsSql },
+    { name: '026_ai_message_compound', sql: aiMessageCompoundSql },
+    { name: '027_purchase_templates', sql: purchaseTemplatesSql },
+    { name: '028_customer_points', sql: customerPointsSql },
   ]
 
   for (const migration of migrations) {

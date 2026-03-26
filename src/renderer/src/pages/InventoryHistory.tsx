@@ -8,6 +8,27 @@ import { useToast } from '@/components/ui/use-toast'
 import type { InventoryAdjustment } from '@/types/schema'
 import { useLang } from '@/lib/useLang'
 
+const DATE_PRESETS = [
+  { label: '今天', days: 0 },
+  { label: '本週', days: 7 },
+  { label: '本月', days: 30, offsetMonth: 0 as number | undefined },
+  { label: '上月', offsetMonth: -1 as number | undefined },
+  { label: '近90天', days: 90 }
+]
+
+function calcPreset(days?: number, offsetMonth?: number): { from: string; to: string } {
+  const today = new Date()
+  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  if (offsetMonth === -1) {
+    const first = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    const last = new Date(today.getFullYear(), today.getMonth(), 0)
+    return { from: fmt(first), to: fmt(last) }
+  }
+  if (days === 0) return { from: fmt(today), to: fmt(today) }
+  const from = new Date(today); from.setDate(from.getDate() - (days ?? 30))
+  return { from: fmt(from), to: fmt(today) }
+}
+
 const REASONS = ['盤點修正', '損耗報廢', '樣品出貨', '退貨入庫', '系統校正', '其他']
 
 function DeltaCell({ delta }: { delta: number }) {
@@ -120,6 +141,22 @@ export default function InventoryHistory() {
               <X className="w-4 h-4" />
             </button>
           )}
+        </div>
+        {/* Date presets */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {DATE_PRESETS.map((preset) => {
+            const { from, to } = calcPreset(preset.days, preset.offsetMonth)
+            const active = dateFrom === from && dateTo === to
+            return (
+              <button
+                key={preset.label}
+                className={`text-xs px-2.5 py-0.5 rounded-full border transition-colors ${active ? 'bg-primary/15 text-primary border-primary/30' : 'border-border bg-muted/40 hover:bg-muted text-muted-foreground'}`}
+                onClick={() => { setDateFrom(from); setDateTo(to) }}
+              >
+                {preset.label}
+              </button>
+            )
+          })}
         </div>
         <Button variant="outline" onClick={handleExport} className="gap-2 ml-auto">
           <Download className="w-4 h-4" />
